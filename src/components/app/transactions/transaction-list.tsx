@@ -215,7 +215,7 @@ function DayBand({ columnCount, label, figureLabel, figure }: DayBandProps) {
       <td colSpan={columnCount} className="p-0 max-sm:block">
         <div
           style={{ height: DAY_BAND_HEIGHT_PX }}
-          className="flex justify-between gap-3 bg-surface-sunken ps-12 pe-13 shadow-[inset_0_1px_0_0_var(--color-border-strong),inset_0_-1px_0_0_var(--color-border-panel)] sm:ps-15 sm:pe-14"
+          className="flex items-center justify-between gap-3 bg-surface-sunken ps-12 pe-13 shadow-[inset_0_1px_0_0_var(--color-border-strong),inset_0_-1px_0_0_var(--color-border-panel)] sm:ps-15 sm:pe-14"
         >
           <span
             className={cn(
@@ -718,7 +718,7 @@ export function TransactionList({
                 <Checkbox
                   excludeFromTabOrder
                   // See `transaction-row.tsx`: a label-less checkbox is 18px wide, and
-                  // `target-min-h` only grows the axis that was already big enough.
+                  // `target-min` grows the hit area without stretching the 40px line.
                   className="target-min"
                   isSelected={allLoadedSelected}
                   isIndeterminate={someSelected}
@@ -737,15 +737,15 @@ export function TransactionList({
               )}
             >
               {/* The sort control fills the rule. Its line box is the arrow's height, so the arrow
-                  is sized to the type and the box set on the rule, which puts the word on the
-                  same baseline as the typed headings beside it. `flex` rather than inline, or the
+                  is sized to the type and the box centred on the rule, which puts the word on the
+                  same centre line as the typed headings beside it. `flex` rather than inline, or the
                   cell's own line box would add a descender under the forty pixels. */}
               <Button
                 variant="ghost"
                 size="sm"
                 excludeFromTabOrder
                 onPress={toggleDateSort}
-                className="-mx-1 flex h-10 items-end px-1 text-micro leading-none tracking-label uppercase [&_svg]:size-3.5"
+                className="-mx-1 flex h-10 items-center px-1 text-micro leading-none tracking-label uppercase [&_svg]:size-3.5"
                 iconAfter={
                   sort.field === 'bookedOn' && sort.direction === 'asc' ? (
                     <ArrowUp />

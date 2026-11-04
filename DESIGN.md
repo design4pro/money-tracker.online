@@ -478,10 +478,10 @@ few characters but never by a pixel of height. `h1`-`h3` take the display face a
 ### Named Rules
 
 **The Typed Line Rule.** A line of the passbook is a 2.5rem box - one rule of the form - and its
-baseline sits 3px above the printed rule, placed by a translate (`translate-y-[calc(1rem-0.22em)]`
-for the typewriter at label size) so paint moves and layout does not. A cell has no vertical
-padding, and the rule under it is drawn as an inset one-pixel shadow rather than a border so it
-adds no height and the table never walks off the pitch.
+type sits vertically centred in that box. A cell has no vertical padding, and the rule under it
+is drawn as an inset one-pixel shadow rather than a border so it adds no height and the table
+never walks off the pitch. (Owner decision, 2026-11-03: centre the type rather than set its
+baseline 3px above the printed rule.)
 
 **The Hand-On-Rules Rule.** A handwritten heading on ruled paper is placed on the rules the same
 way: the hero by `translate-y-[calc(2.5rem-0.33em)]`, a title by `leading-10` plus
@@ -531,8 +531,9 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   `border-panel` rule that is the foot of the form - the same rule that sits under the column
   headings. When the last entry is planned, the balance carried forward is written in pencil
   like the line that produced it, and the page is not marked.
-- **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
-  `border-t` rule under each - never three tiles.
+- **The summary strip**: a `dl` of three items, each a small label over its figure, one pattern
+  for every item, the strip's items vertically centred - never three tiles. (Owner decision,
+  2026-11-03.)
 - **Three width bands, and nothing improvised between them**. A block states which band it belongs
   to; a screen that names none inherits the shell column and spans it, which is how a row carrying
   four short facts comes to draw a rule across 1150px of nothing.
@@ -1322,8 +1323,8 @@ opacity only.
 ### Signature: the typed line
 
 The unit the whole world is built from (`TYPED_LINE` in `src/routes/-ui/ledger-preview.tsx`). A
-2.5rem line box in the typewriter at label size, baseline 3px above the printed rule by a translate,
-no vertical padding, the rule drawn as an inset one-pixel shadow on the cell's last pixel row. On
+2.5rem line box in the typewriter at label size, type vertically centred in the box, no vertical
+padding, the rule drawn as an inset one-pixel shadow on the cell's last pixel row. On
 the wide page every entry is one such line: date in caption `ink-2`, description in `ink` with its
 category after a middle dot in `ink-2`, amount end-aligned in its tone, and the balance-after column
 behind the 2px `border-panel` spine. The opening balance is a line with no amount, and it wears
@@ -1361,8 +1362,8 @@ still fire.
 
 - **Do** set every heading, margin note and section title in Caveat, and every figure, label,
   control and paragraph in Courier Prime.
-- **Do** put a line of the passbook in a 2.5rem box with its baseline 3px above the rule by a
-  translate, and draw the rule under a cell as an inset one-pixel shadow.
+- **Do** put a line of the passbook in a 2.5rem box with its type vertically centred in the
+  rule, and draw the rule under a cell as an inset one-pixel shadow.
 - **Do** build a section, a list or a summary as headings over bodies on `border-t` rules; reach
   for a card only when the content needs its own ground.
 - **Do** spend violet on actions and on what is settled - the primary button, links, the current
@@ -1387,10 +1388,12 @@ still fire.
 ### Don't:
 
 - **Don't** place an eyebrow, kicker or uppercase label above a heading. Micro uppercase is for a
-  column heading or a `dt` on the same line as its figure, never a line above a title.
+  column heading or a `dt` beside or above its figure, never a line above a title.
 - **Don't** use cards as the scaffold of a page, or a grid of equal icon cards as a section.
-- **Don't** build a hero-metric tile - a big number over a small label. A figure is a typed line
-  with its label at the start and the figure at the end.
+- **Don't** build a hero-metric tile - a card or tile of a big number over a small label. A
+  figure elsewhere is a typed line with its label at the start and the figure at the end. The
+  totals strip is the documented exception (owner decision, 2026-11-03): there the label sits
+  over the figure, still as items of a `dl`, never as cards.
 - **Don't** set a figure in the hand or a heading in the typewriter.
 - **Don't** use gradient text, glass, blur, a translucent bar, or a hard offset shadow anywhere.
 - **Don't** put a coloured border wider than 1px on a card, list item, callout or alert, or mark
