@@ -137,7 +137,9 @@ import {
 import { isSuppressed, suppress } from '../email-suppressions'
 import * as emailSuppressions from '../email-suppressions'
 import {
+  createOauthGrant,
   createPatGrant,
+  findOauthGrantByClient,
   findPatGrantByTokenHash,
   listGrants,
   revokeGrant,
@@ -4438,5 +4440,31 @@ describe('agent grants cannot be listed or revoked across a workspace boundary',
     await revokeGrant(world.scope, { grantId: minted.grant.id }, budgetWorldNow)
     expect(await findPatGrantByTokenHash(world.db, minted.secret)).toBeNull()
     expect(await findPatGrantByTokenHash(world.db, 'not-a-token')).toBeNull()
+  })
+
+  it('does not resolve B’s OAuth client as A’s grant', async () => {
+    const world = await createBudgetWorld()
+    await createOauthGrant(
+      world.otherScope,
+      {
+        name: 'B connector',
+        clientId: 'client-b',
+        scopes: [...scopes],
+      },
+      budgetWorldNow,
+    )
+
+    expect(
+      await findOauthGrantByClient(world.db, {
+        userId: 'user-a',
+        clientId: 'client-b',
+      }),
+    ).toBeNull()
+    const theirs = await findOauthGrantByClient(world.db, {
+      userId: 'user-b',
+      clientId: 'client-b',
+    })
+    expect(theirs?.organizationId).toBe('org-b')
+    expect(theirs?.kind).toBe('oauth')
   })
 })

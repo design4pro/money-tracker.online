@@ -2,13 +2,13 @@
  * Agent grants: one user, one workspace, a closed set of `resource:verb` scopes.
  *
  * Personal tokens are hashed (SHA-256) and shown once. OAuth rows are the same table with a
- * `client_id` and no secret; Phase 2 writes those. SQL for tenant rows goes through
- * {@link createTenantRepository}. The one exception is {@link findPatGrantByTokenHash}: the
- * tenant is the *result* of the lookup, so it takes a {@link Database} and matches on
- * `token_hash` only. It does not fork `tenantFilter`.
+ * `client_id` and no secret. SQL for tenant rows goes through
+ * {@link createTenantRepository}. The exceptions are {@link findPatGrantByTokenHash} and
+ * {@link findOauthGrantByClient}: the tenant is the *result* of the lookup, so they take a
+ * {@link Database} and match on the presented credential. They do not fork `tenantFilter`.
  */
 
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -53,6 +53,16 @@ export const createPatGrantSchema = z.strictObject({
   environment: z.enum(AGENT_PAT_ENVIRONMENTS),
 })
 export type CreatePatGrantInput = z.infer<typeof createPatGrantSchema>
+
+export const createOauthGrantSchema = z.strictObject({
+  name: z.string().trim().min(1).max(80),
+  clientId: z.string().trim().min(1).max(256),
+  scopes: z
+    .array(z.enum(AGENT_SCOPE_TUPLE))
+    .min(1)
+    .max(AGENT_SCOPE_VALUES.length),
+})
+export type CreateOauthGrantInput = z.infer<typeof createOauthGrantSchema>
 
 export const revokeGrantSchema = z.strictObject({
   grantId: z.string().trim().min(1).max(64),
@@ -172,6 +182,31 @@ export async function createPatGrant(
   return { grant: toView(row), secret }
 }
 
+/** Owner/admin: persist an OAuth grant for one client in this workspace. */
+export async function createOauthGrant(
+  scope: TenantScope,
+  input: CreateOauthGrantInput,
+  now: Date,
+): Promise<AgentGrantView> {
+  assertRole(scope, 'create an agent grant', 'admin')
+  const parsed = createOauthGrantSchema.parse(input)
+  const scopes = uniqueSortedScopes(parsed.scopes)
+  const row = await grantAccess.insert(scope, {
+    id: newId(),
+    userId: scope.ctx.userId,
+    kind: 'oauth',
+    name: parsed.name,
+    clientId: parsed.clientId,
+    tokenHash: null,
+    tokenPrefix: null,
+    scopes: JSON.stringify(scopes),
+    createdAt: now,
+    revokedAt: null,
+    lastUsedAt: null,
+  })
+  return toView(row)
+}
+
 /** Owner/admin: every grant in this workspace, including revoked ones. */
 export async function listGrants(
   scope: TenantScope,
@@ -221,5 +256,33 @@ export async function findPatGrantByTokenHash(
   if (!row || row.tokenHash === null) return null
   if (!hashesEqual(row.tokenHash, tokenHash)) return null
   if (row.revokedAt) return null
+  return row
+}
+
+/**
+ * Resolve a verified OAuth client to its grant row, or `null`.
+ *
+ * Revoked and unknown pairs are the same answer. The tenant is whatever row
+ * matches this user and client.
+ */
+export async function findOauthGrantByClient(
+  db: Database,
+  input: { userId: string; clientId: string },
+): Promise<AgentGrantRow | null> {
+  const userId = z.string().trim().min(1).max(64).parse(input.userId)
+  const clientId = z.string().trim().min(1).max(256).parse(input.clientId)
+  const rows = await db
+    .select()
+    .from(agentGrants)
+    .where(
+      and(
+        eq(agentGrants.userId, userId),
+        eq(agentGrants.clientId, clientId),
+        eq(agentGrants.kind, 'oauth'),
+      ),
+    )
+    .limit(1)
+  const row = rows[0]
+  if (!row || row.revokedAt) return null
   return row
 }
