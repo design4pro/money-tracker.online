@@ -48,7 +48,7 @@ no MCP traffic yet. `/api/mcp` does not exist after this phase.
 
 ## Progress
 
-PR: #pending
+PR: #847
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
