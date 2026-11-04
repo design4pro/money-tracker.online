@@ -24,12 +24,26 @@ export class McpDeniedError extends Error {
   }
 }
 
+export class McpRateLimitedError extends Error {
+  readonly retryAfterSec: number
+
+  constructor(retryAfterSec: number) {
+    super('rate_limited')
+    this.name = 'McpRateLimitedError'
+    this.retryAfterSec = retryAfterSec
+  }
+}
+
 export interface McpToolFailure {
   readonly kind: McpToolErrorKind
+  readonly retryAfterSec?: number
 }
 
 export function mcpToolFailureOf(error: unknown): McpToolFailure {
   if (error instanceof McpDeniedError) return { kind: 'denied' }
+  if (error instanceof McpRateLimitedError) {
+    return { kind: 'rate_limited', retryAfterSec: error.retryAfterSec }
+  }
   if (error instanceof ZodError) return { kind: 'invalid' }
   const classified = classifyFailure(error)
   switch (classified.kind) {
