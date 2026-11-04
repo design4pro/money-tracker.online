@@ -37,7 +37,7 @@
  * the day one is revised. {@link resolvePrefs} is what makes that invisible to a caller.
  */
 
-import { eq, inArray, isNull } from 'drizzle-orm'
+import { eq, gte, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { NOTIFICATION_KIND_IDS } from '#/lib/enums'
@@ -162,6 +162,28 @@ export async function getNotification(
   id: string,
 ): Promise<NotificationRow | null> {
   return notificationRepo.findById(scope, rowId.parse(id))
+}
+
+const sinceSchema = z.date()
+
+/**
+ * Unread notifications for one member of this workspace, written at or after `since`.
+ *
+ * The nightly digest is the caller: it asks about an addressee, not about the cron principal,
+ * which is why `forUserId` is a parameter rather than `scope.ctx.userId`.
+ */
+export async function listUnreadForSince(
+  scope: TenantScope,
+  forUserId: string,
+  since: Date,
+): Promise<ReadonlyArray<NotificationRow>> {
+  return notificationRepo.findMany(scope, {
+    where: allOf(
+      eq(notifications.userId, userId.parse(forUserId)),
+      isNull(notifications.readAt),
+      gte(notifications.createdAt, sinceSchema.parse(since)),
+    ),
+  })
 }
 
 /** How many of this reader's notifications are unread. The number in the badge. */

@@ -7,10 +7,13 @@
  */
 
 import { createTranslator, loadCatalogue } from '#/lib/i18n'
+import { deepLinkPath } from '#/server/email/deep-link'
+import { selectDigestContent } from '#/server/email/digest-items'
 import { resolveRecipientLocale } from '#/server/email/locale'
 import { hashRecipient } from '#/server/email/recipient-hash'
 import { renderEmail } from '#/server/email/render'
 import { sendEmail } from '#/server/email/send'
+import { digestEmail } from '#/server/email/templates/digest'
 import { notificationEmail } from '#/server/email/templates/notification'
 import {
   listUnsubscribeHeaders,
@@ -34,7 +37,8 @@ import type { StoredLocaleSeam } from '#/server/email/locale'
 import type { EmailTransport } from '#/server/email/send'
 import type { UnsubscribeKeys } from '#/server/email/unsubscribe-token'
 import type { Logger } from '#/server/observability/logger'
-import type { Database } from '#/server/repos/base'
+import type { Database, TenantScope } from '#/server/repos/base'
+import type { EmailDeliveryRow } from '#/server/db/schema'
 
 export class NotifyEmailRetryError extends Error {
   constructor(message = 'notification email send is retryable') {
@@ -76,27 +80,8 @@ function absoluteUrl(appUrl: string, path: string): string {
   return path.startsWith('/') ? `${origin}${path}` : `${origin}/${path}`
 }
 
-function deepLinkOf(kind: NotificationKind, payload: unknown): string {
-  switch (kind) {
-    case 'budget.threshold_crossed':
-      return NOTIFICATION_KINDS[kind].deepLink(
-        NOTIFICATION_KINDS[kind].payload.parse(payload),
-      )
-    case 'budget.exceeded':
-      return NOTIFICATION_KINDS[kind].deepLink(
-        NOTIFICATION_KINDS[kind].payload.parse(payload),
-      )
-    case 'recurring.due_soon':
-    case 'recurring.overdue':
-      return NOTIFICATION_KINDS[kind].deepLink(
-        NOTIFICATION_KINDS[kind].payload.parse(payload),
-      )
-    case 'goal.reached':
-      return NOTIFICATION_KINDS[kind].deepLink(
-        NOTIFICATION_KINDS[kind].payload.parse(payload),
-      )
-  }
-}
+const DAY_MS = 24 * 60 * 60 * 1000
+const DEFERRED_TTL_MS = 48 * 60 * 60 * 1000
 
 export async function handleNotifyEmail(
   args: NotifyEmailArgs,
@@ -115,10 +100,6 @@ export async function handleNotifyEmail(
     throw new Error('notify.email organizationId disagrees with the row')
   }
 
-  if (delivery.kind === 'digest') {
-    throw new Error('digest email is not installed')
-  }
-
   if (!(await isMember(scope, delivery.userId))) {
     await markDelivery(
       scope,
@@ -127,6 +108,10 @@ export async function handleNotifyEmail(
       'queued',
     )
     return 'not-member'
+  }
+
+  if (delivery.kind === 'digest') {
+    return sendDigestEmail(args, scope, delivery)
   }
 
   if (delivery.notificationId === null) {
@@ -248,7 +233,7 @@ export async function handleNotifyEmail(
       locale,
       actionHref: absoluteUrl(
         args.appUrl,
-        deepLinkOf(claimed.kind, parsed.data),
+        deepLinkPath(claimed.kind, parsed.data) ?? '/',
       ),
       workspaceName: await workspaceName(scope),
       unsubscribe,
@@ -304,6 +289,175 @@ export async function handleNotifyEmail(
   }
 
   args.logger.warn('notification email deferred', {
+    deliveryId: claimed.id,
+    kind: result.kind,
+    status: result.status,
+  })
+  await markDelivery(scope, claimed.id, { status: 'queued', toHash }, 'sending')
+  throw new NotifyEmailRetryError()
+}
+
+async function sendDigestEmail(
+  args: NotifyEmailArgs,
+  scope: TenantScope,
+  delivery: EmailDeliveryRow,
+): Promise<NotifyEmailOutcome> {
+  const claimed = await claimDelivery(scope, delivery.id)
+  if (!claimed) return 'already-handled'
+
+  const address = await memberEmail(scope, claimed.userId)
+  if (!address) {
+    await markDelivery(
+      scope,
+      claimed.id,
+      { status: 'failed', errorCode: 'no-address' },
+      'sending',
+    )
+    return 'no-address'
+  }
+
+  if (!args.hashSalt) {
+    args.logger.warn('digest email not sent: EMAIL_HASH_SALT is unset', {
+      deliveryId: claimed.id,
+    })
+    await markDelivery(scope, claimed.id, { status: 'queued' }, 'sending')
+    throw new NotifyEmailRetryError()
+  }
+
+  const toHash = await hashRecipient(address, args.hashSalt)
+  if (await isSuppressed(args.db, toHash)) {
+    await markDelivery(
+      scope,
+      claimed.id,
+      { status: 'suppressed', toHash },
+      'sending',
+    )
+    return 'suppressed'
+  }
+
+  const selection = await selectDigestContent(
+    scope,
+    claimed.userId,
+    new Date(args.now.getTime() - DAY_MS),
+    new Date(args.now.getTime() - DEFERRED_TTL_MS),
+  )
+
+  for (const row of selection.deferredUnsubscribed) {
+    await markDelivery(
+      scope,
+      row.id,
+      { status: 'failed', errorCode: 'unsubscribed' },
+      'deferred',
+    )
+  }
+  for (const row of selection.deferredGone) {
+    await markDelivery(
+      scope,
+      row.id,
+      { status: 'failed', errorCode: 'gone' },
+      'deferred',
+    )
+  }
+
+  if (selection.lines.length === 0) {
+    await markDelivery(
+      scope,
+      claimed.id,
+      { status: 'failed', errorCode: 'gone', toHash },
+      'sending',
+    )
+    return 'gone'
+  }
+
+  const locale =
+    args.locale ??
+    (await resolveRecipientLocale(scope, claimed.userId, args.storedLocale))
+  const t = createTranslator(locale, await loadCatalogue(locale))
+
+  let unsubscribe: { readonly href: string; readonly label: string } | undefined
+  let headers: Readonly<Record<string, string>> | undefined
+  if (args.unsubscribeKeys) {
+    const token = await signUnsubscribeToken(
+      {
+        userId: claimed.userId,
+        organizationId: args.organizationId,
+        subject: 'digest',
+      },
+      args.unsubscribeKeys.current,
+      args.now,
+    )
+    const links = notificationUnsubscribeLinks(args.appUrl, token)
+    unsubscribe = {
+      href: links.pageHref,
+      label: t('email.layout.footer.unsubscribe'),
+    }
+    headers = listUnsubscribeHeaders(links.oneClickHref)
+  }
+
+  const { subject, element } = digestEmail(
+    {
+      locale,
+      workspaceName: await workspaceName(scope),
+      items: selection.lines.map((line) => ({
+        kind: line.kind,
+        href: absoluteUrl(args.appUrl, line.href),
+      })),
+      unsubscribe,
+    },
+    t,
+  )
+  const { html, text } = await renderEmail(element)
+
+  const result = await sendEmail(
+    {
+      to: address,
+      subject,
+      html,
+      text,
+      headers,
+      idempotencyKey: claimed.id,
+      tags: [
+        { name: 'delivery', value: claimed.id },
+        { name: 'org', value: args.organizationId },
+      ],
+    },
+    { ...args.transport, kind: 'digest' },
+  )
+
+  if (result.ok) {
+    await markDelivery(
+      scope,
+      claimed.id,
+      {
+        status: 'sent',
+        toHash,
+        providerMessageId: result.providerMessageId,
+        sentAt: args.now,
+      },
+      'sending',
+    )
+    for (const row of selection.deferredKeep) {
+      await markDelivery(scope, row.id, { status: 'digested' }, 'deferred')
+    }
+    return 'sent'
+  }
+
+  if (result.kind === 'rejected') {
+    await markDelivery(
+      scope,
+      claimed.id,
+      {
+        status: 'failed',
+        toHash,
+        errorCode:
+          result.status === undefined ? 'rejected' : String(result.status),
+      },
+      'sending',
+    )
+    return 'rejected'
+  }
+
+  args.logger.warn('digest email deferred', {
     deliveryId: claimed.id,
     kind: result.kind,
     status: result.status,

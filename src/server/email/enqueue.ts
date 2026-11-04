@@ -2,8 +2,8 @@
  * The real notification-email enqueuer: a delivery row, then a `notify.email` queue message.
  *
  * It does not send. Composing needs a locale, an address and templates, which the queue handler
- * already owns. The daily cap is an abuse brake, not a plan limit: over it, Phase 4 writes
- * `failed` / `capped` and enqueues nothing. Phase 5 switches that branch to `deferred`.
+ * already owns. The daily cap is an abuse brake, not a plan limit: over it, the row is
+ * `deferred` and the next digest carries it.
  *
  * **Not a money surface.** The queue message is ids only. Amounts stay on the in-app row.
  */
@@ -71,8 +71,7 @@ export function createNotificationEmailEnqueuer(
         kind: args.kind,
         notificationId: args.notificationId,
         dedupeKey: `notification:${args.notificationId}`,
-        status: overCap ? 'failed' : 'queued',
-        errorCode: overCap ? 'capped' : undefined,
+        status: overCap ? 'deferred' : 'queued',
       },
       now,
     )

@@ -44,6 +44,7 @@ import {
 } from '#/lib/money'
 import { createTranslator, loadCatalogue } from '#/lib/i18n'
 import { renderEmail } from '#/server/email/render'
+import { digestEmail } from '#/server/email/templates/digest'
 import { notificationEmail } from '#/server/email/templates/notification'
 import { listEnabledCurrencies } from '#/server/catalog/currencies'
 import { projectCompletion } from '#/server/goals/project'
@@ -2985,6 +2986,43 @@ describe('24 — notification email is not a money surface', () => {
       expect(part).not.toContain(String(payload.availableMinor))
       expect(part).not.toContain(payload.budgetName)
       expect(part).not.toContain(drawn)
+    }
+  })
+
+  it('renders a digest of event names and links with no amounts or totals', async () => {
+    const t = createTranslator('en', await loadCatalogue('en'))
+    const { subject, element } = digestEmail(
+      {
+        locale: 'en',
+        workspaceName: 'Haushalt',
+        items: [
+          {
+            kind: 'budget.threshold_crossed',
+            href: 'https://app.example.test/budgets/budget-1',
+          },
+          {
+            kind: 'goal.reached',
+            href: 'https://app.example.test/goals/goal-1',
+          },
+        ],
+      },
+      t,
+    )
+    const { html, text } = await renderEmail(element)
+    const drawn = formatMoney('en', {
+      amountMinor: asMinor(payload.spentMinor),
+      currencyCode: asCurrencyCode(payload.currencyCode),
+    })
+
+    expect(subject).toBe('2 updates from Haushalt')
+    expect(html).toContain('/budgets/budget-1')
+    expect(html).toContain('/goals/goal-1')
+    expect(text).toContain('/budgets/budget-1')
+    for (const part of [html, text, subject]) {
+      expect(part).not.toContain(String(payload.spentMinor))
+      expect(part).not.toContain(payload.budgetName)
+      expect(part).not.toContain(drawn)
+      expect(part).not.toMatch(/total/i)
     }
   })
 })

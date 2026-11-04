@@ -1506,6 +1506,15 @@ const messages = {
   'email.layout.footer.unsubscribe': 'Zatrzymaj te e-maile',
   'email.notification.action': 'Otwórz w {app}',
   'email.notification.body': 'Otwórz {app}, aby zobaczyć, co się stało.',
+  'email.digest.subject': {
+    one: '{count} aktualizacja z domu {workspace}',
+    few: '{count} aktualizacje z domu {workspace}',
+    many: '{count} aktualizacji z domu {workspace}',
+    other: '{count} aktualizacji z domu {workspace}',
+  },
+  'email.digest.heading': 'Twoje dzienne podsumowanie',
+  'email.digest.intro':
+    'Oto co wydarzyło się w domu {workspace} w ciągu ostatniej doby.',
   'email.auth.greeting': 'Cześć {name},',
   'email.auth.singleUse': 'Ten link zadziała tylko raz i wkrótce wygaśnie.',
   'email.auth.verifyEmail.subject': 'Potwierdź swój adres w {app}',

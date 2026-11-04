@@ -1,11 +1,11 @@
 # Transactional email on Resend: React Email templates, the digest and unsubscribe
 
-| Field              | Value                              |
-| ------------------ | ---------------------------------- |
-| **Status**         | in-progress                        |
-| **Issue**          | #210                               |
-| **Spec PR**        | #344                               |
-| **Implementation** | #349, #821, #488, #829, #830, #831 |
+| Field              | Value                                    |
+| ------------------ | ---------------------------------------- |
+| **Status**         | implemented                              |
+| **Issue**          | #210                                     |
+| **Spec PR**        | #344                                     |
+| **Implementation** | #349, #821, #488, #829, #830, #832, #835 |
 
 ## 📝 TLDR
 

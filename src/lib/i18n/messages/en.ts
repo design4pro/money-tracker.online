@@ -1456,6 +1456,12 @@ const messages = {
   'email.layout.footer.unsubscribe': 'Stop these emails',
   'email.notification.action': 'Open in {app}',
   'email.notification.body': 'Open {app} to see what happened.',
+  'email.digest.subject': {
+    one: '{count} update from {workspace}',
+    other: '{count} updates from {workspace}',
+  },
+  'email.digest.heading': 'Your daily summary',
+  'email.digest.intro': 'Here is what happened in {workspace} in the last day.',
   'email.auth.greeting': 'Hi {name},',
   /*
     Stated once, in the frame of every auth email, because the failure it prevents is a person
