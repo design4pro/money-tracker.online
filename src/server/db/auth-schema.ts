@@ -121,10 +121,15 @@ export const account = sqliteTable(
     id: id(),
     /**
      * Stable provider-side namespace, e.g. `https://accounts.google.com`.
-     * Nullable from Better Auth 1.7.17: the adapter no longer writes this column
-     * (`https://www.better-auth.com/docs/guides/1-7-upgrade-guide`).
+     *
+     * The column has been `NOT NULL` since `0000_real_spitfire`. Better Auth 1.7.17
+     * no longer writes it; SQLite cannot drop `NOT NULL` without rebuilding the
+     * table, and D1 ignores `PRAGMA foreign_keys=OFF`, so the live constraint
+     * stays. The application default fills inserts the adapter omits.
      */
-    issuer: text('issuer'),
+    issuer: text('issuer')
+      .notNull()
+      .$defaultFn(() => ''),
     accountId: text('account_id').notNull(),
     providerId: text('provider_id').notNull(),
     userId: text('user_id')
