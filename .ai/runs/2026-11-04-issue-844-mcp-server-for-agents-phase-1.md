@@ -48,12 +48,14 @@ no MCP traffic yet. `/api/mcp` does not exist after this phase.
 
 ## Progress
 
+PR: #pending
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Grants
 
-- [ ] 1.1 Additive schema and migration 0011
-- [ ] 1.2 Plan catalogue mcp feature, copy, resolver tests
-- [ ] 1.3 Grant repo, PAT hash, tenant-isolation
-- [ ] 1.4 Mint and revoke server functions
-- [ ] 1.5 Spec in-progress and spec index
+- [x] 1.1 Additive schema and migration 0011 — 154e105
+- [x] 1.2 Plan catalogue mcp feature, copy, resolver tests — 154e105
+- [x] 1.3 Grant repo, PAT hash, tenant-isolation — 154e105
+- [x] 1.4 Mint and revoke server functions — 154e105
+- [x] 1.5 Spec in-progress and spec index — 154e105
