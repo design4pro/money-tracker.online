@@ -37,6 +37,7 @@
  * - no `EMAIL_API_KEY` → `no-provider`, which is neither: there was nothing to ask.
  */
 
+import type { RenderedEmail } from '#/server/email/render'
 import type { Logger } from '#/server/observability/logger'
 
 /** Provider configuration, as `#/server/auth/env` → `emailDelivery()` reports it. */
@@ -59,15 +60,9 @@ export interface EmailTag {
 }
 
 /** One rendered message, ready to send. Both parts, always. */
-export interface EmailMessage {
+export interface EmailMessage extends RenderedEmail {
   readonly to: string
   readonly subject: string
-  readonly html: string
-  /**
-   * The plain-text alternative. Not a fallback afterthought: it is what stops a plain-text client —
-   * and a spam filter that distrusts HTML-only mail — from receiving an empty message.
-   */
-  readonly text: string
   /** Extra message headers, such as `List-Unsubscribe`. */
   readonly headers?: Readonly<Record<string, string>>
   /**
