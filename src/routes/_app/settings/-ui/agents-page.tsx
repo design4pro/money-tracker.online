@@ -129,7 +129,9 @@ export function AgentsPage({ page, onMint, onRevoke }: AgentsPageProps) {
                   <Column>{t('settings.agents.column.kind')}</Column>
                   <Column>{t('settings.agents.column.scopes')}</Column>
                   <Column>{t('settings.agents.column.lastUsed')}</Column>
-                  <Column>{t('settings.agents.revoke')}</Column>
+                  <Column align="end">
+                    {t('settings.agents.column.actions')}
+                  </Column>
                 </TableHeader>
                 <TableBody>
                   {grants.map((grant) => (
@@ -172,6 +174,9 @@ export function AgentsPage({ page, onMint, onRevoke }: AgentsPageProps) {
                         <Button
                           variant="danger"
                           size="sm"
+                          aria-label={t('settings.agents.revoke.action', {
+                            name: grant.name,
+                          })}
                           onPress={() => setPending(grant)}
                         >
                           {t('settings.agents.revoke')}

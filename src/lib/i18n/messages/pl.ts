@@ -1718,6 +1718,7 @@ const messages = {
   'settings.agents.kind.pat': 'Token osobisty',
   'settings.agents.kind.oauth': 'Aplikacja OAuth',
   'settings.agents.revoke': 'Cofnij',
+  'settings.agents.revoke.action': 'Cofnij: {name}',
   'settings.agents.revoke.title': 'Cofnąć dostęp: {name}?',
   'settings.agents.revoke.body':
     'Następne wywołanie narzędzia z tym uprawnieniem się nie uda. Wiersze, które już zapisało, zostają.',
@@ -1733,6 +1734,7 @@ const messages = {
   'settings.agents.column.kind': 'Rodzaj',
   'settings.agents.column.scopes': 'Dostęp',
   'settings.agents.column.lastUsed': 'Ostatnio użyty',
+  'settings.agents.column.actions': 'Działania',
   'settings.agents.neverUsed': 'Nigdy',
   'settings.agents.list.label': 'Uprawnienia z dostępem do tej przestrzeni',
   'settings.agents.scope.accounts.read': 'Odczyt kont',

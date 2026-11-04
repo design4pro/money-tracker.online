@@ -8,7 +8,8 @@ import { TENANT_B, storageStateFor } from './support/session'
  * Keyboard path on `/settings/agents`: the grant list, then the revoke dialog.
  *
  * TENANT_B is written to (never DEMO). Plus is installed for this spec because
- * MCP is paid-plan only; the row is replaced so a re-run does not collide.
+ * MCP is paid-plan only. Rows from earlier runs stay in this fixture workspace,
+ * so locators are scoped to this grant's row — never a page-wide "Revoke".
  */
 
 test.use({ storageState: storageStateFor('tenant-b') })
@@ -41,12 +42,19 @@ test('the list and revoke dialog are reachable from the keyboard', async ({
   await expect(
     page.getByRole('heading', { name: 'Connected agents', level: 1 }),
   ).toBeVisible()
-  await expect(page.getByRole('grid')).toBeVisible()
-  await expect(page.getByText(grantName)).toBeVisible()
 
-  const revoke = page.getByRole('button', { name: 'Revoke' })
-  await revoke.focus()
-  await page.keyboard.press('Enter')
+  const list = page.getByRole('grid', {
+    name: 'Grants with access to this workspace',
+  })
+  await expect(list).toBeVisible()
+  const row = list.getByRole('row').filter({ hasText: grantName })
+  await expect(row).toBeVisible()
+
+  const revoke = row.getByRole('button', {
+    name: `Revoke ${grantName}`,
+    exact: true,
+  })
+  await revoke.press('Enter')
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toBeVisible()
   await expect(
@@ -56,9 +64,11 @@ test('the list and revoke dialog are reachable from the keyboard', async ({
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
 
-  await revoke.click()
-  await expect(page.getByRole('alertdialog')).toBeVisible()
-  await page.getByRole('button', { name: 'Revoke access' }).click()
-  await expect(page.getByRole('alertdialog')).toHaveCount(0)
-  await expect(page.getByText(grantName)).toHaveCount(0)
+  await revoke.press('Enter')
+  await expect(dialog).toBeVisible()
+  await dialog
+    .getByRole('button', { name: 'Revoke access', exact: true })
+    .click()
+  await expect(dialog).toHaveCount(0)
+  await expect(row).toHaveCount(0)
 })

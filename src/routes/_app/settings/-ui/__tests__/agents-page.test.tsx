@@ -84,7 +84,7 @@ describe('AgentsPage', () => {
     })
     expect(screen.getByText('Inspector')).toBeTruthy()
     expect(
-      screen.getByRole('button', { name: en['settings.agents.revoke'] }),
+      screen.getByRole('button', { name: 'Revoke Inspector' }),
     ).toBeTruthy()
   })
 })

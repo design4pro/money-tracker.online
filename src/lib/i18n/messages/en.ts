@@ -1674,6 +1674,7 @@ const messages = {
   'settings.agents.kind.pat': 'Personal token',
   'settings.agents.kind.oauth': 'OAuth app',
   'settings.agents.revoke': 'Revoke',
+  'settings.agents.revoke.action': 'Revoke {name}',
   'settings.agents.revoke.title': 'Revoke {name}?',
   'settings.agents.revoke.body':
     'The next tool call with this grant fails. This does not delete rows it already wrote.',
@@ -1688,6 +1689,7 @@ const messages = {
   'settings.agents.column.kind': 'Kind',
   'settings.agents.column.scopes': 'Access',
   'settings.agents.column.lastUsed': 'Last used',
+  'settings.agents.column.actions': 'Actions',
   'settings.agents.neverUsed': 'Never',
   'settings.agents.list.label': 'Grants with access to this workspace',
   'settings.agents.scope.accounts.read': 'Read accounts',
