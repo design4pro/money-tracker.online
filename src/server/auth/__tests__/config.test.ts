@@ -97,6 +97,10 @@ describe('session and verification storage', () => {
     expect(options.verification?.storeInDatabase).toBe(true)
   })
 
+  it('dual-writes sessions to D1: the MCP OAuth provider binds codes to a session row', () => {
+    expect(options.session?.storeSessionInDatabase).toBe(true)
+  })
+
   it('has secondary storage: sessions and rate-limit counters live in KV', () => {
     expect(options.secondaryStorage).toBeDefined()
   })
@@ -134,12 +138,24 @@ describe('the admin plugin', () => {
 })
 
 describe('plugin order', () => {
-  it('puts admin first, then two-factor and organization: later plugins read what admin adds', () => {
+  it('puts admin first, then two-factor and organization, then jwt and mcp', () => {
     expect(options.plugins?.map((plugin) => plugin.id)).toEqual([
       'admin',
       'two-factor',
       'organization',
+      'jwt',
+      'oauth-provider',
     ])
+  })
+
+  it('enables DCR on the MCP OAuth provider and binds tokens to /api/mcp', () => {
+    expect(pluginOptions('oauth-provider')).toMatchObject({
+      loginPage: '/login',
+      consentPage: '/consent',
+      resources: ['https://app.example.test/api/mcp'],
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+    })
   })
 })
 

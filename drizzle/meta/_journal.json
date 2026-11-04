@@ -85,6 +85,13 @@
       "when": 1793799860350,
       "tag": "0011_mute_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793811211626,
+      "tag": "0012_classy_wind_dancer",
+      "breakpoints": true
     }
   ]
 }

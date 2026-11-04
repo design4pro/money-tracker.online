@@ -113,6 +113,16 @@ section is the record of what the code does.
   the race protection is gone for that call. The id is not a secret and not an authorisation input;
   `requireOrg` checks a workspace id against `member`.
 
+## Amendment
+
+Date: 2026-11-04. Phase 2 of #844 installs `@better-auth/mcp`. That plugin’s OAuth Provider
+refuses to construct when `secondaryStorage` is set and `session.storeSessionInDatabase` is not.
+The 2026-10-09 “KV only” sentence is therefore narrowed: **KV remains the hot session store**,
+and D1 additionally stores session rows so an `/oauth2/token` request on another isolate can
+resolve the session the authorization code was bound to. App reads still go through Better Auth
+`getSession` (KV first). This is a plugin requirement of the owner-mandated MCP OAuth door, not
+a product decision to move sessions off KV.
+
 Pull requests: #620 (deterministic id and the retry), #621 (configuration, hooks and the KV adapter
 pinned by tests), #623 (a real sign-up driven through Better Auth in workerd), #624 (the
 create-organization route closed) and #625 (further pins).

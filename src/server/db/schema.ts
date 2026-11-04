@@ -3308,6 +3308,10 @@ export const agentGrants = sqliteTable(
       table.organizationId,
       table.userId,
     ),
+    index('agent_grants_organization_id_client_id_idx').on(
+      table.organizationId,
+      table.clientId,
+    ),
     uniqueIndex('agent_grants_token_hash_unique').on(table.tokenHash),
     enumCheck('agent_grants_kind_check', table.kind, AGENT_GRANT_KINDS),
     maxLengthCheck('agent_grants_name_length_check', table.name, 80),
