@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mockup — OAuth consent for one workspace</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px/1.5 'Iowan Old Style',
+          Palatino,
+          serif;
+        background: #f6f1e8;
+        color: #1b1916;
+      }
+      main {
+        max-width: 480px;
+        margin: 40px auto;
+        padding: 28px;
+        background: #fffdf8;
+        border: 1px solid #e4dccf;
+        border-radius: 16px;
+      }
+      .badge {
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #5c574f;
+      }
+      ul {
+        padding-left: 1.2em;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      button {
+        min-height: 44px;
+        flex: 1;
+        font: inherit;
+        border-radius: 8px;
+      }
+      .ok {
+        background: #2f6f4e;
+        color: #fff;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="badge">Proposed · OAuth consent · owner/admin only</p>
+      <h1>Allow Example MCP client?</h1>
+      <p>
+        This app is asking to use <strong>Northwind Household</strong> as Alex
+        Example. It cannot see any other workspace.
+      </p>
+      <p>Requested access:</p>
+      <ul>
+        <li>Read accounts</li>
+        <li>Read and write transactions</li>
+      </ul>
+      <p>You can revoke this later under Settings → Connected agents.</p>
+      <div class="actions">
+        <button type="button">Deny</button>
+        <button class="ok" type="button">Allow</button>
+      </div>
+    </main>
+  </body>
+</html>
