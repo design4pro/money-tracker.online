@@ -48,6 +48,7 @@ import {
   accountGroupMembers,
   accountGroups,
   accounts,
+  agentGrants,
   attachments,
   budgetCategories,
   categories,
@@ -59,6 +60,7 @@ import {
   rules,
   transactions,
 } from '#/server/db/schema'
+import { listedMcpToolNames } from '#/server/mcp/catalog'
 import { forecastSeries } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
@@ -143,6 +145,7 @@ import {
   findPatGrantByTokenHash,
   listGrants,
   revokeGrant,
+  scopesOfGrant,
 } from '../agent-grants'
 import { insertAgentAudit, listAgentAudit } from '../agent-audit'
 import {
@@ -4467,6 +4470,176 @@ describe('agent grants cannot be listed or revoked across a workspace boundary',
     })
     expect(theirs?.organizationId).toBe('org-b')
     expect(theirs?.kind).toBe('oauth')
+  })
+
+  it('replaces scopes on re-consent and keeps the other workspace’s row', async () => {
+    const world = await createBudgetWorld()
+    const older = new Date('2026-01-01T00:00:00.000Z')
+    const newer = new Date('2026-06-01T00:00:00.000Z')
+    const first = await createOauthGrant(
+      world.scope,
+      { name: 'Reader', clientId: 'client-a', scopes: ['accounts:read'] },
+      older,
+    )
+    const replaced = await createOauthGrant(
+      world.scope,
+      {
+        name: 'Writer',
+        clientId: 'client-a',
+        scopes: ['accounts:read', 'transactions:write', 'transactions:delete'],
+      },
+      newer,
+    )
+    expect(replaced.id).toBe(first.id)
+    expect(replaced.scopes).toEqual([
+      'accounts:read',
+      'transactions:delete',
+      'transactions:write',
+    ])
+
+    const live = await listGrants(world.scope)
+    expect(
+      live.filter(
+        (grant) => grant.clientId === 'client-a' && grant.revokedAt === null,
+      ),
+    ).toHaveLength(1)
+
+    await world.db.insert(member).values({
+      id: 'mem-a-in-b',
+      organizationId: 'org-b',
+      userId: 'user-a',
+      role: 'owner',
+      createdAt: budgetWorldNow,
+    })
+    const aInB = createScope(world.db, {
+      userId: 'user-a',
+      organizationId: 'org-b',
+      role: 'owner',
+    })
+    await createOauthGrant(
+      aInB,
+      { name: 'Other house', clientId: 'client-a', scopes: ['payees:read'] },
+      newer,
+    )
+    await createOauthGrant(
+      world.otherScope,
+      { name: 'B connector', clientId: 'client-a', scopes: ['budgets:read'] },
+      newer,
+    )
+
+    const claimed = await findOauthGrantByClient(world.db, {
+      userId: 'user-a',
+      clientId: 'client-a',
+      organizationId: 'org-a',
+    })
+    expect(scopesOfGrant(claimed!)).toEqual([
+      'accounts:read',
+      'transactions:delete',
+      'transactions:write',
+    ])
+    expect(listedMcpToolNames(scopesOfGrant(claimed!)).toSorted()).toEqual(
+      [
+        'confirm_delete',
+        'create_transaction',
+        'delete_transaction',
+        'get_balances',
+        'list_accounts',
+        'update_transaction',
+      ].toSorted(),
+    )
+    expect(
+      scopesOfGrant(
+        (await findOauthGrantByClient(world.db, {
+          userId: 'user-a',
+          clientId: 'client-a',
+          organizationId: 'org-b',
+        }))!,
+      ),
+    ).toEqual(['payees:read'])
+    expect(
+      await findOauthGrantByClient(world.db, {
+        userId: 'user-a',
+        clientId: 'client-a',
+      }),
+    ).toBeNull()
+    expect(
+      await findOauthGrantByClient(world.db, {
+        userId: 'user-a',
+        clientId: 'client-a',
+        organizationId: 'org-missing',
+      }),
+    ).toBeNull()
+    expect(
+      scopesOfGrant(
+        (await findOauthGrantByClient(world.db, {
+          userId: 'user-b',
+          clientId: 'client-a',
+          organizationId: 'org-b',
+        }))!,
+      ),
+    ).toEqual(['budgets:read'])
+
+    await world.db.insert(agentGrants).values([
+      {
+        id: 'legacy-older',
+        organizationId: 'org-a',
+        userId: 'user-a',
+        kind: 'oauth',
+        name: 'Legacy',
+        clientId: 'client-legacy',
+        tokenHash: null,
+        tokenPrefix: null,
+        scopes: JSON.stringify(['accounts:read']),
+        createdAt: older,
+        revokedAt: null,
+        lastUsedAt: null,
+      },
+      {
+        id: 'legacy-newer',
+        organizationId: 'org-a',
+        userId: 'user-a',
+        kind: 'oauth',
+        name: 'Legacy newer',
+        clientId: 'client-legacy',
+        tokenHash: null,
+        tokenPrefix: null,
+        scopes: JSON.stringify(['transactions:write', 'transactions:delete']),
+        createdAt: newer,
+        revokedAt: null,
+        lastUsedAt: null,
+      },
+      {
+        id: 'legacy-revoked',
+        organizationId: 'org-a',
+        userId: 'user-a',
+        kind: 'oauth',
+        name: 'Legacy revoked',
+        clientId: 'client-legacy',
+        tokenHash: null,
+        tokenPrefix: null,
+        scopes: JSON.stringify(['categories:delete']),
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+        revokedAt: newer,
+        lastUsedAt: null,
+      },
+    ])
+    const legacy = await findOauthGrantByClient(world.db, {
+      userId: 'user-a',
+      clientId: 'client-legacy',
+      organizationId: 'org-a',
+    })
+    expect(legacy?.id).toBe('legacy-newer')
+    expect(listedMcpToolNames(scopesOfGrant(legacy!))).toEqual(
+      expect.arrayContaining([
+        'create_transaction',
+        'update_transaction',
+        'delete_transaction',
+        'confirm_delete',
+      ]),
+    )
+    expect(listedMcpToolNames(scopesOfGrant(legacy!))).not.toContain(
+      'delete_category',
+    )
   })
 })
 

@@ -1713,7 +1713,9 @@ const messages = {
   'oauth.consent.title': 'Allow {clientName}?',
   'oauth.consent.body':
     'This app is asking to use {workspaceName}. It cannot see any other workspace.',
-  'oauth.consent.requested': 'Requested access',
+  'oauth.consent.requested': 'Choose access',
+  'oauth.consent.scopeHint':
+    'Reading starts on. Creating, changing, and deleting stay off until you turn them on.',
   'oauth.consent.revokeHint':
     'You can revoke this later under Settings → Connected agents.',
   'oauth.consent.allow': 'Allow',
