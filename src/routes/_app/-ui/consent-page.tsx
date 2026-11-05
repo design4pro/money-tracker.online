@@ -1,14 +1,12 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 
-import { ErrorPanel, FailurePanel } from '#/components/app/shell'
 import {
-  Button,
-  Card,
-  CardBody,
-  Checkbox,
-  CheckboxGroup,
-} from '#/components/ui'
-import { AGENT_SCOPES, READ_SCOPES, scopeMessageKey } from '#/lib/agent-scopes'
+  AgentScopePicker,
+  selectedAgentScopes,
+} from '#/components/app/agent-scope-picker'
+import { ErrorPanel, FailurePanel } from '#/components/app/shell'
+import { Button, Card, CardBody } from '#/components/ui'
+import { READ_SCOPES } from '#/lib/agent-scopes'
 import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 
@@ -27,10 +25,6 @@ export interface ConsentPageProps {
   onDecide: (accept: boolean) => Promise<void>
 }
 
-function chosenScopes(values: ReadonlyArray<string>): Array<AgentScope> {
-  return AGENT_SCOPES.filter((scope) => values.includes(scope))
-}
-
 export function ConsentPage({
   consent,
   clientId,
@@ -47,7 +41,7 @@ export function ConsentPage({
   const trimmedClientId = clientId.trim()
   const clientName =
     trimmedClientId.length > 0 ? trimmedClientId : t('common.unknown')
-  const selected = chosenScopes(scopes)
+  const selected = selectedAgentScopes(scopes)
 
   useLayoutEffect(() => {
     headingRef.current?.focus()
@@ -115,19 +109,13 @@ export function ConsentPage({
             workspaceName: consent.workspaceName,
           })}
         </p>
-        <CheckboxGroup
+        <AgentScopePicker
           isRequired
           label={t('oauth.consent.requested')}
           description={t('oauth.consent.scopeHint')}
-          value={[...scopes]}
+          value={scopes}
           onChange={setScopes}
-        >
-          {AGENT_SCOPES.map((scope) => (
-            <Checkbox key={scope} value={scope}>
-              {t(scopeMessageKey(scope))}
-            </Checkbox>
-          ))}
-        </CheckboxGroup>
+        />
         <p className="text-caption text-ink-2">
           {t('oauth.consent.revokeHint')}
         </p>
