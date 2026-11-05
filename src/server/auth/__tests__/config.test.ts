@@ -12,6 +12,7 @@
  * provisioning hooks are then driven against that database rather than asserted on by shape.
  */
 
+import { getIP } from 'better-auth/api'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { member, organization } from '#/server/db/auth-schema'
@@ -163,6 +164,20 @@ describe('the rate limiter', () => {
   it('counts in secondary storage, because an isolate’s memory is not shared between colos', () => {
     expect(options.rateLimit?.enabled).toBe(true)
     expect(options.rateLimit?.storage).toBe('secondary-storage')
+  })
+
+  it('reads the client address from cf-connecting-ip, not from a caller-supplied x-forwarded-for', () => {
+    // Better Auth's default is x-forwarded-for. On a Worker that header is
+    // absent or a list, so every path — including /oauth2/token — shares one
+    // bucket. cf-connecting-ip is the header Cloudflare sets and overwrites.
+    expect(options.advanced?.ipAddress?.ipAddressHeaders).toEqual([
+      'cf-connecting-ip',
+    ])
+    const headers = new Headers({
+      'cf-connecting-ip': '203.0.113.10',
+      'x-forwarded-for': '198.51.100.20',
+    })
+    expect(getIP(headers, options)).toBe('203.0.113.10')
   })
 
   it('carries exactly the seven custom rules, the four ADR 0011 credential paths among them', () => {
