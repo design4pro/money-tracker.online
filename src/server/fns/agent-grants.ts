@@ -21,6 +21,8 @@ import {
   listGrants,
   revokeGrant,
   revokeGrantSchema,
+  updateAgentGrant as updateAgentGrantRow,
+  updateAgentGrantSchema,
 } from '#/server/repos/agent-grants'
 import { FeatureLockedError } from '#/server/repos/errors'
 import { workspaceName } from '#/server/repos/members'
@@ -128,4 +130,15 @@ export const revokeAgentGrant = createServerFn({ method: 'POST' })
   .inputValidator(revokeGrantSchema)
   .handler(async ({ data }): Promise<AgentGrantView> => {
     return revokeGrant(await requireOrg(), data, new Date())
+  })
+
+export const updateAgentGrant = createServerFn({ method: 'POST' })
+  .inputValidator(updateAgentGrantSchema)
+  .handler(async ({ data }): Promise<AgentGrantView> => {
+    const scope = await requireOrg()
+    const effective = await resolveLimits(scope)
+    if (!effective.features.mcp) {
+      throw new FeatureLockedError('mcp')
+    }
+    return updateAgentGrantRow(scope, data, new Date())
   })
