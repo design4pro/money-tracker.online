@@ -17,6 +17,7 @@ import { useLocale, useTranslate } from '#/lib/i18n'
 import { formatCalendarDate } from '#/lib/i18n/format'
 
 import { ConfirmDialog } from '../../accounts/-ui/confirm-dialog'
+import { EditGrantDialog } from './edit-grant-dialog'
 import { utcDay } from './format-day'
 import { MintTokenDialog } from './mint-token-dialog'
 
@@ -37,18 +38,29 @@ export interface AgentsPageProps {
     scopes: ReadonlyArray<AgentScope>
   }) => Promise<MintedPat>
   onRevoke: (grantId: string) => Promise<unknown>
+  onUpdate: (input: {
+    grantId: string
+    name: string
+    scopes: ReadonlyArray<AgentScope>
+  }) => Promise<unknown>
 }
 
 function asDate(value: Date | string): Date {
   return value instanceof Date ? value : new Date(value)
 }
 
-export function AgentsPage({ page, onMint, onRevoke }: AgentsPageProps) {
+export function AgentsPage({
+  page,
+  onMint,
+  onRevoke,
+  onUpdate,
+}: AgentsPageProps) {
   const t = useTranslate()
   const locale = useLocale()
   const [isMintOpen, setMintOpen] = useState(false)
   const [secret, setSecret] = useState<string | null>(null)
   const [pending, setPending] = useState<AgentGrantView | null>(null)
+  const [editing, setEditing] = useState<AgentGrantView | null>(null)
 
   const grants = page.kind === 'member' ? [] : page.grants
 
@@ -125,16 +137,30 @@ export function AgentsPage({ page, onMint, onRevoke }: AgentsPageProps) {
                   id={grant.id}
                   textValue={grant.name}
                   actions={
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      aria-label={t('settings.agents.revoke.action', {
-                        name: grant.name,
-                      })}
-                      onPress={() => setPending(grant)}
-                    >
-                      {t('settings.agents.revoke')}
-                    </Button>
+                    <>
+                      {page.kind === 'ready' ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={t('settings.agents.edit.action', {
+                            name: grant.name,
+                          })}
+                          onPress={() => setEditing(grant)}
+                        >
+                          {t('settings.agents.edit')}
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        aria-label={t('settings.agents.revoke.action', {
+                          name: grant.name,
+                        })}
+                        onPress={() => setPending(grant)}
+                      >
+                        {t('settings.agents.revoke')}
+                      </Button>
+                    </>
                   }
                 >
                   <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
@@ -178,6 +204,18 @@ export function AgentsPage({ page, onMint, onRevoke }: AgentsPageProps) {
         isOpen={isMintOpen}
         onOpenChange={setMintOpen}
         onMint={mint}
+      />
+
+      <EditGrantDialog
+        grant={editing}
+        isOpen={editing !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setEditing(null)
+        }}
+        onUpdate={async (input) => {
+          await onUpdate(input)
+          toast.success(t('settings.agents.edit.saved', { name: input.name }))
+        }}
       />
 
       <ConfirmDialog
