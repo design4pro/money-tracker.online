@@ -156,6 +156,7 @@ describe('plugin order', () => {
       resources: ['https://app.example.test/api/mcp'],
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultApplicationType: 'infer',
     })
   })
 })
