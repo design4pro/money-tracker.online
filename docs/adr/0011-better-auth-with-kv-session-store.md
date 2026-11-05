@@ -126,3 +126,17 @@ a product decision to move sessions off KV.
 Pull requests: #620 (deterministic id and the retry), #621 (configuration, hooks and the KV adapter
 pinned by tests), #623 (a real sign-up driven through Better Auth in workerd), #624 (the
 create-organization route closed) and #625 (further pins).
+
+## Amendment
+
+Date: 2026-11-05. A session created before the dual-write, or any session that never received a
+D1 row, still satisfies `findSession` from KV. `@better-auth/oauth-provider` does not: the
+authorization-code grant loads `session` by id from the database adapter, and a miss is
+`400 invalid_request` ("session no longer exists").
+
+On `/oauth2/authorize` and `/oauth2/consent`, a KV session with no D1 row is deleted and the
+request continues as signed out. Authorize uses the provider's existing redirect to the login
+page. Consent returns the same `{ redirect, url }` payload the consent screen already follows.
+The KV JSON is not inserted: it is not the row Better Auth writes, and a removed row must not be
+resurrected and then used to mint tokens. A new sign-in is what writes both stores. Requests
+that never enter those two paths keep the KV session.
