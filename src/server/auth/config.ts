@@ -9,8 +9,12 @@
  * from that are marked where they are made.
  */
 
+import { mcp } from '@better-auth/mcp'
+// Required peer of `@better-auth/mcp`. Imported so the runtime-dependency
+// scan sees the declaration rather than a unused-package disposition.
+import '@better-auth/oauth-provider'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { admin, organization, twoFactor } from 'better-auth/plugins'
+import { admin, jwt, organization, twoFactor } from 'better-auth/plugins'
 import { nanoid } from 'nanoid'
 
 import { authSchema } from '#/server/db/auth-schema'
@@ -145,14 +149,20 @@ export function authOptions(): BetterAuthOptions {
 
     /**
      * Sessions, OAuth state and rate-limit counters read from KV at the edge instead of from D1
-     * on the other side of the network (ADR 0011). Sessions live in KV only: a miss means signing in
-     * again. D1 holds the verification rows and the other auth tables.
+     * on the other side of the network (ADR 0011). Session rows are also stored in D1 because
+     * the MCP OAuth provider requires it. D1 holds verification rows and the other auth tables.
      */
     secondaryStorage: createKvSecondaryStorage(sessionStore()),
 
     session: {
       expiresIn: SESSION_EXPIRES_IN,
       updateAge: SESSION_UPDATE_AGE,
+      /**
+       * Dual-write to D1 as well as KV. `@better-auth/mcp` (OAuth Provider) refuses to
+       * start when `secondaryStorage` is set and this is unset: authorization codes bind
+       * to a session row. KV remains the hot read (ADR 0011); this copy is for OAuth.
+       */
+      storeSessionInDatabase: true,
       /**
        * **No `cookieCache`.** It puts a signed copy of the session in the cookie and serves reads
        * from it for its lifetime, which means a ban, a sign-out-everywhere or a role change is not
@@ -216,6 +226,7 @@ export function authOptions(): BetterAuthOptions {
     /**
      * Order matters: `admin` adds the `role`/`banned` columns the other two read, and
      * `organization` adds the `activeOrganizationId` the session hook below writes.
+     * `jwt()` must precede `mcp()`: MCP access tokens are JWTs verified against JWKS.
      */
     plugins: [
       admin(adminOptions),
@@ -237,6 +248,15 @@ export function authOptions(): BetterAuthOptions {
             locale: recipientLocale(request),
           })
         },
+      }),
+      jwt(),
+      mcp({
+        loginPage: '/login',
+        // Phase 5 owns the page. The plugin still needs the path so authorize can redirect.
+        consentPage: '/consent',
+        resource: `${appUrl()}/api/mcp`,
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
       }),
     ],
 

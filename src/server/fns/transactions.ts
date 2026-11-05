@@ -22,10 +22,7 @@ import { z } from 'zod'
 
 import { requireOrg } from '#/server/auth/guards'
 import { runWithLedgerBatch } from '#/server/ledger'
-import {
-  transactionFiltersSchema,
-  transactionSortSchema,
-} from '#/server/repos/transaction-queries'
+import { ledgerPageInputSchema } from '#/server/repos/transaction-queries'
 import {
   createTransaction as createTransactionRow,
   createTransactionSchema,
@@ -62,15 +59,7 @@ export const getTransaction = createServerFn({ method: 'GET' })
     })
   })
 
-const loadTransactionsSchema = z.strictObject({
-  policies: transactionPoliciesSchema,
-  filters: transactionFiltersSchema,
-  sort: transactionSortSchema,
-  cursor: z.string().min(1).nullable(),
-  limit: z.number().int().positive().optional(),
-  /** The per-account passbook asks for the balance-after column; the all-accounts ledger does not. */
-  includeBalanceAfter: z.boolean().optional(),
-})
+export const loadTransactionsSchema = ledgerPageInputSchema
 
 /**
  * One page of the ledger, with the totals under it.

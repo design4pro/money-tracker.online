@@ -1,11 +1,11 @@
 # Remote MCP server for agents (Streamable HTTP, OAuth 2.1 + personal tokens)
 
-| Field              | Value |
-| ------------------ | ----- |
-| **Status**         | draft |
-| **Issue**          | #844  |
-| **Spec PR**        | #845  |
-| **Implementation** | none  |
+| Field              | Value       |
+| ------------------ | ----------- |
+| **Status**         | in-progress |
+| **Issue**          | #844        |
+| **Spec PR**        | #845        |
+| **Implementation** | none        |
 
 ## 📝 TLDR
 

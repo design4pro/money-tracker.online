@@ -38,6 +38,7 @@ import './notify/install'
 // and the recipient-hash salt are both set. Unset, the named no-op stays and the module logs why.
 import './email/install'
 
+import { handleAuthRequest } from './auth'
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
 import { runDigest } from './cron/digest'
@@ -97,6 +98,13 @@ export default {
    * the environment to a parameter that expects request options was never intended.
    */
   fetch(request: Request): Response | Promise<Response> {
+    // TanStack Router ignores dot-directories, so RFC 8414 / RFC 9728 discovery
+    // cannot live as `src/routes/.well-known/$`. MCP clients look at the origin
+    // root; Better Auth `mcp()` already owns the handler.
+    const pathname = new URL(request.url).pathname
+    if (pathname.startsWith('/.well-known/')) {
+      return handleAuthRequest(request)
+    }
     return fetchHandler(request)
   },
 

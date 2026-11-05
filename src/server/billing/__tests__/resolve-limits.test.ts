@@ -223,6 +223,8 @@ describe('against the database', () => {
     // B has no row of its own and must not inherit A's ceilings.
     expect(b.entitlement.planId).toBe('free')
     expect(b.limits.accounts).toBe(PLANS.free.limits.accounts)
+    expect(a.features.mcp).toBe(true)
+    expect(b.features.mcp).toBe(false)
   })
 
   it('reports usage beside the limits, from one call', async () => {

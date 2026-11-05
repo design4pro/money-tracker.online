@@ -86,8 +86,13 @@ import { createLogger, createMemorySink } from '#/server/observability/logger'
 import {
   AccountCurrencyLockedError,
   adjustAccountBalance,
+  getAccount,
   updateAccount,
 } from '../accounts'
+import { rebuildAccountBalance } from '../account-balances'
+import { createPatGrant } from '../agent-grants'
+import { invokeMcpTool } from '#/server/mcp/tools'
+import { MemoryMcpKv } from '#/server/mcp/kv'
 import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
 import {
@@ -3219,5 +3224,49 @@ describe('16 — dashboard whole-month plan never joins actuals', () => {
         amountMinor: planned.refAmountMinor,
       },
     ])
+  })
+})
+
+describe('MCP write tools keep balances equal to the rebuilt ledger', () => {
+  it('N synthetic create_transaction calls match rebuildAccountBalance', async () => {
+    await scope.db.insert(organizationCurrencies).values({
+      organizationId: 'org-a',
+      currencyCode: 'PLN',
+      isBase: true,
+      addedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+    const minted = await createPatGrant(
+      scope,
+      {
+        name: 'mcp writer',
+        scopes: ['transactions:write', 'transactions:read'],
+        environment: 'stg',
+      },
+      new Date('2026-03-15T10:00:00.000Z'),
+    )
+    const ctx = {
+      scopes: ['transactions:write', 'transactions:read'] as const,
+      scope,
+      grantId: minted.grant.id,
+      userId: scope.ctx.userId,
+      kv: new MemoryMcpKv(),
+    }
+    const amounts = [11_00, 22_00, 33_00] as const
+    for (const amountMinor of amounts) {
+      const result = await invokeMcpTool(ctx, 'create_transaction', {
+        accountId: 'acc-a',
+        direction: 'expense',
+        amountMinor,
+        bookedOn: BOOKED_ON,
+        policies: EVERYTHING,
+      })
+      expect(result.ok).toBe(true)
+    }
+    await rebuildAccountBalance(scope.db, 'acc-a')
+    const account = await getAccount(scope, 'acc-a')
+    const expected =
+      (account.initialBalanceMinor as number) -
+      amounts.reduce((sum, amount) => sum + amount, 0)
+    expect(account.currentBalanceMinor).toBe(expected)
   })
 })

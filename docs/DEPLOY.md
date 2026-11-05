@@ -338,6 +338,22 @@ ahead of the site-wide one; mirror that rather than widening the site policy. Ra
 webhook secret and the Access bypass **after this path merges**. This is written down here because
 the failure looks like "the provider is not sending webhooks", not like an access-control problem.
 
+**MCP protocol endpoints need the same Bypass pattern.** MCP clients (Inspector, Claude, ChatGPT,
+Grok Bot) present a bearer grant, not an Access JWT. Production Access will 302 them the same way
+it 302s Polar. Create separate Bypass applications ordered ahead of the site-wide `money-tracker.online`
+app. Do **not** Bypass `/login`, `/oauth2/authorize`, or `/consent` — those are human pages, and
+until Access is removed site-wide only the `team` policy can complete OAuth consent in production.
+Staging has no Access, so Inspector and connectors can be developed there first. Personal tokens
+minted on a session that already passed Access (or on staging) then call `/api/mcp` without Access.
+
+This repository does not create the applications. A person does that in the Zero Trust dashboard.
+
+| Application name (suggested)           | Path prefix to Bypass                                                                                                               | Why                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `money-tracker.online MCP`             | `/api/mcp`                                                                                                                          | Streamable HTTP. Clients have no Access JWT.             |
+| `money-tracker.online MCP OAuth token` | `/oauth2/token` and `/oauth2/register`                                                                                              | Token and DCR must be reachable without an Access login. |
+| `money-tracker.online MCP well-known`  | `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-authorization-server` | RFC 9728 / RFC 8414 discovery.                           |
+
 ---
 
 ## 9. Polar
