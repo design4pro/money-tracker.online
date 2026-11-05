@@ -19,6 +19,7 @@ import { nanoid } from 'nanoid'
 
 import { authSchema } from '#/server/db/auth-schema'
 import { negotiateEmailLocale } from '#/server/fns/locale'
+import { MCP_ORGANIZATION_CLAIM } from '#/server/mcp/organization-claim'
 import { loggerFromEnv } from '#/server/observability/logger'
 import { getDb } from './db'
 import { createAuthEmailer } from './email'
@@ -48,6 +49,23 @@ import type { BetterAuthOptions, betterAuth } from 'better-auth'
 
 /** Where the auth routes are mounted. The browser client in `src/lib/auth-client.ts` matches it. */
 export const AUTH_BASE_PATH = '/api/auth'
+
+/**
+ * Workspace pinned on the session. Empty and missing are the same: no
+ * reference id, so a token is not bound to a workspace the query named.
+ *
+ * The OAuth callback's session type does not list `activeOrganizationId`.
+ * The organization plugin still sets it on the object, which is what the
+ * issued token's `org_id` claim is read from.
+ */
+function organizationIdFromAuthSession(session: unknown): string | undefined {
+  if (typeof session !== 'object' || session === null) return undefined
+  if (!('activeOrganizationId' in session)) return undefined
+  const value = session.activeOrganizationId
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
 
 /**
  * Which language to write an auth email in.
@@ -265,6 +283,22 @@ export function authOptions(): BetterAuthOptions {
         // 127.0.0.1, or [::1], or uses a private-use scheme. Every other
         // omitted registration stays `web`, and a sent application_type is kept.
         clientRegistrationDefaultApplicationType: 'infer',
+        // Product scopes stay off this provider. Clients send the OIDC set;
+        // the person chooses `resource:verb` on `/consent`. The reference id
+        // is the workspace that consent belongs to, read from the session.
+        // `shouldRedirect` stays false: the active workspace is already on
+        // the session, so authorize must not detour through another page.
+        // `page` is required by the option and is never requested.
+        postLogin: {
+          page: '/consent',
+          consentReferenceId: ({ session }) =>
+            organizationIdFromAuthSession(session),
+          shouldRedirect: () => false,
+        },
+        customAccessTokenClaims: ({ referenceId }) => {
+          if (referenceId === undefined || referenceId.length === 0) return {}
+          return { [MCP_ORGANIZATION_CLAIM]: referenceId }
+        },
       }),
     ],
 

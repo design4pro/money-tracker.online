@@ -18,6 +18,7 @@ import { createOauthGrant } from '#/server/repos/agent-grants'
 import { createScope, isOrganizationRole } from '#/server/repos/scope'
 
 import { handleMcpRequest } from '../handler'
+import { MCP_ORGANIZATION_CLAIM } from '../organization-claim'
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({ handler: (run: unknown) => run }),
@@ -110,7 +111,61 @@ describe('oauth access at the MCP door', () => {
         'get_balances',
         'list_accounts',
       ])
+      expect(jwtPayload(issued.accessToken)[MCP_ORGANIZATION_CLAIM]).toBe(
+        membership.organizationId,
+      )
       expect(fetches.filter((path) => path.includes('jwks'))).toEqual([])
+
+      await createOauthGrant(
+        scope,
+        {
+          name: 'Synthetic writer',
+          clientId: issued.clientId,
+          scopes: [
+            'accounts:read',
+            'transactions:read',
+            'categories:read',
+            'payees:read',
+            'recurring:read',
+            'budgets:read',
+            'transactions:write',
+            'transactions:delete',
+          ],
+        },
+        new Date(now.getTime() + 1_000),
+      )
+      const widened = await handleMcpRequest(
+        new Request(`${appUrl()}/api/mcp`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${issued.accessToken}`,
+            'content-type': 'application/json',
+            accept: 'application/json, text/event-stream',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/list',
+            params: {},
+          }),
+        }),
+      )
+      const widenedBody = await rpcBody(widened)
+      expect(widened.status, JSON.stringify(widenedBody)).toBe(200)
+      expect(toolNames(widenedBody).toSorted()).toEqual([
+        'confirm_delete',
+        'create_transaction',
+        'delete_transaction',
+        'get_balances',
+        'get_month_summary',
+        'list_accounts',
+        'list_budgets',
+        'list_categories',
+        'list_payees',
+        'list_recurring',
+        'list_transactions',
+        'update_transaction',
+      ])
     } finally {
       globalThis.fetch = original
     }
@@ -227,6 +282,15 @@ async function issueAccessToken(): Promise<{
   expect(token.status, 'token endpoint').toBe(200)
   expect(accessToken).toEqual(expect.any(String))
   return { email, clientId: clientId!, accessToken: accessToken! }
+}
+
+function jwtPayload(token: string): Record<string, unknown> {
+  const segment = token.split('.')[1] ?? ''
+  const padded = segment.replaceAll('-', '+').replaceAll('_', '/')
+  const json = atob(
+    padded.padEnd(padded.length + ((4 - (padded.length % 4)) % 4), '='),
+  )
+  return JSON.parse(json) as Record<string, unknown>
 }
 
 function toolNames(body: unknown): Array<string> {

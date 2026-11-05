@@ -1758,7 +1758,9 @@ const messages = {
   'oauth.consent.title': 'Zezwolić aplikacji {clientName}?',
   'oauth.consent.body':
     'Ta aplikacja prosi o dostęp do domu {workspaceName}. Nie zobaczy żadnej innej przestrzeni.',
-  'oauth.consent.requested': 'Żądany dostęp',
+  'oauth.consent.requested': 'Wybierz dostęp',
+  'oauth.consent.scopeHint':
+    'Odczyt jest włączony. Tworzenie, zmiana i usuwanie zostają wyłączone, dopóki ich nie włączysz.',
   'oauth.consent.revokeHint':
     'Możesz to później cofnąć w Ustawieniach → Połączone agenty.',
   'oauth.consent.allow': 'Zezwól',

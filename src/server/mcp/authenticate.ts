@@ -15,6 +15,8 @@ import {
 import { FeatureLockedError } from '#/server/repos/errors'
 import { createScope, isOrganizationRole } from '#/server/repos/scope'
 
+import { MCP_ORGANIZATION_CLAIM } from './organization-claim'
+
 import type { AppDatabase } from '#/server/auth/db'
 import type { AgentGrantRow } from '#/server/db/schema'
 import type { Database, TenantScope } from '#/server/repos/base'
@@ -24,6 +26,7 @@ export interface OauthAccessClaims {
   readonly sub?: unknown
   readonly azp?: unknown
   readonly client_id?: unknown
+  readonly org_id?: unknown
 }
 
 const PAT_SECRET = /^mto_(stg|live)_[a-z0-9]+\.[A-Za-z0-9_-]+$/
@@ -54,6 +57,17 @@ export function oauthClientIdFromClaims(
   return null
 }
 
+/** Workspace bound into the access token, or null when the claim is absent. */
+export function organizationIdFromClaims(
+  claims: OauthAccessClaims,
+): string | null {
+  const value = claims[MCP_ORGANIZATION_CLAIM]
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (trimmed.length === 0 || trimmed.length > 64) return null
+  return trimmed
+}
+
 export async function resolvePatGrant(
   db: Database,
   secret: string,
@@ -68,7 +82,11 @@ export async function resolveOauthGrant(
   const userId = typeof claims.sub === 'string' ? claims.sub : null
   const clientId = oauthClientIdFromClaims(claims)
   if (!userId || !clientId) return null
-  return findOauthGrantByClient(db, { userId, clientId })
+  return findOauthGrantByClient(db, {
+    userId,
+    clientId,
+    organizationId: organizationIdFromClaims(claims),
+  })
 }
 
 /**

@@ -56,7 +56,6 @@ function ConsentRoute() {
     <ConsentPage
       consent={consent}
       clientId={search.client_id ?? ''}
-      requestedScope={search.scope}
       onAllow={async (input) => {
         await recordOauthGrant({
           data: {
