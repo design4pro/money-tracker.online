@@ -40,6 +40,7 @@ import {
   DISABLED_ORGANIZATION_PATHS,
   adminOptions,
 } from './permissions'
+import { rejectKvOnlyOauthSession } from './oauth-session-guard'
 import { createKvSecondaryStorage } from './secondary-storage'
 
 import type { Locale } from '#/lib/i18n'
@@ -161,6 +162,8 @@ export function authOptions(): BetterAuthOptions {
        * Dual-write to D1 as well as KV. `@better-auth/mcp` (OAuth Provider) refuses to
        * start when `secondaryStorage` is set and this is unset: authorization codes bind
        * to a session row. KV remains the hot read (ADR 0011); this copy is for OAuth.
+       * A session written before this flag has no row. `rejectKvOnlyOauthSession` signs
+       * that session out at the OAuth door instead of copying the KV JSON into D1.
        */
       storeSessionInDatabase: true,
       /**
@@ -303,8 +306,26 @@ export function authOptions(): BetterAuthOptions {
       },
     },
 
+    /**
+     * KV-only sessions are signed out on the two routes that bind an
+     * authorization code. Every other path still reads KV first.
+     */
+    hooks: {
+      before: rejectKvOnlyOauthSession,
+    },
+
     advanced: {
       cookiePrefix: 'mtr',
+      /**
+       * Cloudflare sets this header and overwrites a client-supplied value.
+       * The default `x-forwarded-for` does not resolve on a Worker, and the
+       * limiter then counts every caller in one shared per-path bucket.
+       * Listing this header replaces the default; `x-forwarded-for` stays
+       * untrusted.
+       */
+      ipAddress: {
+        ipAddressHeaders: ['cf-connecting-ip'],
+      },
       database: {
         /**
          * The same id shape as the rest of the schema: 24 URL-safe characters, generated in the

@@ -4,7 +4,9 @@
  * Sessions, OAuth state and rate-limit counters live at the edge so the hot read path never
  * touches D1 first. `session.storeSessionInDatabase` is also on: the MCP OAuth provider will not
  * start without a D1 session row to bind authorization codes to (ADR 0011, 2026-11-04
- * amendment). D1 still holds verification rows and the other auth tables.
+ * amendment). A KV session that never received that row is signed out at the OAuth door
+ * rather than copied in (ADR 0011, 2026-11-05 amendment). D1 still holds verification rows
+ * and the other auth tables.
  *
  * `increment` is a read-modify-write and **not** an atomic operation — KV offers no compare-and-swap
  * — so a burst arriving inside one eventual-consistency window can undercount. Better Auth's rate
