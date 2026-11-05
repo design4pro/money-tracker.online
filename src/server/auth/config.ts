@@ -260,6 +260,11 @@ export function authOptions(): BetterAuthOptions {
         resource: `${appUrl()}/api/mcp`,
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        // The library default is `web`, which rejects loopback http. `infer`
+        // records `native` when a redirect is http on exact localhost,
+        // 127.0.0.1, or [::1], or uses a private-use scheme. Every other
+        // omitted registration stays `web`, and a sent application_type is kept.
+        clientRegistrationDefaultApplicationType: 'infer',
       }),
     ],
 
