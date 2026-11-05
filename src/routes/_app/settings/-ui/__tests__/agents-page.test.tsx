@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '#/lib/i18n'
@@ -86,5 +87,24 @@ describe('AgentsPage', () => {
     expect(
       screen.getByRole('button', { name: 'Revoke Inspector' }),
     ).toBeTruthy()
+  })
+
+  it('opens the revoke dialog when Enter is pressed on the named control', async () => {
+    const user = userEvent.setup()
+    renderPage({
+      kind: 'ready',
+      mcpUrl: 'https://example.test/api/mcp',
+      grants: [grant],
+    })
+
+    const revoke = screen.getByRole('button', { name: 'Revoke Inspector' })
+    revoke.focus()
+    await user.keyboard('{Enter}')
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(
+      screen.getByRole('heading', { name: 'Revoke Inspector?' }),
+    ).toBeTruthy()
+    expect(dialog).toBeTruthy()
   })
 })

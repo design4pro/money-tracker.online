@@ -6,15 +6,10 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Cell,
-  Column,
   EmptyState,
+  GridList,
+  GridListItem,
   Link,
-  Row,
-  Table,
-  TableBody,
-  TableContainer,
-  TableHeader,
   toast,
 } from '#/components/ui'
 import { scopeMessageKey } from '#/lib/agent-scopes'
@@ -120,73 +115,61 @@ export function AgentsPage({ page, onMint, onRevoke }: AgentsPageProps) {
           {grants.length === 0 ? (
             <EmptyState headingLevel={2} title={t('settings.agents.empty')} />
           ) : (
-            <TableContainer>
-              <Table aria-label={t('settings.agents.list.label')}>
-                <TableHeader>
-                  <Column isRowHeader>
-                    {t('settings.agents.column.name')}
-                  </Column>
-                  <Column>{t('settings.agents.column.kind')}</Column>
-                  <Column>{t('settings.agents.column.scopes')}</Column>
-                  <Column>{t('settings.agents.column.lastUsed')}</Column>
-                  <Column align="end">
-                    {t('settings.agents.column.actions')}
-                  </Column>
-                </TableHeader>
-                <TableBody>
-                  {grants.map((grant) => (
-                    <Row key={grant.id}>
-                      <Cell>
-                        <span className="font-medium text-ink">
-                          {grant.name}
+            <GridList
+              aria-label={t('settings.agents.list.label')}
+              selectionMode="none"
+            >
+              {grants.map((grant) => (
+                <GridListItem
+                  key={grant.id}
+                  id={grant.id}
+                  textValue={grant.name}
+                  actions={
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      aria-label={t('settings.agents.revoke.action', {
+                        name: grant.name,
+                      })}
+                      onPress={() => setPending(grant)}
+                    >
+                      {t('settings.agents.revoke')}
+                    </Button>
+                  }
+                >
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-ink">{grant.name}</span>
+                      {grant.tokenPrefix === null ? null : (
+                        <span className="mt-0.5 block text-caption text-ink-2">
+                          {grant.tokenPrefix}
                         </span>
-                        {grant.tokenPrefix === null ? null : (
-                          <span className="mt-0.5 block text-caption text-ink-2">
-                            {grant.tokenPrefix}
-                          </span>
-                        )}
-                      </Cell>
-                      <Cell>
-                        <Badge tone="neutral">
-                          {t(
-                            grant.kind === 'oauth'
-                              ? KIND_LABEL.oauth
-                              : KIND_LABEL.pat,
+                      )}
+                    </span>
+                    <Badge tone="neutral">
+                      {t(
+                        grant.kind === 'oauth'
+                          ? KIND_LABEL.oauth
+                          : KIND_LABEL.pat,
+                      )}
+                    </Badge>
+                    <ul className="flex min-w-0 flex-col gap-0.5">
+                      {grant.scopes.map((scope) => (
+                        <li key={scope}>{t(scopeMessageKey(scope))}</li>
+                      ))}
+                    </ul>
+                    <span className="shrink-0 text-caption text-ink-2">
+                      {grant.lastUsedAt == null
+                        ? t('settings.agents.neverUsed')
+                        : formatCalendarDate(
+                            locale,
+                            utcDay(asDate(grant.lastUsedAt)),
                           )}
-                        </Badge>
-                      </Cell>
-                      <Cell>
-                        <ul className="flex flex-col gap-0.5">
-                          {grant.scopes.map((scope) => (
-                            <li key={scope}>{t(scopeMessageKey(scope))}</li>
-                          ))}
-                        </ul>
-                      </Cell>
-                      <Cell>
-                        {grant.lastUsedAt == null
-                          ? t('settings.agents.neverUsed')
-                          : formatCalendarDate(
-                              locale,
-                              utcDay(asDate(grant.lastUsedAt)),
-                            )}
-                      </Cell>
-                      <Cell align="end">
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          aria-label={t('settings.agents.revoke.action', {
-                            name: grant.name,
-                          })}
-                          onPress={() => setPending(grant)}
-                        >
-                          {t('settings.agents.revoke')}
-                        </Button>
-                      </Cell>
-                    </Row>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    </span>
+                  </div>
+                </GridListItem>
+              ))}
+            </GridList>
           )}
         </>
       )}
