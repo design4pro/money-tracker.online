@@ -341,18 +341,45 @@ the failure looks like "the provider is not sending webhooks", not like an acces
 **MCP protocol endpoints need the same Bypass pattern.** MCP clients (Inspector, Claude, ChatGPT,
 Grok Bot) present a bearer grant, not an Access JWT. Production Access will 302 them the same way
 it 302s Polar. Create separate Bypass applications ordered ahead of the site-wide `money-tracker.online`
-app. Do **not** Bypass `/login`, `/oauth2/authorize`, or `/consent` — those are human pages, and
-until Access is removed site-wide only the `team` policy can complete OAuth consent in production.
-Staging has no Access, so Inspector and connectors can be developed there first. Personal tokens
-minted on a session that already passed Access (or on staging) then call `/api/mcp` without Access.
+app. Do **not** Bypass `/login`, `/api/auth/oauth2/authorize`, or `/consent` — those are human
+pages, and until Access is removed site-wide only the `team` policy can complete OAuth consent in
+production. Staging has no Access, so Inspector and connectors can be developed there first.
+Personal tokens minted on a session that already passed Access (or on staging) then call `/api/mcp`
+without Access.
 
-This repository does not create the applications. A person does that in the Zero Trust dashboard.
+**Better Auth OAuth and discovery (what the Worker serves).** The issuer is
+`https://money-tracker.online/api/auth` (`AUTH_BASE_PATH` in `src/server/auth/config.ts`). Better
+Auth `mcp()` mounts OAuth 2.1 on that base path:
 
-| Application name (suggested)           | Path prefix to Bypass                                                                                                               | Why                                                      |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `money-tracker.online MCP`             | `/api/mcp`                                                                                                                          | Streamable HTTP. Clients have no Access JWT.             |
-| `money-tracker.online MCP OAuth token` | `/oauth2/token` and `/oauth2/register`                                                                                              | Token and DCR must be reachable without an Access login. |
-| `money-tracker.online MCP well-known`  | `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-authorization-server` | RFC 9728 / RFC 8414 discovery.                           |
+| Surface                                                                        | Path                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authorize (human; stays behind Access)                                         | `/api/auth/oauth2/authorize`                                                                                                                                                                |
+| Token, DCR, revoke, introspect                                                 | `/api/auth/oauth2/token`, `/api/auth/oauth2/register`, `/api/auth/oauth2/revoke`, `/api/auth/oauth2/introspect`                                                                             |
+| JWKS (MCP access tokens are JWTs; `jwt()` precedes `mcp()` in the plugin list) | `/api/auth/jwks` (`jwksUrl()` in `src/server/mcp/resource.ts`)                                                                                                                              |
+| Protected-resource metadata (RFC 9728)                                         | `/.well-known/oauth-protected-resource/api/mcp` (`mcpResourceMetadataUrl()` in the same file)                                                                                               |
+| Authorization-server metadata (RFC 8414)                                       | `/.well-known/oauth-authorization-server/api/auth` (Better Auth issuer-inserted path; served because `src/server/worker.ts` forwards every `/.well-known/*` request to `handleAuthRequest`) |
+| Streamable HTTP MCP                                                            | `/api/mcp` (`MCP_ROUTE` in `src/server/mcp/resource.ts`, route in `src/routes/api/mcp.ts`)                                                                                                  |
+
+Bare `/.well-known/oauth-authorization-server` (without the `/api/auth` suffix) is **not** served —
+production answers **404**. Do not point Bypass or client configuration at it.
+
+`src/routes/oauth2/$.ts` also mounts `/oauth2/*` to the same auth handler, but Better Auth
+publishes issuer-relative paths under `/api/auth/oauth2/*`. With Access ordered as below,
+`/oauth2/token` and `/oauth2/register` still receive **302** to Cloudflare Access while the live
+protocol endpoints under `/api/auth/oauth2/*` answer on the Worker (for example **415** / **400**
+on `POST` without a valid body, not **404**). Treat `/api/auth/oauth2/*` as the source of truth
+for runbooks and Bypass rules.
+
+This repository does not create the Access applications. A person does that in the Zero Trust
+dashboard. **As of 2026-11-05 production** the Bypass (Everyone) applications ahead of the site-wide
+`money-tracker.online` app use these path prefixes:
+
+| Application name (suggested)           | Path prefix to Bypass (Bypass, Everyone)                                                                                             | Why                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `money-tracker.online MCP`             | `/api/mcp`                                                                                                                           | Streamable HTTP. Clients have no Access JWT.          |
+| `money-tracker.online MCP OAuth token` | `/api/auth/oauth2/token`, `/api/auth/oauth2/register`, `/api/auth/oauth2/revoke`, `/api/auth/oauth2/introspect`                      | Token, DCR, revoke, and introspection without Access. |
+| `money-tracker.online MCP JWKS`        | `/api/auth/jwks`                                                                                                                     | JWT verification for MCP bearer tokens.               |
+| `money-tracker.online MCP well-known`  | `/.well-known/oauth-protected-resource*` and `/.well-known/oauth-authorization-server*` (covers `/api/mcp` and `/api/auth` variants) | RFC 9728 / RFC 8414 discovery without Access.         |
 
 ---
 

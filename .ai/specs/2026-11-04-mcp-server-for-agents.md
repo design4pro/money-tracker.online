@@ -127,13 +127,22 @@ ahead of it, scoped to one path. MCP needs the same pattern. Implementation amen
 creates the applications in the dashboard. Suggested applications (path prefix, Bypass, ahead of
 the site app):
 
-| Application name (suggested)           | Path prefix to Bypass                                                                                                                                                                         | Why                                                      |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `money-tracker.online MCP`             | `/api/mcp`                                                                                                                                                                                    | Streamable HTTP. Clients have no Access JWT.             |
-| `money-tracker.online MCP OAuth token` | `/oauth2/token` and `/oauth2/register` **or** the Better Auth equivalents under `/api/auth/` once the plugin's real paths are read from its docs at install time                              | Token and DCR must be reachable without an Access login. |
-| `money-tracker.online MCP well-known`  | `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/api/mcp`, `/.well-known/oauth-authorization-server` (and issuer-inserted variants the plugin actually serves) | RFC 9728 / RFC 8414 discovery.                           |
+| Application name (suggested)           | Path prefix to Bypass (Bypass, Everyone)                                                                        | Why                                                   |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `money-tracker.online MCP`             | `/api/mcp`                                                                                                      | Streamable HTTP. Clients have no Access JWT.          |
+| `money-tracker.online MCP OAuth token` | `/api/auth/oauth2/token`, `/api/auth/oauth2/register`, `/api/auth/oauth2/revoke`, `/api/auth/oauth2/introspect` | Token, DCR, revoke, and introspection without Access. |
+| `money-tracker.online MCP JWKS`        | `/api/auth/jwks`                                                                                                | JWT verification for MCP bearer tokens.               |
+| `money-tracker.online MCP well-known`  | `/.well-known/oauth-protected-resource*` and `/.well-known/oauth-authorization-server*`                         | RFC 9728 / RFC 8414 discovery without Access.         |
 
-**Do not Bypass `/sign-in`, `/oauth2/authorize`, or the consent page.** Those are human pages. Until
+Issuer `https://money-tracker.online/api/auth` (`AUTH_BASE_PATH`). OAuth 2.1 protocol paths are
+`/api/auth/oauth2/{authorize,token,register,revoke,introspect}`; JWKS at `/api/auth/jwks`;
+protected-resource metadata at `/.well-known/oauth-protected-resource/api/mcp`; authorization-server
+metadata at `/.well-known/oauth-authorization-server/api/auth`. Bare
+`/.well-known/oauth-authorization-server` is not served (**404** on production). `src/routes/oauth2/$.ts`
+mounts `/oauth2/*` to the same handler, but clients and Bypass rules must use the issuer-relative
+paths above (see `docs/DEPLOY.md` §8.1).
+
+**Do not Bypass `/login`, `/api/auth/oauth2/authorize`, or `/consent`.** Those are human pages. Until
 production Access is removed site-wide, only the `team` policy can complete OAuth consent in
 production. Staging has no Access, so Inspector and connectors can be developed there first.
 Personal tokens minted on a session that already passed Access (or on staging) then call `/api/mcp`
@@ -246,6 +255,12 @@ cross-environment paste.
 
 Better Auth `mcp()` with:
 
+- Issuer `https://<host>/api/auth` (`AUTH_BASE_PATH`). OAuth 2.1 HTTP surface:
+  `/api/auth/oauth2/{authorize,token,register,revoke,introspect}`; JWKS at `/api/auth/jwks`
+  (`jwksUrl()` in `src/server/mcp/resource.ts`). Discovery:
+  `/.well-known/oauth-protected-resource/api/mcp` and
+  `/.well-known/oauth-authorization-server/api/auth` (Worker forwards `/.well-known/*` in
+  `src/server/worker.ts`). Bare `/.well-known/oauth-authorization-server` is not served.
 - `resource` = canonical MCP URL (`https://money-tracker.online/api/mcp` in production,
   staging host on staging). Tokens are audience-bound to that resource.
 - `allowDynamicClientRegistration: true`
@@ -532,3 +547,10 @@ Compared against public remote-MCP patterns, not the reference product (`docs/ag
 No `product-brief.md` in this tree. Relied-on ADRs: 0002 (tenant repos), 0006 / `docs/MONEY.md`
 (integer minors), 0008 (no bank connectors), 0010 (ledger DO), 0011 (Better Auth), 0012 (plans),
 0015 (workerd tests), 0037 (this spec's library record).
+
+## Amendment
+
+Docs-only alignment (#857): OAuth and Access Bypass paths in this spec and `docs/DEPLOY.md` §8.1 now
+match Better Auth `mcp()` on `AUTH_BASE_PATH` (`/api/auth/oauth2/*`, `/api/auth/jwks`, issuer-scoped
+well-known URLs). Production Bypass uses those paths; bare `/oauth2/*` runbook entries and
+`/.well-known/oauth-authorization-server` without `/api/auth` were wrong for production.
