@@ -7,9 +7,9 @@ its `H1` names the issue and the pull requests behind it. The rules are in [AGEN
 
 ## Draft — being written (1)
 
-| Spec                                                                                          | Date       | Issue                                                                 | Spec PR | Implementation |
-| --------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------- | -------------- |
-| [Edit settings and permissions of a connected app](2026-11-05-edit-connected-app-settings.md) | 2026-11-05 | [#870](https://github.com/design4pro/money-tracker.online/issues/870) | —       | —              |
+| Spec                                                                                          | Date       | Issue                                                                 | Spec PR                                                             | Implementation |
+| --------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
+| [Edit settings and permissions of a connected app](2026-11-05-edit-connected-app-settings.md) | 2026-11-05 | [#870](https://github.com/design4pro/money-tracker.online/issues/870) | [#871](https://github.com/design4pro/money-tracker.online/pull/871) | —              |
 
 ## Ready — merged, waiting for a build (6)
 
