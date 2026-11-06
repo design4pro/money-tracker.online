@@ -12,6 +12,8 @@ import {
 } from '#/server/repos/agent-grants'
 import { createBudgetWorld, NOW } from '#/server/repos/__tests__/budget-harness'
 import { FeatureLockedError } from '#/server/repos/errors'
+import { createScope } from '#/server/repos/scope'
+import { member } from '#/server/db/auth-schema'
 
 import {
   bearerToken,
@@ -134,6 +136,59 @@ describe('resolveOauthGrant', () => {
     expect(
       await resolveOauthGrant(world.db, { sub: 'user-b', azp: 'client-b' }),
     ).toMatchObject({ organizationId: 'org-b' })
+  })
+
+  it('binds the organization claim and refuses a token that could see two workspaces', async () => {
+    await createOauthGrant(
+      world.scope,
+      { name: 'Home', clientId: 'client-a', scopes: ['accounts:read'] },
+      NOW,
+    )
+    await world.db.insert(member).values({
+      id: 'mem-a-in-b',
+      organizationId: 'org-b',
+      userId: 'user-a',
+      role: 'owner',
+      createdAt: NOW,
+    })
+    await createOauthGrant(
+      createScope(world.db, {
+        userId: 'user-a',
+        organizationId: 'org-b',
+        role: 'owner',
+      }),
+      {
+        name: 'Other house',
+        clientId: 'client-a',
+        scopes: ['transactions:write', 'transactions:delete'],
+      },
+      new Date(NOW.getTime() + 1_000),
+    )
+
+    expect(
+      await resolveOauthGrant(world.db, { sub: 'user-a', azp: 'client-a' }),
+    ).toBeNull()
+    expect(
+      await resolveOauthGrant(world.db, {
+        sub: 'user-a',
+        azp: 'client-a',
+        org_id: 'org-a',
+      }),
+    ).toMatchObject({ organizationId: 'org-a' })
+    expect(
+      await resolveOauthGrant(world.db, {
+        sub: 'user-a',
+        azp: 'client-a',
+        org_id: 'org-b',
+      }),
+    ).toMatchObject({ organizationId: 'org-b' })
+    expect(
+      await resolveOauthGrant(world.db, {
+        sub: 'user-a',
+        azp: 'client-a',
+        org_id: 'org-missing',
+      }),
+    ).toBeNull()
   })
 })
 

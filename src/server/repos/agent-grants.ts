@@ -8,7 +8,7 @@
  * {@link Database} and match on the presented credential. They do not fork `tenantFilter`.
  */
 
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -68,6 +68,16 @@ export const revokeGrantSchema = z.strictObject({
   grantId: z.string().trim().min(1).max(64),
 })
 export type RevokeGrantInput = z.infer<typeof revokeGrantSchema>
+
+export const updateAgentGrantSchema = z.strictObject({
+  grantId: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(80),
+  scopes: z
+    .array(z.enum(AGENT_SCOPE_TUPLE))
+    .min(1)
+    .max(AGENT_SCOPE_VALUES.length),
+})
+export type UpdateAgentGrantInput = z.infer<typeof updateAgentGrantSchema>
 
 /** Public grant: never `token_hash`. */
 export interface AgentGrantView {
@@ -187,7 +197,14 @@ export async function createPatGrant(
   return { grant: toView(row), secret }
 }
 
-/** Owner/admin: persist an OAuth grant for one client in this workspace. */
+/**
+ * Owner/admin: store the scopes this person just chose for one client.
+ *
+ * One live row per workspace, user, and client. A second consent replaces
+ * that row's scopes; it does not union with them and it does not insert
+ * another live row. Older live duplicates in this workspace are revoked.
+ * Another workspace's row is untouched.
+ */
 export async function createOauthGrant(
   scope: TenantScope,
   input: CreateOauthGrantInput,
@@ -196,20 +213,41 @@ export async function createOauthGrant(
   assertRole(scope, 'create an agent grant', 'admin')
   const parsed = createOauthGrantSchema.parse(input)
   const scopes = uniqueSortedScopes(parsed.scopes)
-  const row = await grantAccess.insert(scope, {
-    id: newId(),
-    userId: scope.ctx.userId,
-    kind: 'oauth',
-    name: parsed.name,
-    clientId: parsed.clientId,
-    tokenHash: null,
-    tokenPrefix: null,
-    scopes: JSON.stringify(scopes),
-    createdAt: now,
-    revokedAt: null,
-    lastUsedAt: null,
+  const stored = JSON.stringify(scopes)
+  const live = await grantAccess.findMany(scope, {
+    where: and(
+      eq(agentGrants.userId, scope.ctx.userId),
+      eq(agentGrants.clientId, parsed.clientId),
+      eq(agentGrants.kind, 'oauth'),
+      isNull(agentGrants.revokedAt),
+    ),
+    orderBy: [desc(agentGrants.createdAt), desc(agentGrants.id)],
   })
-  return toView(row)
+  const current = live[0]
+  if (!current) {
+    const row = await grantAccess.insert(scope, {
+      id: newId(),
+      userId: scope.ctx.userId,
+      kind: 'oauth',
+      name: parsed.name,
+      clientId: parsed.clientId,
+      tokenHash: null,
+      tokenPrefix: null,
+      scopes: stored,
+      createdAt: now,
+      revokedAt: null,
+      lastUsedAt: null,
+    })
+    return toView(row)
+  }
+  const updated = await grantAccess.requireUpdate(scope, current.id, {
+    name: parsed.name,
+    scopes: stored,
+  })
+  for (const extra of live.slice(1)) {
+    await grantAccess.requireUpdate(scope, extra.id, { revokedAt: now })
+  }
+  return toView(updated)
 }
 
 /** Owner/admin: every grant in this workspace, including revoked ones. */
@@ -241,6 +279,34 @@ export async function revokeGrant(
 }
 
 /**
+ * Owner/admin: replace the name and the scope set on one live grant.
+ *
+ * A missing id and a revoked row are not found, and the row is left as it was.
+ * The write does not touch the secret, the client id, the grantor, the
+ * workspace, or `last_used_at`. `now` matches the other grant writes and is
+ * not stored: this update does not stamp a time.
+ */
+export async function updateAgentGrant(
+  scope: TenantScope,
+  input: UpdateAgentGrantInput,
+  now: Date,
+): Promise<AgentGrantView> {
+  void now
+  assertRole(scope, 'update an agent grant', 'admin')
+  const parsed = updateAgentGrantSchema.parse(input)
+  const existing = await grantAccess.findById(scope, parsed.grantId)
+  if (!existing || existing.revokedAt) {
+    throw new NotFoundError('agent grant', parsed.grantId)
+  }
+  const scopes = uniqueSortedScopes(parsed.scopes)
+  const updated = await grantAccess.requireUpdate(scope, parsed.grantId, {
+    name: parsed.name,
+    scopes: JSON.stringify(scopes),
+  })
+  return toView(updated)
+}
+
+/**
  * Resolve a presented PAT to its grant row, or `null`.
  *
  * Revoked, malformed, and unknown secrets are the same answer. The hash comparison is
@@ -267,15 +333,22 @@ export async function findPatGrantByTokenHash(
 /**
  * Resolve a verified OAuth client to its grant row, or `null`.
  *
- * Revoked and unknown pairs are the same answer. The tenant is whatever row
- * matches this user and client.
+ * Revoked and unknown pairs are the same answer. When `organizationId` is
+ * set, only that workspace is eligible, and the newest live row wins. When
+ * it is missing (a token issued before the claim existed), the newest live
+ * row wins only if every live row for this user and client is in one
+ * workspace. Two workspaces answer null.
+ *
+ * The tenant is the result of the lookup, so this takes a {@link Database}.
+ * It does not fork `tenantFilter`.
  */
 export async function findOauthGrantByClient(
   db: Database,
-  input: { userId: string; clientId: string },
+  input: { userId: string; clientId: string; organizationId?: string | null },
 ): Promise<AgentGrantRow | null> {
   const userId = z.string().trim().min(1).max(64).parse(input.userId)
   const clientId = z.string().trim().min(1).max(256).parse(input.clientId)
+  const organizationId = parseOrganizationClaim(input.organizationId)
   const rows = await db
     .select()
     .from(agentGrants)
@@ -284,10 +357,22 @@ export async function findOauthGrantByClient(
         eq(agentGrants.userId, userId),
         eq(agentGrants.clientId, clientId),
         eq(agentGrants.kind, 'oauth'),
+        isNull(agentGrants.revokedAt),
+        organizationId
+          ? eq(agentGrants.organizationId, organizationId)
+          : undefined,
       ),
     )
-    .limit(1)
-  const row = rows[0]
-  if (!row || row.revokedAt) return null
-  return row
+    .orderBy(desc(agentGrants.createdAt), desc(agentGrants.id))
+  if (organizationId) return rows[0] ?? null
+  const workspaces = new Set(rows.map((row) => row.organizationId))
+  if (workspaces.size !== 1) return null
+  return rows[0] ?? null
+}
+
+function parseOrganizationClaim(
+  value: string | null | undefined,
+): string | null {
+  if (value === undefined || value === null) return null
+  return z.string().trim().min(1).max(64).parse(value)
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react'
 
+import { AgentScopePicker } from '#/components/app/agent-scope-picker'
 import { FailurePanel } from '#/components/app/shell'
 import {
   Button,
-  Checkbox,
-  CheckboxGroup,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -13,7 +12,7 @@ import {
   Modal,
   TextField,
 } from '#/components/ui'
-import { AGENT_SCOPES, READ_SCOPES, scopeMessageKey } from '#/lib/agent-scopes'
+import { READ_SCOPES } from '#/lib/agent-scopes'
 import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 
@@ -82,18 +81,12 @@ export function MintTokenDialog({
                 onChange={setName}
                 autoComplete="off"
               />
-              <CheckboxGroup
+              <AgentScopePicker
                 isRequired
                 label={t('settings.agents.scopesLabel')}
-                value={[...scopes]}
+                value={scopes}
                 onChange={setScopes}
-              >
-                {AGENT_SCOPES.map((scope) => (
-                  <Checkbox key={scope} value={scope}>
-                    {t(scopeMessageKey(scope))}
-                  </Checkbox>
-                ))}
-              </CheckboxGroup>
+              />
               {failure === null ? null : (
                 <FailurePanel
                   failure={failure}

@@ -1680,6 +1680,11 @@ const messages = {
     'The next tool call with this grant fails. This does not delete rows it already wrote.',
   'settings.agents.revoke.confirm': 'Revoke access',
   'settings.agents.revoked': 'Access for {name} was revoked.',
+  'settings.agents.edit': 'Edit settings',
+  'settings.agents.edit.action': 'Edit settings for {name}',
+  'settings.agents.edit.title': 'Settings for {name}',
+  'settings.agents.edit.saved': 'Access for {name} was updated.',
+  'settings.agents.edit.scopesRequired': 'Choose at least one permission.',
   'settings.agents.locked':
     'Agent access is part of Plus and Household. The free plan does not include it.',
   'settings.agents.locked.cta': 'See plans',
@@ -1713,7 +1718,9 @@ const messages = {
   'oauth.consent.title': 'Allow {clientName}?',
   'oauth.consent.body':
     'This app is asking to use {workspaceName}. It cannot see any other workspace.',
-  'oauth.consent.requested': 'Requested access',
+  'oauth.consent.requested': 'Choose access',
+  'oauth.consent.scopeHint':
+    'Reading starts on. Creating, changing, and deleting stay off until you turn them on.',
   'oauth.consent.revokeHint':
     'You can revoke this later under Settings → Connected agents.',
   'oauth.consent.allow': 'Allow',

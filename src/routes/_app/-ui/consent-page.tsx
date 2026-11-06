@@ -1,8 +1,12 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 
+import {
+  AgentScopePicker,
+  selectedAgentScopes,
+} from '#/components/app/agent-scope-picker'
 import { ErrorPanel, FailurePanel } from '#/components/app/shell'
 import { Button, Card, CardBody } from '#/components/ui'
-import { parseRequestedAgentScopes, scopeMessageKey } from '#/lib/agent-scopes'
+import { READ_SCOPES } from '#/lib/agent-scopes'
 import { failureOf } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 
@@ -13,7 +17,6 @@ import type { AgentScope } from '#/lib/agent-scopes'
 export interface ConsentPageProps {
   consent: ConsentPageView
   clientId: string
-  requestedScope?: string
   onAllow: (input: {
     name: string
     clientId: string
@@ -25,20 +28,20 @@ export interface ConsentPageProps {
 export function ConsentPage({
   consent,
   clientId,
-  requestedScope,
   onAllow,
   onDecide,
 }: ConsentPageProps) {
   const t = useTranslate()
   const headingId = useId()
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const [scopes, setScopes] = useState<ReadonlyArray<string>>([...READ_SCOPES])
   const [isWorking, setIsWorking] = useState(false)
   const [failure, setFailure] = useState<FailureEnvelope | null>(null)
 
   const trimmedClientId = clientId.trim()
   const clientName =
     trimmedClientId.length > 0 ? trimmedClientId : t('common.unknown')
-  const scopes = parseRequestedAgentScopes(requestedScope)
+  const selected = selectedAgentScopes(scopes)
 
   useLayoutEffect(() => {
     headingRef.current?.focus()
@@ -75,10 +78,11 @@ export function ConsentPage({
     setFailure(null)
     try {
       if (accept) {
+        if (selected.length === 0) return
         await onAllow({
           name: clientName.slice(0, 80),
           clientId: trimmedClientId,
-          scopes,
+          scopes: selected,
         })
       }
       await onDecide(accept)
@@ -105,16 +109,13 @@ export function ConsentPage({
             workspaceName: consent.workspaceName,
           })}
         </p>
-        <div>
-          <h2 className="text-label font-semibold text-ink">
-            {t('oauth.consent.requested')}
-          </h2>
-          <ul className="mt-2 list-disc ps-5 text-body text-ink">
-            {scopes.map((scope) => (
-              <li key={scope}>{t(scopeMessageKey(scope))}</li>
-            ))}
-          </ul>
-        </div>
+        <AgentScopePicker
+          isRequired
+          label={t('oauth.consent.requested')}
+          description={t('oauth.consent.scopeHint')}
+          value={scopes}
+          onChange={setScopes}
+        />
         <p className="text-caption text-ink-2">
           {t('oauth.consent.revokeHint')}
         </p>
@@ -141,7 +142,7 @@ export function ConsentPage({
             variant="primary"
             size="lg"
             isPending={isWorking}
-            isDisabled={!consent.mcpEnabled}
+            isDisabled={!consent.mcpEnabled || selected.length === 0}
             onPress={() => void finish(true)}
           >
             {t('oauth.consent.allow')}

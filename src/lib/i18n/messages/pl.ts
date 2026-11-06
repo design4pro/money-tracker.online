@@ -1724,6 +1724,12 @@ const messages = {
     'Następne wywołanie narzędzia z tym uprawnieniem się nie uda. Wiersze, które już zapisało, zostają.',
   'settings.agents.revoke.confirm': 'Cofnij dostęp',
   'settings.agents.revoked': 'Dostęp dla {name} został cofnięty.',
+  'settings.agents.edit': 'Edytuj ustawienia',
+  'settings.agents.edit.action': 'Edytuj ustawienia: {name}',
+  'settings.agents.edit.title': 'Ustawienia: {name}',
+  'settings.agents.edit.saved': 'Dostęp dla {name} został zaktualizowany.',
+  'settings.agents.edit.scopesRequired':
+    'Wybierz co najmniej jedno uprawnienie.',
   'settings.agents.locked':
     'Dostęp agentów jest w planach Plus i Household. Plan bezpłatny go nie obejmuje.',
   'settings.agents.locked.cta': 'Zobacz plany',
@@ -1758,7 +1764,9 @@ const messages = {
   'oauth.consent.title': 'Zezwolić aplikacji {clientName}?',
   'oauth.consent.body':
     'Ta aplikacja prosi o dostęp do domu {workspaceName}. Nie zobaczy żadnej innej przestrzeni.',
-  'oauth.consent.requested': 'Żądany dostęp',
+  'oauth.consent.requested': 'Wybierz dostęp',
+  'oauth.consent.scopeHint':
+    'Odczyt jest włączony. Tworzenie, zmiana i usuwanie zostają wyłączone, dopóki ich nie włączysz.',
   'oauth.consent.revokeHint':
     'Możesz to później cofnąć w Ustawieniach → Połączone agenty.',
   'oauth.consent.allow': 'Zezwól',
