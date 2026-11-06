@@ -39,14 +39,14 @@ async function keysOrWarn(): Promise<UnsubscribeKeys | null> {
 }
 
 export const readUnsubscribeLink = createServerFn({ method: 'GET' })
-  .inputValidator(unsubscribeInputSchema)
+  .validator(unsubscribeInputSchema)
   .handler(async ({ data }): Promise<UnsubscribeOutcome> => {
     const { getDb } = await import('#/server/auth/db')
     return readUnsubscribe(getDb(), await keysOrWarn(), data.t, new Date())
   })
 
 export const confirmUnsubscribe = createServerFn({ method: 'POST' })
-  .inputValidator(unsubscribeInputSchema)
+  .validator(unsubscribeInputSchema)
   .handler(async ({ data }): Promise<UnsubscribeOutcome> => {
     const { getDb } = await import('#/server/auth/db')
     return applyUnsubscribe(getDb(), await keysOrWarn(), data.t, new Date())

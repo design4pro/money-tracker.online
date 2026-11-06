@@ -49,7 +49,7 @@ const transactionIdSchema = z.strictObject({
 
 /** One transaction, under the policies the caller states. A miss is a `NotFoundError`. */
 export const getTransaction = createServerFn({ method: 'GET' })
-  .inputValidator(transactionIdSchema)
+  .validator(transactionIdSchema)
   .handler(async ({ data }): Promise<Transaction> => {
     const scope = await requireOrg()
     return getTransactionRow({
@@ -69,7 +69,7 @@ export const loadTransactionsSchema = ledgerPageInputSchema
  * own single `requireOrg()`, which is why the body is not here.
  */
 export const loadTransactions = createServerFn({ method: 'GET' })
-  .inputValidator(loadTransactionsSchema)
+  .validator(loadTransactionsSchema)
   .handler(async ({ data }): Promise<TransactionListPage> =>
     ledgerPageFor(await requireOrg(), data),
   )
@@ -84,7 +84,7 @@ const createSchema = z.strictObject({
 })
 
 export const createTransaction = createServerFn({ method: 'POST' })
-  .inputValidator(createSchema)
+  .validator(createSchema)
   .handler(async ({ data }): Promise<Transaction> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -104,7 +104,7 @@ const updateSchema = z.strictObject({
 })
 
 export const updateTransaction = createServerFn({ method: 'POST' })
-  .inputValidator(updateSchema)
+  .validator(updateSchema)
   .handler(async ({ data }): Promise<Transaction> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -119,7 +119,7 @@ export const updateTransaction = createServerFn({ method: 'POST' })
   )
 
 export const deleteTransaction = createServerFn({ method: 'POST' })
-  .inputValidator(transactionIdSchema)
+  .validator(transactionIdSchema)
   .handler(async ({ data }): Promise<void> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()

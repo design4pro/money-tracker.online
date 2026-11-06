@@ -59,7 +59,7 @@ export interface ImportBatchDescription {
 
 /** Re-reads a stored batch's file. What it does, and why, is in {@link describeImportBatchFor}. */
 export const describeImportBatch = createServerFn({ method: 'GET' })
-  .inputValidator(describeImportBatchSchema)
+  .validator(describeImportBatchSchema)
   .handler(async ({ data }): Promise<ImportBatchDescription> => {
     const scope = await requireOrg()
     const { env } = await import('cloudflare:workers')

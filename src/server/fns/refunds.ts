@@ -47,7 +47,7 @@ import type { RefundSummary, RefundTarget } from '#/server/repos/refunds'
 
 /** One transaction's refunds, what is left of it, and what it is itself a refund of. */
 export const loadRefunds = createServerFn({ method: 'GET' })
-  .inputValidator(transactionIdSchema)
+  .validator(transactionIdSchema)
   .handler(async ({ data }): Promise<RefundSummary> => {
     const scope = await requireOrg()
     return listRefundsForRows(scope, data)
@@ -55,7 +55,7 @@ export const loadRefunds = createServerFn({ method: 'GET' })
 
 /** What this refund might be a refund of, ranked and explained. It suggests; it never links. */
 export const suggestRefundTargets = createServerFn({ method: 'GET' })
-  .inputValidator(refundTransactionIdSchema)
+  .validator(refundTransactionIdSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<RefundTarget>> => {
     const scope = await requireOrg()
     return suggestRefundTargetsRows(scope, data)
@@ -63,7 +63,7 @@ export const suggestRefundTargets = createServerFn({ method: 'GET' })
 
 /** Records that one transaction gives back part of another — or of something outside the system. */
 export const linkRefund = createServerFn({ method: 'POST' })
-  .inputValidator(linkRefundSchema)
+  .validator(linkRefundSchema)
   .handler(async ({ data }): Promise<Refund> => {
     const scope = await requireOrg()
     return linkRefundRow(scope, data)
@@ -71,7 +71,7 @@ export const linkRefund = createServerFn({ method: 'POST' })
 
 /** Removes the link. Both transactions survive; only what one of them was *for* changes. */
 export const unlinkRefund = createServerFn({ method: 'POST' })
-  .inputValidator(refundIdSchema)
+  .validator(refundIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await unlinkRefundRow(scope, data)

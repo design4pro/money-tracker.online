@@ -65,7 +65,7 @@ export interface ImportUploadResult {
 
 /** Stores one file and answers with what it is. The whole of it is {@link uploadImportFor}. */
 export const uploadImport = createServerFn({ method: 'POST' })
-  .inputValidator((data: FormData) => data)
+  .validator((data: FormData) => data)
   .handler(async ({ data }): Promise<ImportUploadResult> => {
     const scope = await requireOrg()
     return uploadImportFor(scope, await filesBucket(), data)
@@ -73,7 +73,7 @@ export const uploadImport = createServerFn({ method: 'POST' })
 
 /** The import history, newest first. */
 export const listImports = createServerFn({ method: 'GET' })
-  .inputValidator(listImportBatchesSchema)
+  .validator(listImportBatchesSchema)
   .handler(async ({ data }): Promise<CursorPage<ImportBatchDto>> => {
     const scope = await requireOrg()
     return listImportsFor(scope, data)
@@ -81,7 +81,7 @@ export const listImports = createServerFn({ method: 'GET' })
 
 /** One batch, or a not-found. */
 export const getImport = createServerFn({ method: 'GET' })
-  .inputValidator(importBatchIdSchema)
+  .validator(importBatchIdSchema)
   .handler(async ({ data }): Promise<ImportBatchDto> => {
     const scope = await requireOrg()
     return getImportFor(scope, data)

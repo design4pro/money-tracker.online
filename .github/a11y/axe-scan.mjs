@@ -473,9 +473,9 @@ const open = async (page, route, { theme, viewportName }) => {
 //
 // The meter correction below is the other half of the same argument, and it is imported rather
 // than restated: `e2e/support/axe-defects.ts` drops the `aria-allowed-attr` nodes that are an
-// axe-core resolution failure against React Aria's `role="meter progressbar"` fallback list, on
-// three conditions and with a re-check date. It is a correction, not a waiver - a fifth attribute,
-// a different element or a changed role string still fails here exactly as it fails the spec.
+// axe-core resolution failure against React Aria's older `role="meter progressbar"` fallback
+// list. 1.22.1 emits `role="meter"`, so the helper currently drops nothing; a revert to the list
+// still fails only the four value attributes, on the same three conditions.
 const runAxe = async (page, tags) => {
   const results = await new AxeBuilder({ page })
     .withTags(tags)

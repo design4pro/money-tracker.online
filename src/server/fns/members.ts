@@ -101,7 +101,7 @@ export interface InviteResult {
 }
 
 export const inviteMember = createServerFn({ method: 'POST' })
-  .inputValidator(inviteSchema)
+  .validator(inviteSchema)
   .handler(async ({ data }): Promise<InviteResult> => {
     const scope = await requireOrg()
     const invitation = await inviteMemberRow(scope, data)
@@ -116,7 +116,7 @@ export const inviteMember = createServerFn({ method: 'POST' })
   })
 
 export const resendInvitation = createServerFn({ method: 'POST' })
-  .inputValidator(idSchema)
+  .validator(idSchema)
   .handler(async ({ data }): Promise<InviteResult> => {
     const scope = await requireOrg()
     const invitation = await renewInvitation(scope, data.invitationId)
@@ -131,21 +131,19 @@ export const resendInvitation = createServerFn({ method: 'POST' })
   })
 
 export const revokeInvitation = createServerFn({ method: 'POST' })
-  .inputValidator(idSchema)
+  .validator(idSchema)
   .handler(async ({ data }): Promise<void> => {
     await revokeInvitationRow(await requireOrg(), data.invitationId)
   })
 
 export const changeMemberRole = createServerFn({ method: 'POST' })
-  .inputValidator(memberIdSchema)
+  .validator(memberIdSchema)
   .handler(async ({ data }): Promise<void> => {
     await changeMemberRoleRow(await requireOrg(), data)
   })
 
 export const removeMember = createServerFn({ method: 'POST' })
-  .inputValidator(
-    z.strictObject({ memberId: z.string().trim().min(1).max(64) }),
-  )
+  .validator(z.strictObject({ memberId: z.string().trim().min(1).max(64) }))
   .handler(async ({ data }): Promise<void> => {
     await removeMemberRow(await requireOrg(), data.memberId)
   })
@@ -161,7 +159,7 @@ export const leaveWorkspace = createServerFn({ method: 'POST' }).handler(
 /* -------------------------------------------------------------------------- */
 
 export const loadInvitation = createServerFn({ method: 'GET' })
-  .inputValidator(idSchema)
+  .validator(idSchema)
   .handler(async ({ data }): Promise<InvitationView> => {
     const user = await requireUser()
     const { getDb } = await import('#/server/auth/db')
@@ -172,7 +170,7 @@ export const loadInvitation = createServerFn({ method: 'GET' })
   })
 
 export const acceptInvitation = createServerFn({ method: 'POST' })
-  .inputValidator(idSchema)
+  .validator(idSchema)
   .handler(async ({ data }): Promise<{ organizationId: string }> => {
     const user = await requireUser()
     const { getDb } = await import('#/server/auth/db')
