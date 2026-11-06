@@ -124,12 +124,18 @@ import {
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
   NOTIFICATION_KIND_IDS,
+  EMAIL_DELIVERY_STATUSES,
+  EMAIL_DELIVERY_KINDS,
+  EMAIL_SUPPRESSION_REASONS,
   BOOKS,
   LOAN_KINDS,
   LOAN_STATUSES,
   LOAN_REPAYMENT_SHAPES,
   LOAN_PAYMENT_FREQUENCIES,
   LOAN_INSTALMENT_STATUSES,
+  AGENT_GRANT_KINDS,
+  AGENT_AUDIT_OUTCOMES,
+  AGENT_VERBS,
 } from '#/lib/enums'
 
 /**
@@ -172,12 +178,20 @@ export {
   EXPORT_STATUSES,
   SUGGESTION_KINDS,
   NOTIFICATION_KIND_IDS,
+  EMAIL_DELIVERY_STATUSES,
+  EMAIL_DELIVERY_KINDS,
+  EMAIL_SUPPRESSION_REASONS,
   BOOKS,
   LOAN_KINDS,
   LOAN_STATUSES,
   LOAN_REPAYMENT_SHAPES,
   LOAN_PAYMENT_FREQUENCIES,
   LOAN_INSTALMENT_STATUSES,
+  AGENT_GRANT_KINDS,
+  AGENT_RESOURCES,
+  AGENT_VERBS,
+  AGENT_AUDIT_OUTCOMES,
+  AGENT_PAT_ENVIRONMENTS,
 } from '#/lib/enums'
 export type {
   PlanId,
@@ -215,12 +229,20 @@ export type {
   ExportStatus,
   SuggestionKind,
   NotificationKind,
+  EmailDeliveryStatus,
+  EmailDeliveryKind,
+  EmailSuppressionReason,
   Book,
   LoanKind,
   LoanStatus,
   LoanRepaymentShape,
   LoanPaymentFrequency,
   LoanInstalmentStatus,
+  AgentGrantKind,
+  AgentResource,
+  AgentVerb,
+  AgentAuditOutcome,
+  AgentPatEnvironment,
 } from '#/lib/enums'
 
 /* -------------------------------------------------------------------------- */
@@ -794,11 +816,13 @@ export type OrganizationExchangeRateRow =
  * a parent does not orphan a child into an unreachable third level (`set null` promotes it).
  *
  * `color` is `NOT NULL` — a child inherits its parent's colour at creation time and stores it,
- * rather than resolving it on read. A stored colour survives the parent being recoloured, which is
- * what a reader expects of a chart they printed last month.
+ * rather than resolving it on read. A child that still carries the parent's colour is repainted
+ * when the parent is recoloured (`cascadeColor`); a child that carries its own colour is not.
  *
- * `is_system` rows may be renamed and recoloured but not deleted: the import mappers and the rule
- * engine address them by `slug`, and a missing slug is a silently mis-categorised import.
+ * `is_system` is reserved for a row the product itself must find by slug. None exists today.
+ * The standard set writes ordinary rows (`is_system = 0`) so a person who does not want them can
+ * delete them. Import mappers and the rule engine address categories by free text and by id, not
+ * by this flag.
  */
 export const categories = sqliteTable(
   'categories',
@@ -1818,6 +1842,16 @@ export const transactions = sqliteTable(
 
     /** A future or forecast row. Excluded from actuals unless a policy says otherwise. */
     isPlanned: integer('is_planned', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    /**
+     * This row was created as a plan, or was flipped from planned to posted.
+     *
+     * Never cleared. The dashboard whole-month plan (`#840`) uses `is_planned OR was_planned`
+     * so a posted one-off stays in the plan at its stored `ref_amount_minor`. Rows created
+     * already posted stay `false`. Additive: history before this column is an accepted hole.
+     */
+    wasPlanned: integer('was_planned', { mode: 'boolean' })
       .notNull()
       .default(false),
     /**
@@ -3185,3 +3219,177 @@ export const notificationPrefs = sqliteTable(
 )
 
 export type NotificationPrefRow = typeof notificationPrefs.$inferSelect
+
+/**
+ * One attempt to send a notification (or digest) email.
+ *
+ * The unique key is `(organization_id, user_id, dedupe_key)`, so a second enqueue of the same
+ * occasion in the same workspace is an insert conflict, and two workspaces may both hold
+ * `digest:2026-09-20`. `to_hash` is written at send time from the address actually used, never
+ * the address itself; rotating `EMAIL_HASH_SALT` would break bounce correlation, which is why
+ * that secret is never rotated.
+ *
+ * `notification_id` is null for a digest and becomes null when the in-app row is deleted
+ * (`ON DELETE SET NULL`). The handler treats that as `gone` and does not call the provider.
+ */
+export const emailDeliveries = sqliteTable(
+  'email_deliveries',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    notificationId: text('notification_id').references(() => notifications.id, {
+      onDelete: 'set null',
+    }),
+    dedupeKey: text('dedupe_key').notNull(),
+    /** HMAC-SHA-256 of the address actually used. Never the address. */
+    toHash: text('to_hash'),
+    providerMessageId: text('provider_message_id'),
+    status: text('status').notNull(),
+    /** Provider HTTP status or an error `name`. Never a message body. */
+    errorCode: text('error_code'),
+    createdAt: createdAt(),
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex(
+      'email_deliveries_organization_id_user_id_dedupe_key_unique',
+    ).on(table.organizationId, table.userId, table.dedupeKey),
+    index('email_deliveries_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    enumCheck('email_deliveries_kind_check', table.kind, EMAIL_DELIVERY_KINDS),
+    enumCheck(
+      'email_deliveries_status_check',
+      table.status,
+      EMAIL_DELIVERY_STATUSES,
+    ),
+  ],
+)
+
+export type EmailDeliveryRow = typeof emailDeliveries.$inferSelect
+export type EmailDeliveryInsert = typeof emailDeliveries.$inferInsert
+
+/**
+ * One agent grant: OAuth or a personal token, bound to one user and one workspace.
+ *
+ * The secret is never stored. `token_hash` is SHA-256 of the PAT; OAuth rows leave it null.
+ * Revocation sets `revoked_at`; v1 does not delete the row (`docs/specs` MCP Phase 1).
+ */
+export const agentGrants = sqliteTable(
+  'agent_grants',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    name: text('name').notNull(),
+    clientId: text('client_id'),
+    tokenHash: text('token_hash'),
+    tokenPrefix: text('token_prefix'),
+    /** JSON array of `resource:verb` strings. */
+    scopes: text('scopes').notNull(),
+    createdAt: createdAt(),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    index('agent_grants_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    index('agent_grants_organization_id_user_id_idx').on(
+      table.organizationId,
+      table.userId,
+    ),
+    index('agent_grants_organization_id_client_id_idx').on(
+      table.organizationId,
+      table.clientId,
+    ),
+    uniqueIndex('agent_grants_token_hash_unique').on(table.tokenHash),
+    enumCheck('agent_grants_kind_check', table.kind, AGENT_GRANT_KINDS),
+    maxLengthCheck('agent_grants_name_length_check', table.name, 80),
+    check(
+      'agent_grants_kind_secret_check',
+      sql`(${table.kind} = 'pat' and ${table.tokenHash} is not null and ${table.tokenPrefix} is not null and ${table.clientId} is null) or (${table.kind} = 'oauth' and ${table.tokenHash} is null and ${table.tokenPrefix} is null)`,
+    ),
+  ],
+)
+
+export type AgentGrantRow = typeof agentGrants.$inferSelect
+export type AgentGrantInsert = typeof agentGrants.$inferInsert
+
+/**
+ * One MCP (or mint) operation. Ids, tool, verb, outcome — never amounts or payloads.
+ */
+export const agentAuditLog = sqliteTable(
+  'agent_audit_log',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    grantId: text('grant_id')
+      .notNull()
+      .references(() => agentGrants.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    tool: text('tool').notNull(),
+    verb: text('verb').notNull(),
+    resource: text('resource').notNull(),
+    resourceId: text('resource_id'),
+    outcome: text('outcome').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('agent_audit_log_organization_id_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    index('agent_audit_log_organization_id_grant_id_idx').on(
+      table.organizationId,
+      table.grantId,
+    ),
+    enumCheck('agent_audit_log_verb_check', table.verb, AGENT_VERBS),
+    enumCheck(
+      'agent_audit_log_outcome_check',
+      table.outcome,
+      AGENT_AUDIT_OUTCOMES,
+    ),
+  ],
+)
+
+export type AgentAuditLogRow = typeof agentAuditLog.$inferSelect
+export type AgentAuditLogInsert = typeof agentAuditLog.$inferInsert
+
+/**
+ * Addresses that must never be mailed again, keyed by the same salted hash `to_hash` uses.
+ *
+ * **Platform data, not tenant data** — the fourth documented carve-out from `docs/SPEC.md` §5.2.
+ * A bounce or complaint is a fact about a mailbox. Per-workspace suppression would keep emailing
+ * a complained address from a second household and burn sender reputation. There is no
+ * `organization_id`, and the only readers are the queue handler (lookup) and the Resend webhook
+ * (write, a later phase).
+ */
+export const emailSuppressions = sqliteTable(
+  'email_suppressions',
+  {
+    emailHash: text('email_hash').primaryKey(),
+    reason: text('reason').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    enumCheck(
+      'email_suppressions_reason_check',
+      table.reason,
+      EMAIL_SUPPRESSION_REASONS,
+    ),
+  ],
+)
+
+export type EmailSuppressionRow = typeof emailSuppressions.$inferSelect

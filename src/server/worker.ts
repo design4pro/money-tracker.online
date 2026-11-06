@@ -34,8 +34,15 @@ import './billing/install'
 // summaries say `dispatcherInstalled: false`.
 import './notify/install'
 
+// Side effect only: installs the notification-email enqueuer when the unsubscribe signing key
+// and the recipient-hash salt are both set. Unset, the named no-op stays and the module logs why.
+import './email/install'
+
+import { handleAuthRequest } from './auth'
 import { runBudgetPeriodSweep } from './cron/budget-periods'
 import { runBudgetThresholdSweep } from './cron/budget-thresholds'
+import { runDigest } from './cron/digest'
+import { runEmailRecovery } from './cron/email-recovery'
 import { runRecurringHourly, runRecurringReminderSweep } from './cron/recurring'
 import { dbFromEnv } from './db/from-env'
 import { handleTaskBatch } from './queue/dispatch'
@@ -91,6 +98,13 @@ export default {
    * the environment to a parameter that expects request options was never intended.
    */
   fetch(request: Request): Response | Promise<Response> {
+    // TanStack Router ignores dot-directories, so RFC 8414 / RFC 9728 discovery
+    // cannot live as `src/routes/.well-known/$`. MCP clients look at the origin
+    // root; Better Auth `mcp()` already owns the handler.
+    const pathname = new URL(request.url).pathname
+    if (pathname.startsWith('/.well-known/')) {
+      return handleAuthRequest(request)
+    }
     return fetchHandler(request)
   },
 
@@ -164,9 +178,37 @@ export default {
       })
       logger.info('budget threshold sweep finished', { ...thresholds })
 
+      const recovery = await runEmailRecovery({
+        scopes: args.scopes,
+        now,
+        logger,
+        send: async (message) => {
+          await env.TASKS.send(message)
+        },
+        hasProvider:
+          typeof env.EMAIL_API_KEY === 'string' && env.EMAIL_API_KEY.length > 0,
+      })
+      logger.info('email recovery sweep finished', { ...recovery })
+
       // Returned, not fallen through: this slot now has handlers, and reaching the warning below
       // would report the tag reminders that are still owed as if nothing in the slot had run.
       return
+    }
+
+    if (controller.cron === NIGHTLY_CRON) {
+      const now = new Date(controller.scheduledTime)
+      const digest = await runDigest({
+        scopes: await listCronScopes(dbFromEnv(env)),
+        now,
+        logger,
+        send: async (message) => {
+          await env.TASKS.send(message)
+        },
+        hasProvider:
+          typeof env.EMAIL_API_KEY === 'string' && env.EMAIL_API_KEY.length > 0,
+      })
+      logger.info('digest sweep finished', { ...digest })
+      // Digest is wired; the remaining nightly jobs are still owed, so the warning stays.
     }
 
     logger.warn('cron has no handler yet', {

@@ -173,6 +173,7 @@ function subject(overrides: Partial<RuleSubject> = {}): RuleSubject {
     direction: 'expense',
     bookedOn: '2026-03-10',
     payeeLocked: false,
+    isPlanned: false,
     ...overrides,
   }
 }

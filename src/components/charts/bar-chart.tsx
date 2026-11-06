@@ -16,6 +16,7 @@ import { useRovingFocus } from './use-roving-focus'
 
 import type { ReactNode } from 'react'
 import type { BandLayout } from './scales'
+import type { ChartTableRow } from './data-table'
 import type { ChartCopy, ChartSeries } from './types'
 import type { Locale } from '#/lib/i18n'
 import type { CurrencyCode, Minor } from '#/lib/money'
@@ -83,6 +84,14 @@ export interface BarChartProps {
   readonly emphasis?: ReadonlyArray<boolean>
   /** A note under the legend. The place to say what the context categories are. */
   readonly footnote?: ReactNode
+  /**
+   * Extra rows appended to the text equivalent after the series rows.
+   *
+   * Used for native-currency planned amounts that the chart (single-currency by construction)
+   * cannot draw. They stay in the same table so a reader does not meet two tables of the same
+   * month.
+   */
+  readonly extraTableRows?: ReadonlyArray<ChartTableRow>
   readonly className?: string
 }
 
@@ -97,6 +106,7 @@ export function BarChart({
   showLegend = true,
   emphasis,
   footnote,
+  extraTableRows,
   className,
 }: BarChartProps) {
   const [readout, setReadout] = useState<string | null>(null)
@@ -157,11 +167,14 @@ export function BarChart({
           caption={copy.title}
           rowHeader={copy.categoryHeader}
           columnHeaders={series.map((entry) => entry.name)}
-          rows={rowsFromSeries(
-            series,
-            (amountMinor) => chartAmount(locale, currencyCode, amountMinor),
-            copy.noData,
-          )}
+          rows={[
+            ...rowsFromSeries(
+              series,
+              (amountMinor) => chartAmount(locale, currencyCode, amountMinor),
+              copy.noData,
+            ),
+            ...(extraTableRows ?? []),
+          ]}
           footerRow={
             totalLabel === undefined
               ? undefined

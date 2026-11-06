@@ -43,6 +43,7 @@ import { runWithLedgerBatch, setLedgerBatchPorts } from '#/server/ledger/batch'
 import { ConflictError, NotFoundError } from '../errors'
 import { createScope } from '../scope'
 import { deleteTransaction, findTransaction } from '../transactions'
+import { sqliteBatchCallback } from './db-harness'
 import {
   convertToTransfer,
   createTransfer,
@@ -55,7 +56,8 @@ import {
 import type { RateE10 } from '#/lib/money'
 import type { CreateTransferInput } from '#/server/transfers/create'
 import type { Database, TenantScope } from '../base'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type { TransactionPolicies } from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 import type { UpdateTransferInput } from '../transfers'
 
 /** The `internal` member of the create union, which is what every fixture below builds. */
@@ -95,7 +97,7 @@ function openTestDb(): Database {
       .all(...(params as Array<never>))
       .map((row) => Object.values(row as Record<string, unknown>))
     return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  }, sqliteBatchCallback(sqlite))
 }
 
 const EVERYTHING: TransactionPolicies = {

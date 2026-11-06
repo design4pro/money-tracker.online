@@ -8,12 +8,14 @@
  * The plugins mirror the server's, minus one. `admin` is deliberately absent: its HTTP paths are
  * closed by `disabledPaths` in `src/server/auth/permissions.ts`, so a client for them would be a
  * set of methods that always answer `404` — an invitation to try, and a misleading one.
+ * `oauthProviderClient` signs the consent POST (`oauth_query`) from the authorize redirect.
  *
  * `AuthFailure` at the bottom exists because every auth screen needs the same three facts about a
  * refusal and Better Auth hands back a wide error object. Normalising once here means the screens
  * hold one shape and the message catalogue holds one key per code.
  */
 
+import { oauthProviderClient } from '@better-auth/oauth-provider/client'
 import { createAuthClient } from 'better-auth/react'
 import { organizationClient, twoFactorClient } from 'better-auth/client/plugins'
 
@@ -32,7 +34,7 @@ export const AUTH_BASE_PATH = '/api/auth'
  */
 export const authClient = createAuthClient({
   basePath: AUTH_BASE_PATH,
-  plugins: [twoFactorClient(), organizationClient()],
+  plugins: [twoFactorClient(), organizationClient(), oauthProviderClient()],
 })
 
 export const {
@@ -59,8 +61,8 @@ export interface AuthFailure {
   /**
    * The server's own sentence.
    *
-   * A fallback for a code the catalogue does not know yet, never the primary text: it is English,
-   * it comes from a dependency, and the product ships in more than one language.
+   * Kept for diagnostics. Screens never render it: `authFailureMessage` maps `code` and `status`
+   * to the catalogue, and falls back to the generic auth failure, never this English string.
    */
   readonly message: string
 }

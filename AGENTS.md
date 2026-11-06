@@ -12,8 +12,9 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
 - Money stays in integer minor units at every layer. The scale is `currencies.digits`, never a
   hard-coded 2. `ref_amount_minor` is historical and never recomputed (`docs/MONEY.md`).
 - All SQL lives in `src/server/repos` and goes through the tenant-scoped base repository;
-  `src/server/catalog`, `billing_events` and the `organization_currencies` insert in the
-  workspace-creation batch (`src/server/auth/organization.ts`) are the three documented exceptions
+  `src/server/catalog`, `billing_events`, `email_suppressions` and the `organization_currencies`
+  insert in the workspace-creation batch (`src/server/auth/organization.ts`) are the documented
+  exceptions
   (`docs/SPEC.md` §5.2).
 - Validate every server-function input with Zod, and parse it a second time in the repository.
   Validation is shape, never permission.
@@ -31,11 +32,16 @@ This file is the router. It stays under 32 KiB; detail lives in the documents th
   additive.
 - Anything slow is enqueued on `TASKS`; balances are rebuilt through the `LEDGER` Durable Object.
 - Conventional Commits in English, scope = module or plan area. Branches are `<type>/issue-<n>-<slug>`
-  when an issue exists and `<type>/<slug>` when none does; `<type>` is an open set (`fix`, `feat`,
-  `chore`, `docs`, `ci`, `perf`, `test`, `claude`), `spec/<slug>` is a spec, `cez/<id8>` is Cezar's
-  task branch, and Dependabot's and other bot branches are outside the rule. PRs target `develop`
-  and carry `Closes #<n>` when there is an issue (a stacked PR is the one exception to the target:
-  `SDLC.md` -> Stacked pull requests).
+  when an issue exists and `<type>/<slug>` when none does; a phase PR of a multi-phase spec is
+  `<type>/issue-<n>-<slug>-phase-<k>` (usually `feat/`, `fix/` when that phase is a correction).
+  `<type>` is an open set (`fix`, `feat`, `chore`, `docs`, `ci`, `perf`, `test`, `claude`),
+  `spec/<slug>` is a spec, `cez/<id8>` is Cezar's task branch, and Dependabot's and other bot
+  branches are outside the rule. PRs target `develop` (a stacked PR is the one exception to the
+  target: `SDLC.md` -> Stacked pull requests). A PR that finishes an issue carries `Closes #<n>`.
+  A phase PR that is not the last phase of its spec, and a stacked PR that is not the last in its
+  stack, carry `Refs #<n>` and never `Closes` on the umbrella. The spec's phase list names the last
+  phase; the coordinator is who notices it and puts `Closes #<n>` on that last phase PR
+  (`SDLC.md` -> Phase pull requests).
 - Every number you write down came from a command whose output you read (`docs/SPEC.md` §7.7). So
   does every claim about what a tool, a library or the suite does: probe it once instead of copying
   a sentence from a comment, an ADR or a brief (#472, #531, #574). A spec or a brief describes the
@@ -166,7 +172,7 @@ file is allowed; printing a value is not.
 | Tests                                          | skill `tdd`; skill `verifying-changes`; `vitest.config.ts`; `e2e/support/`                                       | Failing test first; workerd project for Worker code (ADR 0015); console red fails a browser run                                                                                                                                                                                  |
 | Verifying a change, a confusing failure        | skill `verifying-changes`                                                                                        | Re-run failed files alone; a timeout is a claim about the machine until the text says otherwise                                                                                                                                                                                  |
 | Visual verification                            | ADR 0016; `scripts/visual/capture.mjs`                                                                           | Light + dark, 360 + 1280, the interaction state; frames outside the repository                                                                                                                                                                                                   |
-| Background work, cron, email                   | `src/server/queue/`, `src/server/cron/`, `src/server/email/`; `wrangler.jsonc`                                   | Idempotent handlers; one `kind` per job; keys not sentences in envelopes                                                                                                                                                                                                         |
+| Background work, cron, email                   | `src/server/queue/`, `src/server/cron/`, `src/server/email/`; `wrangler.jsonc`; ADR 0035                         | Idempotent handlers; one `kind` per job; keys not sentences in envelopes; notification mail is event name + deep link, never amounts or transaction data                                                                                                                         |
 | Bindings, secrets, deploys                     | `wrangler.jsonc`; `docs/DEPLOY.md`; `docs/SECURITY.md`; `.dev.vars.example`                                      | Append-only DO migrations; never a secret in a log or a PR                                                                                                                                                                                                                       |
 | A new feature or area                          | `docs/plans/README.md` and the area's plan; `docs/agents/out-of-scope.md`                                        | Plans are the backlog source; a rejected request is not re-litigated                                                                                                                                                                                                             |
 | Product discovery, a brief, a backlog          | `.ai/specs/product-brief.md`; `.ai/specs/research/`; `SDLC.md` § Definition of Ready, § Product decisions        | The brief's non-goals, rules and decisions are a protected contract: supersede an entry, never contradict it; a synthetic persona is a hypothesis <!-- discovery -->                                                                                                             |

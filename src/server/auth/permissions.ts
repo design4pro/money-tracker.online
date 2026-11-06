@@ -274,6 +274,9 @@ export const DISABLED_ADMIN_PATHS: string[] = [
   '/admin/stop-impersonating',
   '/admin/unban-user',
   '/admin/update-user',
+  '/admin/oauth2/create-client',
+  '/admin/oauth2/update-client',
+  '/admin/oauth2/resources',
 ]
 
 /**

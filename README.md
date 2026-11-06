@@ -15,6 +15,9 @@ Playwright + `@axe-core/playwright`. The dependency set is **pinned and frozen**
 
 ## Quickstart
 
+Node comes from `.nvmrc` (currently 24). `package.json` `engines.node` is `>=24` and warns if
+the host is below that range; it does not fail `pnpm install`.
+
 ```bash
 pnpm install
 cp .dev.vars.example .dev.vars      # runtime secrets read by the Worker

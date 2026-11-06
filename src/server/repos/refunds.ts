@@ -61,7 +61,8 @@ import { refunds, transactionSplits, transactions } from '#/server/db/schema'
 
 import { allOf, asc, createTenantTableAccess, desc, inIds } from './base'
 import { ConflictError, NotFoundError } from './errors'
-import { applyPolicies, getTransaction, toTransaction } from './transactions'
+import { applyPolicies, getTransaction } from './transactions'
+import { toTransaction } from '#/server/transactions/row'
 
 import type { SQL } from 'drizzle-orm'
 import type { Minor } from '#/lib/money'
@@ -132,6 +133,7 @@ export class RefundDirectionError extends ConflictError {
   constructor(refundDirection: string, originalDirection: string) {
     super(
       `A refund points the opposite way to what it refunds; this one is an ${refundDirection} and so is the original.`,
+      'REFUND_DIRECTION',
     )
     this.refundDirection = refundDirection
     this.originalDirection = originalDirection
@@ -152,6 +154,7 @@ export class RefundCurrencyError extends ConflictError {
   constructor(refundCurrencyCode: string, originalCurrencyCode: string) {
     super(
       `A ${refundCurrencyCode} refund cannot be netted against a ${originalCurrencyCode} transaction without a rate nobody chose.`,
+      'REFUND_CURRENCY',
     )
     this.refundCurrencyCode = refundCurrencyCode
     this.originalCurrencyCode = originalCurrencyCode
@@ -179,6 +182,7 @@ export class OverRefundError extends ConflictError {
     super(
       `${subject} is ${limitMinor} minor units and ${linkedMinor} are already refunded; ` +
         `another ${addedMinor} would give back ${linkedMinor + addedMinor - limitMinor} more than was paid.`,
+      'OVER_REFUND',
     )
     this.limitMinor = limitMinor
     this.linkedMinor = linkedMinor

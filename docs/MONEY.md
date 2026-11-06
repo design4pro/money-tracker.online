@@ -103,7 +103,9 @@ that is rounded, stored, read and rounded again has been rounded twice and is wr
 They are never mixed and never stored in one column. A calendar date is not an instant with the
 time zeroed; it is a date, and it has no timezone.
 
-Calendar arithmetic goes through `@internationalized/date`. `date-fns` is for formatting only.
+Calendar arithmetic goes through `@internationalized/date`. Formatting goes through
+`src/lib/i18n/format.ts` (`@internationalized/date` and `@internationalized/number`), never through
+a date library. `date-fns` was declared for formatting and never imported; ADR 0036 removed it.
 
 ---
 
@@ -212,6 +214,11 @@ The two legitimate ways `ref_amount_minor` changes:
   re-denomination job**: every `ref_amount_minor` is recomputed at each row's own `booked_on` rate
   against the new base, in one queue job, with a before/after net-worth figure shown to the person
   who asked for it. It is not a background side effect of a settings toggle.
+
+Changing an **account's** currency is not one of those ways. Once the account has transactions, the
+change is refused; booked rows stay in the currency they were written in. An empty account may still
+change currency, and that re-derives only the account row's opening `ref_` columns. Detecting rows
+that already disagree with their account (#695) reports them; it does not rewrite them.
 
 ### 3.2 `rate_e10` on the row is not redundant
 
@@ -541,6 +548,14 @@ report.** The redaction middleware scrubs money-shaped fields by key **and** the
 built from typed error codes rather than from interpolated messages. An exception message that
 embeds an amount is a data-protection incident, not a debugging convenience.
 
+### 7.5 Email is not a money surface
+
+Notification and other transactional emails **do not format, quote or list amounts**. They name the
+event and link into the app (ADR 0035). Stored notification rows still hold integer minor units;
+in-app rendering still goes through `formatMoney` at `currencies.digits`. The mailbox is not a
+second copy of that number. A template that interpolates `amountMinor`, a locale-formatted amount,
+or a payee / account / category amount into HTML or text is a defect, not a formatting choice.
+
 ---
 
 ## 8. The failure gallery
@@ -564,6 +579,7 @@ product category.
 | 12  | A conversion silently invented at a made-up rate                                                                   | §2.3 rung 4, refuse and ask             |
 | 13  | An amount appearing in a Sentry event                                                                              | §7.4                                    |
 | 14  | Reports changing because someone changed the workspace timezone                                                    | §6.4                                    |
+| 15  | An amount or a transaction row appearing in a notification email                                                   | §7.5, ADR 0035                          |
 
 ---
 

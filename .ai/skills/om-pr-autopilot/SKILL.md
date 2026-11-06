@@ -58,15 +58,43 @@ chains:
   head does not count: merge with `gh pr merge --match-head-commit <the judged head>`, so a push
   after the verdict makes the merge fail instead of landing unjudged code.
 - **Every rejection goes back to the agents, three rounds at most.** A failed check,
-  `changes-requested`, a `qa-failed` the QA panel set (its 🤖 QA comment carries the verdicts) and a
-  refused security verdict all route to `om-auto-fix-pr {pr}` with the findings, and then to
-  review, QA and the security verdict again on the new head - never to a stop that asks for a
-  person. Row 0c's failed-QA stop applies only to a `qa-failed` a person set; `om-auto-fix-pr`
-  removes the panel's `qa-failed` once its fix is pushed. Each round opens with a 🤖 comment
-  `Autopilot round <n>/3: <what failed>`, counted from the PR's comments, so the count survives
-  across runs. When the third round still fails, add `blocked` and post one comment that starts
-  `🤖 HUMAN-ONLY: ` and lists what each round tried and what still fails: that is the only way this
-  loop hands a PR to a person.
+  `changes-requested`, a `qa-failed` the QA panel set and a refused security verdict all route to
+  `om-auto-fix-pr {pr}` with the findings, and then to review, QA and the security verdict again on
+  the new head - never to a stop that asks for a person. Judge the round and the panel label with
+  one command, never by listing comments yourself:
+
+  ```bash
+  node .ai/scripts/qa-panel-failed.mjs --repo {owner}/{repo} --pr {n}
+  ```
+
+  That script is the only definition of the predicate. `nextRound` is
+  max(count of surviving `Autopilot round` comments, count of `labeled` timeline events for
+  `qa-failed` and `changes-requested`) plus one — a CI or refused-security round leaves no
+  `qa-failed` event, so comments still count; deleting the 🤖 comments cannot reset the cap because
+  the labeled events remain. `isPanelQaFailed` is true only when the latest `labeled qa-failed`
+  event is followed by a `🤖 QA-PANEL-FAILED head:<sha>` marker. Row 0c's failed-QA stop applies
+  only when `qa-failed` is present and `isPanelQaFailed` is false; a panel `qa-failed` routes to
+  `om-auto-fix-pr`, which removes that label once its fix is pushed. Each round opens with a 🤖
+  comment `Autopilot round <n>/3: <what failed>` using `nextRound`. When `exhausted` is true (the
+  next round would be 4), add `blocked` and post one comment that starts `🤖 HUMAN-ONLY: ` and lists
+  what each round tried and what still fails: that is one of two ways this loop hands a PR to a
+  person (the other is a gate PR at the merge row). Residual risk: label and timeline events come
+  from the shared account, so the timeline helps against deleted comments, not against a rogue
+  agent.
+
+## Gate-path PRs are Rafał's merge
+
+Owner decision 2026-11-02 (ADR 0031 addendum, signed by Rafał): a PR whose file list matches a
+gate-path glob is never merged by this skill or by `om-approve-merge-pr`. The globs and the
+detect / fail-closed / hold procedure live in `.ai/skills/afk-decide/SKILL.md` § 5; this file
+does not copy the list. Unattended runs still fix, review, QA, and record a security verdict.
+
+Immediately before state-matrix row 9 under `--allow-merge` (after those steps), run that
+procedure against **get-pr-files** and the `origin/develop` copy of `afk-decide`. On a gate PR
+(or fail-closed): apply `blocked`, post the § 5 `🤖 HUMAN-ONLY:` comment if a trusted agent has
+not already, do **not** invoke `om-approve-merge-pr`, stop at merge-ready, and report that
+**Rafał** merges it. Do not apply `blocked` earlier in the chain. Detection never uses labels,
+the author's risk claim, or `gh pr view --json files`.
 
 ## A spec PR the plan-to-spec run opened merges
 

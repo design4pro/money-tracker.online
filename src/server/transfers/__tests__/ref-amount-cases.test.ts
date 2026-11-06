@@ -23,7 +23,10 @@ import { RateUnavailableError } from '#/server/repos/errors'
 
 import { transferRefAmounts } from '../ref-amount-cases'
 
-import type { ConversionContext, RefAmount } from '#/server/repos/transactions'
+import type {
+  ConversionContext,
+  RefAmount,
+} from '#/server/transactions/ref-amount'
 
 const DAY = '2026-03-15'
 

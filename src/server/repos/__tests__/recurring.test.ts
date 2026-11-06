@@ -38,10 +38,13 @@ import { occurrences } from '#/server/recurring/schedule'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { forecastSeries } from '#/server/recurring/forecast'
 
-import { NotFoundError } from '../errors'
+import { ConflictError, NotFoundError } from '../errors'
+import { createLoan, markInstalmentPaid } from '../loans'
+import { deleteTransaction } from '../transactions'
 import {
   RecurringAutomationConflictError,
   RecurringPeriodPaidError,
+  RecurringTransactionLinkedError,
   createSeries,
   deleteSeries,
   getSeries,
@@ -50,15 +53,23 @@ import {
   listSeries,
   listSeriesLinkDetails,
   markPaid,
+  sumSeriesSpendThisYear,
   markSkipped,
   pauseSeries,
   periodVarianceMinor,
+  removeUnpaidOpenPeriods,
   revertPeriod,
   terminationOf,
   unlinkTransaction,
   updateSeries,
 } from '../recurring'
-import { NOW, createBudgetWorld, seedTransaction } from './budget-harness'
+import {
+  NOW,
+  createBudgetWorld,
+  executed,
+  fault,
+  seedTransaction,
+} from './budget-harness'
 
 import type { BudgetWorld } from './budget-harness'
 import type { CreateSeriesInput } from '../recurring'
@@ -84,6 +95,34 @@ let world: BudgetWorld
 beforeEach(async () => {
   world = await createBudgetWorld()
 })
+
+async function materialisedPeriod(): Promise<{
+  seriesId: string
+  periodStart: string
+}> {
+  const series = await createSeries(world.scope, seriesInput())
+  await materializeSeries(world.scope, {
+    seriesId: series.id,
+    today: TODAY,
+    ahead: 0,
+  })
+  const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
+  if (period === undefined) throw new Error('no period materialised')
+  return { seriesId: series.id, periodStart: period.periodStart }
+}
+
+async function storedPeriod(key: { seriesId: string; periodStart: string }) {
+  const [row] = await world.db
+    .select()
+    .from(recurringPeriods)
+    .where(
+      and(
+        eq(recurringPeriods.seriesId, key.seriesId),
+        eq(recurringPeriods.periodStart, key.periodStart),
+      ),
+    )
+  return row
+}
 
 describe('forecast spending policy', () => {
   it.each([
@@ -131,6 +170,224 @@ describe('forecast spending policy', () => {
       expect((await forecast()).spentThisYearMinor).toBe(0)
     },
   )
+})
+
+describe('overview spent-this-year aggregate', () => {
+  async function linkPayment(input: {
+    readonly seriesId: string
+    readonly transactionId: string
+    readonly amountMinor: number
+    readonly bookedOn: string
+    readonly periodStart?: string
+  }): Promise<void> {
+    await seedTransaction(world.db, {
+      id: input.transactionId,
+      refAmountMinor: input.amountMinor,
+      bookedOn: input.bookedOn,
+    })
+    if (input.periodStart !== undefined) {
+      await markPaid(world.scope, {
+        seriesId: input.seriesId,
+        periodStart: input.periodStart,
+        transactionId: input.transactionId,
+      })
+      return
+    }
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: input.seriesId,
+      transactionId: input.transactionId,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+  }
+
+  it('sums this calendar year per series, skipping other years, currencies and policy rows', async () => {
+    const zloty = await createSeries(world.scope, seriesInput({ name: 'Rent' }))
+    const euro = await createSeries(
+      world.scope,
+      seriesInput({
+        name: 'Hosting',
+        expectedAmountMinor: 40_00,
+        expectedCurrencyCode: 'EUR',
+      }),
+    )
+    const income = await createSeries(
+      world.scope,
+      seriesInput({ name: 'Salary', direction: 'income' }),
+    )
+    await materializeSeries(world.scope, {
+      seriesId: zloty.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    await materializeSeries(world.scope, {
+      seriesId: euro.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const zlotyPeriod = (await listPeriods(world.scope, zloty.id, TODAY)).at(0)
+    const euroPeriod = (await listPeriods(world.scope, euro.id, TODAY)).at(0)
+    if (zlotyPeriod === undefined || euroPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-this-year',
+      amountMinor: 250_000,
+      bookedOn: '2026-01-31',
+      periodStart: zlotyPeriod.periodStart,
+    })
+    await linkPayment({
+      seriesId: euro.id,
+      transactionId: 'euro-this-year',
+      amountMinor: 40_00,
+      bookedOn: '2026-02-01',
+      periodStart: euroPeriod.periodStart,
+    })
+    await world.db
+      .update(transactions)
+      .set({
+        currencyCode: 'EUR',
+        refCurrencyCode: 'EUR',
+      })
+      .where(eq(transactions.id, 'euro-this-year'))
+
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-last-year',
+      amountMinor: 250_000,
+      bookedOn: '2025-12-31',
+    })
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-next-year',
+      amountMinor: 250_000,
+      bookedOn: '2027-01-01',
+    })
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-other-currency',
+      amountMinor: 40_00,
+      bookedOn: '2026-02-15',
+    })
+    await world.db
+      .update(transactions)
+      .set({ currencyCode: 'EUR', refCurrencyCode: 'EUR' })
+      .where(eq(transactions.id, 'zloty-other-currency'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-planned',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-01',
+    })
+    await world.db
+      .update(transactions)
+      .set({ isPlanned: true })
+      .where(eq(transactions.id, 'zloty-planned'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-adjustment',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-02',
+    })
+    await world.db
+      .update(transactions)
+      .set({ isBalanceAdjustment: true })
+      .where(eq(transactions.id, 'zloty-adjustment'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-transfer',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-03',
+    })
+    await world.db
+      .update(transactions)
+      .set({ transferKind: 'external_out' })
+      .where(eq(transactions.id, 'zloty-transfer'))
+    await linkPayment({
+      seriesId: zloty.id,
+      transactionId: 'zloty-unlinked',
+      amountMinor: 10_00,
+      bookedOn: '2026-03-04',
+    })
+    await world.db
+      .update(recurringLinks)
+      .set({ status: 'unlinked' })
+      .where(eq(recurringLinks.transactionId, 'zloty-unlinked'))
+    await linkPayment({
+      seriesId: income.id,
+      transactionId: 'income-this-year',
+      amountMinor: 8_000_00,
+      bookedOn: '2026-03-01',
+    })
+    await world.db
+      .update(transactions)
+      .set({ direction: 'income' })
+      .where(eq(transactions.id, 'income-this-year'))
+
+    executed.length = 0
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today: TODAY,
+      seriesIds: [zloty.id, euro.id, income.id, zloty.id],
+    })
+    const sql = executed.join('\n')
+
+    expect(rows).toHaveLength(2)
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        {
+          seriesId: zloty.id,
+          currencyCode: 'PLN',
+          spentThisYearMinor: 250_000,
+        },
+        {
+          seriesId: euro.id,
+          currencyCode: 'EUR',
+          spentThisYearMinor: 40_00,
+        },
+      ]),
+    )
+    expect(Number.isInteger(rows[0]?.spentThisYearMinor)).toBe(true)
+    expect(sql).toContain('sum(')
+    expect(sql).toContain('booked_on')
+    expect(sql).toMatch(/organization_id/)
+  })
+
+  it('includes the first and last calendar day of the year and returns nothing for no series', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await linkPayment({
+      seriesId: series.id,
+      transactionId: 'new-years-day',
+      amountMinor: 10_00,
+      bookedOn: '2026-01-01',
+    })
+    await linkPayment({
+      seriesId: series.id,
+      transactionId: 'new-years-eve',
+      amountMinor: 20_00,
+      bookedOn: '2026-12-31',
+    })
+
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today: '2026-06-15',
+      seriesIds: [series.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: series.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 30_00,
+      },
+    ])
+
+    executed.length = 0
+    await expect(
+      sumSeriesSpendThisYear(world.scope, { today: TODAY, seriesIds: [] }),
+    ).resolves.toEqual([])
+    expect(executed).toEqual([])
+  })
 })
 
 describe('materialisation', () => {
@@ -441,34 +698,6 @@ describe('the termination is a union', () => {
 })
 
 describe('skipping a period', () => {
-  async function materialisedPeriod(): Promise<{
-    seriesId: string
-    periodStart: string
-  }> {
-    const series = await createSeries(world.scope, seriesInput())
-    await materializeSeries(world.scope, {
-      seriesId: series.id,
-      today: TODAY,
-      ahead: 0,
-    })
-    const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
-    if (period === undefined) throw new Error('no period materialised')
-    return { seriesId: series.id, periodStart: period.periodStart }
-  }
-
-  async function storedPeriod(key: { seriesId: string; periodStart: string }) {
-    const [row] = await world.db
-      .select()
-      .from(recurringPeriods)
-      .where(
-        and(
-          eq(recurringPeriods.seriesId, key.seriesId),
-          eq(recurringPeriods.periodStart, key.periodStart),
-        ),
-      )
-    return row
-  }
-
   it('refuses a period another tab has already marked paid, and leaves it and its link alone', async () => {
     const key = await materialisedPeriod()
     await seedTransaction(world.db, {
@@ -531,6 +760,81 @@ describe('money', () => {
     await expect(
       createSeries(world.scope, seriesInput({ expectedAmountMinor: 0 })),
     ).rejects.toThrow()
+  })
+
+  it('refuses a transaction that already settles another period of another series', async () => {
+    const rent = await createSeries(world.scope, seriesInput({ name: 'Rent' }))
+    const phone = await createSeries(
+      world.scope,
+      seriesInput({ name: 'Phone', expectedAmountMinor: 50_00 }),
+    )
+    await materializeSeries(world.scope, {
+      seriesId: rent.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    await materializeSeries(world.scope, {
+      seriesId: phone.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-shared',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    const rentPeriod = (await listPeriods(world.scope, rent.id, TODAY)).at(0)
+    const phonePeriod = (await listPeriods(world.scope, phone.id, TODAY)).at(0)
+    if (rentPeriod === undefined || phonePeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+
+    await markPaid(world.scope, {
+      seriesId: rent.id,
+      periodStart: rentPeriod.periodStart,
+      transactionId: 'txn-shared',
+    })
+    await expect(
+      markPaid(world.scope, {
+        seriesId: phone.id,
+        periodStart: phonePeriod.periodStart,
+        transactionId: 'txn-shared',
+      }),
+    ).rejects.toBeInstanceOf(RecurringTransactionLinkedError)
+    expect((await storedPeriod(phonePeriod)).status).not.toBe('paid')
+  })
+
+  it('is idempotent for the same period and the same transaction', async () => {
+    const key = await materialisedPeriod()
+    await seedTransaction(world.db, {
+      id: 'txn-again',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    await markPaid(world.scope, { ...key, transactionId: 'txn-again' })
+    await expect(
+      markPaid(world.scope, { ...key, transactionId: 'txn-again' }),
+    ).resolves.toBeUndefined()
+    expect((await storedPeriod(key)).settledTransactionId).toBe('txn-again')
+  })
+
+  it('does not leave a period paid when the link write fails', async () => {
+    const key = await materialisedPeriod()
+    await seedTransaction(world.db, {
+      id: 'txn-atomic',
+      refAmountMinor: 250_000,
+      bookedOn: '2026-01-31',
+    })
+    fault.when = (query) => /insert into "recurring_links"/i.test(query)
+
+    await expect(
+      markPaid(world.scope, { ...key, transactionId: 'txn-atomic' }),
+    ).rejects.toThrow(/injected fault/i)
+
+    fault.when = null
+    const period = await storedPeriod(key)
+    expect(period.status).not.toBe('paid')
+    expect(period.settledTransactionId).toBeNull()
   })
 
   it('copies no amount when a period is marked paid', async () => {
@@ -684,6 +988,10 @@ describe('tenant isolation', () => {
       (id: string) =>
         materializeSeries(world.scope, { seriesId: id, today: TODAY }),
     ],
+    [
+      'removeUnpaidOpenPeriods',
+      (id: string) => removeUnpaidOpenPeriods(world.scope, id),
+    ],
   ])("refuses B's series id from A's scope: %s", async (_name, call) => {
     const id = await seriesInB()
     await expect(call(id)).rejects.toBeInstanceOf(NotFoundError)
@@ -746,5 +1054,186 @@ describe('tenant isolation', () => {
       .where(eq(recurringSeries.id, id))
     expect(after).toEqual(before)
     expect(NOW.getTime()).toBeGreaterThan(0)
+  })
+})
+
+describe('deleting a transaction that settled a paid period', () => {
+  const policies = {
+    planned: 'include' as const,
+    adjustments: 'include' as const,
+    transfers: 'include' as const,
+    completeness: 'any' as const,
+  }
+
+  it('releases that period and leaves every other period unchanged', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const periods = await listPeriods(world.scope, series.id, TODAY)
+    const settled = periods.at(0)
+    const other = periods.at(1)
+    if (settled === undefined || other === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-netflix',
+      refAmountMinor: 4_999,
+      bookedOn: settled.dueOn,
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+      transactionId: 'txn-netflix',
+    })
+    const settledBefore = await storedPeriod({
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+    })
+    const otherBefore = await storedPeriod({
+      seriesId: series.id,
+      periodStart: other.periodStart,
+    })
+    if (settledBefore === undefined || otherBefore === undefined) {
+      throw new Error('period row missing')
+    }
+    expect(settledBefore.status).toBe('paid')
+    expect(settledBefore.settledTransactionId).toBe('txn-netflix')
+
+    executed.length = 0
+    await deleteTransaction({
+      scope: world.scope,
+      policies,
+      id: 'txn-netflix',
+    })
+    const release = executed.filter((query) =>
+      /recurring_periods|recurring_links|delete from "transactions"/i.test(
+        query,
+      ),
+    )
+    // One batch: the three writes are adjacent, period then link then the delete.
+    // Bound values are parameters, so the status words are not in the SQL text.
+    expect(release).toHaveLength(3)
+    const first = executed.indexOf(release[0] ?? '')
+    expect(executed.slice(first, first + 3)).toEqual(release)
+    expect(release[0]).toMatch(
+      /update "recurring_periods" set "status" = \?, "settled_transaction_id" = \?/,
+    )
+    expect(release[0]).toContain('"recurring_periods"."organization_id"')
+    expect(release[0]).toContain('not exists')
+    expect(release[1]).toMatch(/update "recurring_links" set "status" = \?/)
+    expect(release[1]).toContain('"recurring_links"."organization_id"')
+    expect(release[1]).toContain('not exists')
+    expect(release[2]).toMatch(/^delete from "transactions"/)
+    expect(release[2]).toContain('"transactions"."organization_id"')
+    expect(release[2]).toContain('not exists')
+
+    await expect(
+      world.db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(eq(transactions.id, 'txn-netflix')),
+    ).resolves.toEqual([])
+    const settledAfter = await storedPeriod({
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+    })
+    expect(settledAfter).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+      expectedAmountMinor: settledBefore.expectedAmountMinor,
+      expectedCurrencyCode: settledBefore.expectedCurrencyCode,
+      dueOn: settledBefore.dueOn,
+      periodStart: settledBefore.periodStart,
+      seriesId: series.id,
+    })
+    expect(
+      await storedPeriod({
+        seriesId: series.id,
+        periodStart: other.periodStart,
+      }),
+    ).toEqual(otherBefore)
+    await expect(
+      world.db
+        .select()
+        .from(recurringLinks)
+        .where(eq(recurringLinks.transactionId, 'txn-netflix')),
+    ).resolves.toEqual([])
+  })
+
+  it('leaves the paid period in place when a paid loan instalment refuses the delete', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
+    if (period === undefined) throw new Error('no period materialised')
+    await seedTransaction(world.db, {
+      id: 'txn-both',
+      refAmountMinor: 120_00,
+      bookedOn: period.dueOn,
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: period.periodStart,
+      transactionId: 'txn-both',
+    })
+    const loan = await createLoan(world.scope, {
+      name: 'Loan A',
+      lender: 'Lender A',
+      currencyCode: 'PLN',
+      principalMinor: 500_00,
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      endsOn: '2026-04-20',
+      book: 'business',
+      kind: 'credit',
+      instalments: [{ dueOn: '2026-02-20', amountMinor: 120_00 }],
+    })
+    await markInstalmentPaid(world.scope, {
+      loanId: loan.id,
+      sequence: 1,
+      transactionId: 'txn-both',
+    })
+    const before = await storedPeriod({
+      seriesId: series.id,
+      periodStart: period.periodStart,
+    })
+    const linkBefore = await world.db
+      .select()
+      .from(recurringLinks)
+      .where(eq(recurringLinks.transactionId, 'txn-both'))
+
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies,
+        id: 'txn-both',
+      }),
+    ).rejects.toBeInstanceOf(ConflictError)
+
+    expect(
+      await storedPeriod({
+        seriesId: series.id,
+        periodStart: period.periodStart,
+      }),
+    ).toEqual(before)
+    expect(
+      await world.db
+        .select()
+        .from(recurringLinks)
+        .where(eq(recurringLinks.transactionId, 'txn-both')),
+    ).toEqual(linkBefore)
+    await expect(
+      world.db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(eq(transactions.id, 'txn-both')),
+    ).resolves.toEqual([{ id: 'txn-both' }])
   })
 })

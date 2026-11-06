@@ -1,6 +1,10 @@
 /**
- * The transactions repository: the write path, the four policies, and the one place
- * `ref_amount_minor` is ever computed.
+ * The transactions repository: the write path and the four policies.
+ *
+ * Conversion (`computeRefAmount`) lives in `#/server/transactions/ref-amount`. Row branding
+ * (`toTransaction`) lives in `#/server/transactions/row`. This module owns the account/currency
+ * relationship of a write: a create is denominated in the account's currency, and an update that
+ * moves the row to another account is refused when that account's currency is not the stored one.
  *
  * Three rules govern everything below, and each exists because its opposite is a defect class this
  * product has already seen in the system it replaces.
@@ -30,6 +34,7 @@
  */
 
 import {
+  and,
   count,
   eq,
   isNotNull,
@@ -42,16 +47,11 @@ import {
 } from 'drizzle-orm'
 import { z } from 'zod'
 
-import {
-  IDENTITY_RATE,
-  asCurrencyCode,
-  asMinor,
-  asRateE10,
-  convert,
-  money,
-} from '#/lib/money'
+import { asCurrencyCode, asMinor } from '#/lib/money'
 import { assertBookable } from '#/server/booking-rule'
 import { newId } from '#/server/db/ids'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
+import { toTransaction } from '#/server/transactions/row'
 import {
   PAYMENT_METHODS,
   TRANSACTION_DIRECTIONS,
@@ -59,20 +59,28 @@ import {
   categories,
   loanInstalments,
   payees,
+  recurringLinks,
+  recurringPeriods,
   transactions,
 } from '#/server/db/schema'
 
 import {
   assertScopedWrite,
   createTenantTableAccess,
+  runTenantBatch,
   tenantFilter,
   touchLedgerAccount,
 } from './base'
-import { ConflictError, NotFoundError, RateUnavailableError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 
 import type { SQL } from 'drizzle-orm'
-import type { CurrencyCode, Minor, RateE10 } from '#/lib/money'
+import type { CurrencyCode } from '#/lib/money'
+import type { BookingPair } from '#/server/booking-rule'
 import type { Transaction } from '#/server/db/types'
+import type {
+  ConversionContext,
+  RefAmount,
+} from '#/server/transactions/ref-amount'
 import type { KeyedTenantTable, TenantScope } from './base'
 
 /**
@@ -83,6 +91,14 @@ import type { KeyedTenantTable, TenantScope } from './base'
  * future column addition has to remember.
  */
 const transactionAccess = createTenantTableAccess(transactions, 'transaction')
+const recurringPeriodAccess = createTenantTableAccess(
+  recurringPeriods,
+  'recurring period',
+)
+const recurringLinkAccess = createTenantTableAccess(
+  recurringLinks,
+  'recurring link',
+)
 
 /* -------------------------------------------------------------------------- */
 /* Policies                                                                    */
@@ -302,96 +318,22 @@ export function assertPolicySatisfied(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Reference amount                                                            */
+/* Booking                                                                     */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Resolves the rate for one ordered pair on one calendar day.
+ * The write path's one question of the booking rule.
  *
- * Supplied by the caller rather than imported, because the resolution order (workspace flat rate →
- * catalogue rate for the day → most recent catalogue rate within the look-back) belongs to the
- * workspace-currency repository and this module must not acquire a second opinion about it.
- * Returning `null` means "no rate exists"; it never means "assume parity".
+ * Create, update, and the transfer writers that mint settled rows all call this rather than
+ * {@link assertBookable} themselves, so a settled date after the cutoff is refused in one place.
+ * Matching (rules) still asks {@link import('#/server/booking-rule').isBookable} — that is a
+ * predicate, not a write.
  */
-export type RateResolver = (query: {
-  readonly base: CurrencyCode
-  readonly quote: CurrencyCode
-  readonly date: string
-}) => Promise<RateE10 | null>
-
-/** The workspace's base currency and the rate source, as one value the write path carries. */
-export interface ConversionContext {
-  readonly baseCurrencyCode: CurrencyCode
-  readonly resolveRate: RateResolver
-}
-
-/** What a conversion needs to know about the amount being converted. */
-export interface RefAmountInput {
-  readonly amountMinor: Minor
-  readonly currencyCode: CurrencyCode
-  /** The calendar date the rate is anchored to. `YYYY-MM-DD`, never an instant. */
-  readonly bookedOn: string
-}
-
-/** The triple that lands on the row: the converted amount, its currency, and the rate used. */
-export interface RefAmount {
-  readonly refAmountMinor: Minor
-  readonly refCurrencyCode: CurrencyCode
-  readonly rateE10: RateE10
-}
-
-/**
- * Converts an amount into the workspace base currency at `booked_on`'s rate.
- *
- * The rate is asked for as `(base = the amount's currency, quote = the workspace base)`, because
- * `rate_e10` is major-per-major in that direction and `convert` reads it as "units of `to` per unit
- * of `from`". Getting that pair backwards is a silent inversion, so it is spelled out here once and
- * nowhere else.
- *
- * **A missing rate is an error, never a default.** A conversion at an invented rate is worse than
- * a conversion that did not happen, because it is invisible.
- *
- * The identity case short-circuits *before* the resolver: a row already in the base currency gets
- * `ref_amount_minor === amount_minor` and `rate_e10 === 1e10` exactly, with no arithmetic at all
- * and therefore no possibility of rounding drift. The table's
- * `transactions_base_currency_identity_check` asserts the same thing from the other side.
- */
-export async function computeRefAmount(
-  input: RefAmountInput,
-  conversion: ConversionContext,
-): Promise<RefAmount> {
-  const { baseCurrencyCode, resolveRate } = conversion
-  if (input.currencyCode === baseCurrencyCode) {
-    return {
-      refAmountMinor: input.amountMinor,
-      refCurrencyCode: baseCurrencyCode,
-      rateE10: IDENTITY_RATE,
-    }
-  }
-
-  const resolved = await resolveRate({
-    base: input.currencyCode,
-    quote: baseCurrencyCode,
-    date: input.bookedOn,
-  })
-  if (resolved === null) {
-    throw new RateUnavailableError(
-      input.currencyCode,
-      baseCurrencyCode,
-      input.bookedOn,
-    )
-  }
-
-  const converted = convert({
-    amount: money(input.amountMinor, input.currencyCode),
-    to: baseCurrencyCode,
-    rateE10: asRateE10(resolved),
-  })
-  return {
-    refAmountMinor: converted.amountMinor,
-    refCurrencyCode: baseCurrencyCode,
-    rateE10: converted.rateE10,
-  }
+export function assertWriteBookable(
+  next: BookingPair,
+  options: { readonly stored?: BookingPair; readonly now?: Date } = {},
+): void {
+  assertBookable(next, options)
 }
 
 /* -------------------------------------------------------------------------- */
@@ -399,11 +341,6 @@ export async function computeRefAmount(
 /* -------------------------------------------------------------------------- */
 
 const idField = z.string().trim().min(1).max(64)
-const currencyField = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(/^[A-Z]{3}$/, 'An ISO 4217 alphabetic code')
 
 /**
  * The create payload.
@@ -413,6 +350,10 @@ const currencyField = z
  * `bookedOn` is a calendar date; `bookedAt` is epoch-ms and orders rows inside one day and does
  * nothing else, so it is optional and defaults to now.
  *
+ * **No `currencyCode`.** The write owns the account/currency relationship and stamps the account's
+ * currency. A caller that still sent one had to keep it equal to the account's; that check was
+ * the caller duplicating what this module already knows.
+ *
  * `transferKind`, `transferId` and the split columns are absent on purpose — they are plan `10`
  * and plan `11`, and a half-accepted field is worse than an absent one.
  */
@@ -420,7 +361,6 @@ export const createTransactionSchema = z.strictObject({
   accountId: idField,
   direction: z.enum(TRANSACTION_DIRECTIONS),
   amountMinor: z.number().int().positive(),
-  currencyCode: currencyField,
   bookedOn: z.iso.date(),
   bookedAt: z.number().int().optional(),
   categoryId: idField.nullish(),
@@ -442,28 +382,6 @@ export type CreateTransactionInput = z.input<typeof createTransactionSchema>
 export const updateTransactionSchema = createTransactionSchema.partial()
 
 export type UpdateTransactionInput = z.input<typeof updateTransactionSchema>
-
-/* -------------------------------------------------------------------------- */
-/* Row branding                                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Brands a row's money columns on the way out of the repository.
- *
- * The claim `#/server/db/types` makes — that a repository hands out `Minor` and `RateE10` rather
- * than bare `number` — is made true here, and it is a check rather than a cast: a column that
- * somehow holds a non-integer throws at the boundary instead of becoming a float two layers up.
- */
-export function toTransaction(
-  row: typeof transactions.$inferSelect,
-): Transaction {
-  return {
-    ...row,
-    amountMinor: asMinor(row.amountMinor),
-    refAmountMinor: asMinor(row.refAmountMinor),
-    rateE10: asRateE10(row.rateE10),
-  }
-}
 
 /* -------------------------------------------------------------------------- */
 /* Parent validation                                                           */
@@ -626,26 +544,16 @@ export async function createTransaction(
   const input = createTransactionSchema.parse(args.input)
   // The rule is a validation of the pair, so it runs before any read: a refusal writes nothing and
   // asks the conversion nothing (`#/server/booking-rule`).
-  assertBookable({
+  assertWriteBookable({
     bookedOn: input.bookedOn,
     isPlanned: input.isPlanned ?? false,
   })
 
-  const accountCurrencyCode = await requireAccountCurrency(
-    scope,
-    input.accountId,
-  )
+  const currencyCode = await requireAccountCurrency(scope, input.accountId)
   await assertParentsInScope(scope, {
     categoryId: input.categoryId ?? null,
     payeeId: input.payeeId ?? null,
   })
-  // Unconditional: no policy reaches it, and it runs before any rate is asked for or row written.
-  const currencyCode = asCurrencyCode(input.currencyCode)
-  assertCurrencyMatchesAccount(
-    input.accountId,
-    accountCurrencyCode,
-    currencyCode,
-  )
 
   const subject: PolicySubject = {
     isPlanned: input.isPlanned ?? false,
@@ -683,6 +591,7 @@ export async function createTransaction(
     note: input.note ?? null,
     paymentMethod: input.paymentMethod ?? null,
     isPlanned: subject.isPlanned,
+    wasPlanned: subject.isPlanned,
     isBalanceAdjustment: subject.isBalanceAdjustment,
     excludeFromStats: input.excludeFromStats ?? false,
     createdByUserId: scope.ctx.userId,
@@ -703,10 +612,11 @@ export interface UpdateTransactionArgs extends TransactionScopeArgs {
 /**
  * Edits one transaction, re-anchoring its conversion only when it has to.
  *
- * `ref_amount_minor` is recomputed **if and only if** the amount, the currency or `booked_on`
- * changes, and it is recomputed at the *new* `booked_on`'s rate. A save that changes a note must
- * not re-anchor a March row to today's rate, and a no-op save must not write a new figure at all —
- * that is the money invariant this function exists to hold.
+ * `ref_amount_minor` is recomputed **if and only if** the amount or `booked_on` changes, and it is
+ * recomputed at the *new* `booked_on`'s rate. A save that changes a note must not re-anchor a
+ * March row to today's rate, and a no-op save must not write a new figure at all — that is the
+ * money invariant this function exists to hold. Currency is not a patch field: it is the stored
+ * one, checked against a newly chosen account.
  */
 export async function updateTransaction(
   args: UpdateTransactionArgs,
@@ -717,7 +627,7 @@ export async function updateTransaction(
 
   // Judged on the merged pair, and only when it differs from the stored one: the detail screen
   // re-sends both keys on every save, so a legacy future-dated row must still take a note.
-  assertBookable(
+  assertWriteBookable(
     {
       bookedOn: patch.bookedOn ?? current.bookedOn,
       isPlanned: patch.isPlanned ?? current.isPlanned,
@@ -738,20 +648,15 @@ export async function updateTransaction(
     patch.amountMinor === undefined
       ? current.amountMinor
       : asMinor(patch.amountMinor)
-  const currencyCode =
-    patch.currencyCode === undefined
-      ? asCurrencyCode(current.currencyCode)
-      : asCurrencyCode(patch.currencyCode)
+  // The stored currency, never a caller-supplied one. A create stamps the account's currency; an
+  // update that does not move the account leaves a legacy mismatch alone (`docs/MONEY.md` §5.1
+  // remediation is a separate follow-up). Moving the account is refused when the new account's
+  // currency is not the stored one — adopting it would silently re-denominate the minor units.
+  const currencyCode = asCurrencyCode(current.currencyCode)
   const bookedOn = patch.bookedOn ?? current.bookedOn
 
-  // Judged on the merged pair, and only when it differs from the stored one: a legacy row that
-  // already disagrees with its account (`findAccountCurrencyMismatches`) must still take a note or
-  // an amount, and what it must not do is move onto a pair that disagrees as well.
   const accountId = patch.accountId ?? current.accountId
-  if (
-    accountId !== current.accountId ||
-    currencyCode !== current.currencyCode
-  ) {
+  if (accountId !== current.accountId) {
     assertCurrencyMatchesAccount(
       accountId,
       patchedAccountCurrencyCode ??
@@ -761,9 +666,7 @@ export async function updateTransaction(
   }
 
   const conversionChanged =
-    amountMinor !== current.amountMinor ||
-    currencyCode !== current.currencyCode ||
-    bookedOn !== current.bookedOn
+    amountMinor !== current.amountMinor || bookedOn !== current.bookedOn
 
   const ref: RefAmount = conversionChanged
     ? await computeRefAmount(
@@ -822,6 +725,7 @@ export async function updateTransaction(
           ? current.paymentMethod
           : (patch.paymentMethod ?? null),
       isPlanned: next.isPlanned,
+      wasPlanned: current.wasPlanned || current.isPlanned || next.isPlanned,
       isBalanceAdjustment: next.isBalanceAdjustment,
       excludeFromStats: patch.excludeFromStats ?? current.excludeFromStats,
       updatedAt: new Date(),
@@ -851,6 +755,11 @@ export interface DeleteTransactionArgs extends TransactionScopeArgs {
  * plan `10`'s. Both refuse with a {@link ConflictError} naming what to do first, rather than
  * cascading a deletion the person did not ask for.
  * A paid loan instalment must likewise be reverted before its settling transaction is deleted.
+ * A paid recurring period is the opposite: the delete releases it. `settled_transaction_id` is
+ * `ON DELETE SET NULL`, and `recurring_periods_paid_requires_transaction_check` rejects that while
+ * `status` is still `paid`, so the period is returned to `upcoming` in the same batch as the
+ * delete. The loan `CHECK` is the same shape and is not released — the existing `notExists` stays
+ * on every statement, and a match is still {@link ConflictError}.
  */
 export async function deleteTransaction(
   args: DeleteTransactionArgs,
@@ -889,13 +798,34 @@ export async function deleteTransaction(
     notExists(paidInstalments),
   ]
   assertScopedWrite(predicates)
+  // Repeated on the period and link writes so a paid instalment matches nothing there either.
+  // A batch that deleted zero rows must not have released a period on the way past the refusal.
+  const loanStillBlocks = notExists(paidInstalments)
+  const now = new Date()
 
-  const rows = await scope.db
-    .delete(transactions)
-    .where(tenantFilter(scope, transactions, ...predicates))
-    .returning({ accountId: transactions.accountId })
+  const [, , deletedRows] = await runTenantBatch(scope, [
+    recurringPeriodAccess.updateWhereStatement(
+      scope,
+      and(
+        eq(recurringPeriods.settledTransactionId, id),
+        eq(recurringPeriods.status, 'paid'),
+        loanStillBlocks,
+      ) as SQL,
+      {
+        status: 'upcoming',
+        settledTransactionId: null,
+        updatedAt: now,
+      },
+    ),
+    recurringLinkAccess.updateWhereStatement(
+      scope,
+      and(eq(recurringLinks.transactionId, id), loanStillBlocks) as SQL,
+      { status: 'unlinked', updatedAt: now },
+    ),
+    transactionAccess.removeWhereStatement(scope, and(...predicates) as SQL),
+  ])
 
-  const deleted = rows.at(0)
+  const deleted = deletedRows.at(0)
   if (deleted === undefined) {
     const [bound] = await paidInstalments.limit(1)
     if (bound !== undefined) {
@@ -937,10 +867,10 @@ export interface CurrencyMismatchReport {
  * Reports the transactions whose `currency_code` differs from their account's **current**
  * `currency_code`: how many there are, and a capped sample of their ids.
  *
- * Read-only, and the safety net for rows the write rule cannot reach — one written before the rule
- * existed, or one stranded when {@link updateAccount} changed the account's currency under its
- * history. It updates, deletes and backfills nothing; what to do about the rows it names is a
- * separate decision. Both joined tables carry the tenant predicate.
+ * Read-only, and the safety net for rows the write rule cannot reach — one written before the
+ * account-currency lock existed. {@link updateAccount} now refuses a currency change once the
+ * account has transactions, so this reporter does not repair anything: it names the rows, and
+ * remediation is a separate decision. Both joined tables carry the tenant predicate.
  */
 export async function findAccountCurrencyMismatches(
   scope: TenantScope,

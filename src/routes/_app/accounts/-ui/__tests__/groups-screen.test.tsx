@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { I18nProvider } from '#/lib/i18n'
 import { FAILURE_MESSAGE_KEYS } from '#/lib/failure-envelope'
 import { PublicFailureError } from '#/lib/public-failure'
 import en from '#/lib/i18n/messages/en'
+import pl from '#/lib/i18n/messages/pl'
 
 import { GroupTreeSkeleton } from '../group-states'
 import { GroupsScreen } from '../groups-screen'
@@ -27,6 +35,7 @@ const server = vi.hoisted(() => ({
   updateAccountGroup: vi.fn(),
   deleteAccountGroup: vi.fn(),
   reorderAccountGroups: vi.fn(),
+  moveAccountGroup: vi.fn(),
   moveAccountToGroup: vi.fn(),
 }))
 
@@ -170,10 +179,14 @@ describe('account membership menus', () => {
   )
 })
 
-function renderScreen(groups: ReadonlyArray<GroupItem> = GROUPS) {
+function renderScreen(
+  groups: ReadonlyArray<GroupItem> = GROUPS,
+  locale: 'en' | 'pl' = 'en',
+) {
   const onRefresh = vi.fn().mockResolvedValue(undefined)
+  const messages = (locale === 'pl' ? pl : en) as Catalogue
   const tree = (rows: ReadonlyArray<GroupItem>) => (
-    <I18nProvider locale="en" messages={en as Catalogue}>
+    <I18nProvider locale={locale} messages={messages}>
       <GroupsScreen groups={rows} onRefresh={onRefresh} />
     </I18nProvider>
   )
@@ -254,6 +267,38 @@ describe('GroupsScreen refusals', () => {
     await pickFromMenu(user, 'Business', 'Move up')
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(''))
   })
+
+  it('empties the live region between two identical refusals so the second is announced', async () => {
+    server.reorderAccountGroups.mockRejectedValue(refused('internal'))
+    server.deleteAccountGroup.mockRejectedValue(refused('internal'))
+    const { user } = renderScreen()
+    await pickFromMenu(user, 'Business', 'Move up')
+    const region = await screen.findByRole('alert')
+    await waitFor(() =>
+      expect(region.textContent).toMatch(/Something went wrong/),
+    )
+
+    const seen: string[] = []
+    const observer = new MutationObserver(() => {
+      seen.push(region.textContent ?? '')
+    })
+    observer.observe(region, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    })
+    await pickFromMenu(user, 'Empty', 'Delete group')
+    await user.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: 'Delete group',
+      }),
+    )
+    await waitFor(() => expect(seen).toContain(''))
+    await waitFor(() =>
+      expect(region.textContent).toMatch(/Something went wrong/),
+    )
+    observer.disconnect()
+  })
 })
 
 describe('GroupsScreen moves', () => {
@@ -269,9 +314,8 @@ describe('GroupsScreen moves', () => {
     })
   })
 
-  it('re-parents first, then reorders the run it landed in', async () => {
-    server.updateAccountGroup.mockResolvedValue(undefined)
-    server.reorderAccountGroups.mockResolvedValue(undefined)
+  it('re-parents and reorders the run it landed in with one write', async () => {
+    server.moveAccountGroup.mockResolvedValue(undefined)
     const { user, onRefresh } = renderScreen()
     await user.click(
       screen.getByRole('button', { name: 'Actions for Business' }),
@@ -281,19 +325,19 @@ describe('GroupsScreen moves', () => {
     await user.click(within(submenu).getByRole('menuitem', { name: 'Joint' }))
 
     await waitFor(() => expect(onRefresh).toHaveBeenCalled())
-    expect(server.updateAccountGroup).toHaveBeenCalledWith({
-      data: { groupId: 'business', patch: { parentId: 'joint' } },
+    expect(server.moveAccountGroup).toHaveBeenCalledWith({
+      data: {
+        id: 'business',
+        parentId: 'joint',
+        orderedIds: ['trips', 'business'],
+      },
     })
-    expect(server.reorderAccountGroups).toHaveBeenCalledWith({
-      data: { ids: ['trips', 'business'] },
-    })
-    expect(server.updateAccountGroup.mock.invocationCallOrder[0]).toBeLessThan(
-      server.reorderAccountGroups.mock.invocationCallOrder[0],
-    )
+    expect(server.updateAccountGroup).not.toHaveBeenCalled()
+    expect(server.reorderAccountGroups).not.toHaveBeenCalled()
   })
 
-  it('does not reorder when the re-parenting is refused', async () => {
-    server.updateAccountGroup.mockRejectedValue(refused('conflict'))
+  it('does not reorder when the move is refused', async () => {
+    server.moveAccountGroup.mockRejectedValue(refused('conflict'))
     const { user } = renderScreen()
     await user.click(
       screen.getByRole('button', { name: 'Actions for Business' }),
@@ -306,6 +350,7 @@ describe('GroupsScreen moves', () => {
       expect(screen.getByRole('alert').textContent).toMatch(/does not fit/),
     )
     expect(server.reorderAccountGroups).not.toHaveBeenCalled()
+    expect(server.updateAccountGroup).not.toHaveBeenCalled()
   })
 })
 
@@ -316,8 +361,9 @@ describe('GroupsScreen delete', () => {
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).toContain('Delete Joint?')
     expect(dialog.textContent).toContain(
-      '2 accounts leave this group. None is deleted. Sub-groups become top-level groups.',
+      '2 accounts leave this group. None is deleted.',
     )
+    expect(dialog.textContent).toContain('Sub-groups become top-level groups.')
     expect(dialog.textContent).toContain(
       'Rules that use this group will be paused until you pick another.',
     )
@@ -328,7 +374,38 @@ describe('GroupsScreen delete', () => {
     await pickFromMenu(user, 'Empty', 'Delete group')
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).not.toMatch(/accounts? leaves? this group/)
-    expect(dialog.textContent).toContain('Sub-groups become top-level groups.')
+    expect(dialog.textContent).not.toContain(
+      'Sub-groups become top-level groups.',
+    )
+  })
+
+  it('mentions sub-groups only when the group has some, in EN and PL', async () => {
+    const { user } = renderScreen()
+    await pickFromMenu(user, 'Joint', 'Delete group')
+    const withChildren = await screen.findByRole('alertdialog')
+    expect(withChildren.textContent).toContain(
+      '2 accounts leave this group. None is deleted.',
+    )
+    expect(withChildren.textContent).toContain(
+      'Sub-groups become top-level groups.',
+    )
+    await user.keyboard('{Escape}')
+    cleanup()
+
+    const parentOnly = [
+      group('folder', 'Folder'),
+      group('child', 'Child', 'folder'),
+    ]
+    const polish = renderScreen(parentOnly, 'pl')
+    await polish.user.click(
+      screen.getByRole('button', { name: 'Działania dla: Folder' }),
+    )
+    await polish.user.click(
+      await screen.findByRole('menuitem', { name: 'Usuń grupę' }),
+    )
+    const plDialog = await screen.findByRole('alertdialog')
+    expect(plDialog.textContent).toContain('Podgrupy trafią na poziom główny.')
+    expect(plDialog.textContent).not.toMatch(/konto opuszcza/)
   })
 
   it('deletes, then reloads', async () => {
@@ -380,6 +457,37 @@ describe('GroupsScreen form', () => {
     )
   })
 
+  it('renames then moves when the form changes both', async () => {
+    server.updateAccountGroup.mockResolvedValue(undefined)
+    server.moveAccountGroup.mockResolvedValue(undefined)
+    const { user, onRefresh } = renderScreen()
+    await pickFromMenu(user, 'Business', 'Rename')
+    const dialog = await screen.findByRole('dialog')
+    const name = within(dialog).getByRole('textbox')
+    await user.clear(name)
+    await user.type(name, 'Ops')
+    await user.click(within(dialog).getByRole('button', { name: /Inside/ }))
+    await user.click(await screen.findByRole('option', { name: 'Joint' }))
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save changes' }),
+    )
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    expect(server.updateAccountGroup).toHaveBeenCalledWith({
+      data: { groupId: 'business', patch: { name: 'Ops' } },
+    })
+    expect(server.moveAccountGroup).toHaveBeenCalledWith({
+      data: {
+        id: 'business',
+        parentId: 'joint',
+        orderedIds: ['trips', 'business'],
+      },
+    })
+    expect(server.reorderAccountGroups).not.toHaveBeenCalled()
+    expect(server.updateAccountGroup.mock.invocationCallOrder[0]).toBeLessThan(
+      server.moveAccountGroup.mock.invocationCallOrder[0]!,
+    )
+  })
+
   it('creates a group under the parent it was opened from', async () => {
     server.createAccountGroup.mockResolvedValue({ id: 'new', name: 'Fun' })
     const { user, onRefresh } = renderScreen()
@@ -392,6 +500,22 @@ describe('GroupsScreen form', () => {
     expect(server.createAccountGroup).toHaveBeenCalledWith({
       data: { name: 'Fun', parentId: 'business' },
     })
+  })
+
+  it('focuses the new row after a successful create', async () => {
+    server.createAccountGroup.mockResolvedValue({ id: 'fun', name: 'Fun' })
+    const { user, reload, onRefresh } = renderScreen()
+    await user.click(screen.getByRole('button', { name: 'New group' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByRole('textbox'), 'Fun')
+    await user.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload([...GROUPS, group('fun', 'Fun')])
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('data-key')).toBe(
+        'group:fun',
+      ),
+    )
   })
 
   it('keeps the dialog open with the sentence when the save is refused', async () => {
@@ -477,12 +601,23 @@ describe('GroupsScreen focus', () => {
     reload([GROUPS[2]!, GROUPS[0]!, GROUPS[1]!, GROUPS[3]!])
     await waitFor(() => expect(focusedKey()).toBe('group:business'))
   })
+
+  it('lands on a surviving row after a reload removes the focused one', async () => {
+    server.reorderAccountGroups.mockRejectedValue(refused('not_found'))
+    const { user, reload, onRefresh } = renderScreen()
+    await pickFromMenu(user, 'Business', 'Move up')
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    reload(GROUPS.filter((row) => row.id !== 'business'))
+    await waitFor(() => {
+      expect(document.activeElement).not.toBe(document.body)
+      expect(focusedKey()).toBe('group:empty')
+    })
+  })
 })
 
 describe('GroupsScreen reload failures', () => {
-  it('reloads when the form re-parented the group but the reorder failed', async () => {
-    server.updateAccountGroup.mockResolvedValue(undefined)
-    server.reorderAccountGroups.mockRejectedValue(new Error('network'))
+  it('reloads when the form re-parented the group but the move failed', async () => {
+    server.moveAccountGroup.mockRejectedValue(new Error('network'))
     const { user, onRefresh } = renderScreen()
     await pickFromMenu(user, 'Business', 'Rename')
     const dialog = await screen.findByRole('dialog')
@@ -493,6 +628,7 @@ describe('GroupsScreen reload failures', () => {
     )
     await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
     expect(dialog.textContent).toContain('The group was not saved')
+    expect(server.updateAccountGroup).not.toHaveBeenCalled()
   })
 
   it('does not report a failed reload as a failed write', async () => {
@@ -505,9 +641,8 @@ describe('GroupsScreen reload failures', () => {
     expect(document.body.textContent).not.toContain(RAW)
   })
 
-  it('reloads when the re-parenting landed but the reorder was refused', async () => {
-    server.updateAccountGroup.mockResolvedValue(undefined)
-    server.reorderAccountGroups.mockRejectedValue(new Error('network'))
+  it('reloads when the move is refused', async () => {
+    server.moveAccountGroup.mockRejectedValue(new Error('network'))
     const { user, onRefresh } = renderScreen()
     await user.click(
       screen.getByRole('button', { name: 'Actions for Business' }),
@@ -516,6 +651,7 @@ describe('GroupsScreen reload failures', () => {
     const submenu = (await screen.findAllByRole('menu')).at(-1)!
     await user.click(within(submenu).getByRole('menuitem', { name: 'Joint' }))
     await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1))
+    expect(server.reorderAccountGroups).not.toHaveBeenCalled()
   })
 })
 

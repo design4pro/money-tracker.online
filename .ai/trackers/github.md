@@ -239,6 +239,8 @@ gh api -X PATCH repos/{owner}/{repo}/issues/comments/{commentId} -F body=@<path>
 ```bash
 gh pr view {prNumber} --json number,title,url,body,state,author,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,maintainerCanModify,mergeable,mergeStateStatus,reviewDecision,labels,latestReviews,reviews,commits,files,assignees,comments,mergedAt,mergeCommit,closingIssuesReferences,createdAt,closedAt,additions,changedFiles
 ```
+The `files` field truncates. A complete changed-file list is **get-pr-files**. The gate-path check
+in `afk-decide` § 5 uses that operation and `changedFiles`, never `files`.
 
 #### list-prs
 State/search filters, field list, limit → PRs.
@@ -321,9 +323,13 @@ gh pr diff {prNumber} --name-only
 ```
 
 #### get-pr-files
-`{prNumber}` → changed files with per-file status (added/modified/removed), paginated.
+`{prNumber}` → changed files with per-file status (added/modified/removed/renamed), paginated.
+Emits `previous_filename` when GitHub has one (renames). Callers that decide from the file list
+(gate-path PRs in `afk-decide` § 5) **must** use this operation, never `gh pr view --json files`,
+which truncates. Compare the row count to **get-pr** `changedFiles`; 3000 rows is the REST
+ceiling and is incomplete.
 ```bash
-gh api "repos/{owner}/{repo}/pulls/{prNumber}/files" --paginate --jq '.[] | {path: .filename, status: .status}'
+gh api "repos/{owner}/{repo}/pulls/{prNumber}/files" --paginate --jq '.[] | {path: .filename, status: .status, previous_filename: .previous_filename}'
 ```
 
 #### checkout-pr

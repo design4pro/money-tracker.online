@@ -12,6 +12,7 @@
  * provisioning hooks are then driven against that database rather than asserted on by shape.
  */
 
+import { getIP } from 'better-auth/api'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { member, organization } from '#/server/db/auth-schema'
@@ -97,6 +98,10 @@ describe('session and verification storage', () => {
     expect(options.verification?.storeInDatabase).toBe(true)
   })
 
+  it('dual-writes sessions to D1: the MCP OAuth provider binds codes to a session row', () => {
+    expect(options.session?.storeSessionInDatabase).toBe(true)
+  })
+
   it('has secondary storage: sessions and rate-limit counters live in KV', () => {
     expect(options.secondaryStorage).toBeDefined()
   })
@@ -134,12 +139,25 @@ describe('the admin plugin', () => {
 })
 
 describe('plugin order', () => {
-  it('puts admin first, then two-factor and organization: later plugins read what admin adds', () => {
+  it('puts admin first, then two-factor and organization, then jwt and mcp', () => {
     expect(options.plugins?.map((plugin) => plugin.id)).toEqual([
       'admin',
       'two-factor',
       'organization',
+      'jwt',
+      'oauth-provider',
     ])
+  })
+
+  it('enables DCR on the MCP OAuth provider and binds tokens to /api/mcp', () => {
+    expect(pluginOptions('oauth-provider')).toMatchObject({
+      loginPage: '/login',
+      consentPage: '/consent',
+      resources: ['https://app.example.test/api/mcp'],
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultApplicationType: 'infer',
+    })
   })
 })
 
@@ -147,6 +165,20 @@ describe('the rate limiter', () => {
   it('counts in secondary storage, because an isolate’s memory is not shared between colos', () => {
     expect(options.rateLimit?.enabled).toBe(true)
     expect(options.rateLimit?.storage).toBe('secondary-storage')
+  })
+
+  it('reads the client address from cf-connecting-ip, not from a caller-supplied x-forwarded-for', () => {
+    // Better Auth's default is x-forwarded-for. On a Worker that header is
+    // absent or a list, so every path — including /oauth2/token — shares one
+    // bucket. cf-connecting-ip is the header Cloudflare sets and overwrites.
+    expect(options.advanced?.ipAddress?.ipAddressHeaders).toEqual([
+      'cf-connecting-ip',
+    ])
+    const headers = new Headers({
+      'cf-connecting-ip': '203.0.113.10',
+      'x-forwarded-for': '198.51.100.20',
+    })
+    expect(getIP(headers, options)).toBe('203.0.113.10')
   })
 
   it('carries exactly the seven custom rules, the four ADR 0011 credential paths among them', () => {

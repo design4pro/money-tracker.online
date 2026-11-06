@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_WORKSPACE_TIMEZONE,
+  canonicalIanaTimeZone,
   civilDayInTimeZone,
   isIanaTimeZone,
   latestCalendarDayOnEarth,
@@ -78,5 +79,27 @@ describe('isIanaTimeZone', () => {
     expect(isIanaTimeZone('UTC')).toBe(true)
     expect(isIanaTimeZone('Not/AZone')).toBe(false)
     expect(isIanaTimeZone('')).toBe(false)
+  })
+
+  it('rejects offsets, abbreviations and lower-case ids that Intl would otherwise accept', () => {
+    expect(isIanaTimeZone('+05:00')).toBe(false)
+    expect(isIanaTimeZone('EST')).toBe(false)
+    expect(isIanaTimeZone('europe/warsaw')).toBe(false)
+    expect(isIanaTimeZone('GMT')).toBe(false)
+    expect(isIanaTimeZone('Poland')).toBe(false)
+  })
+})
+
+describe('canonicalIanaTimeZone', () => {
+  it('returns the Intl canonical id for a real zone', () => {
+    expect(canonicalIanaTimeZone('Europe/Warsaw')).toBe('Europe/Warsaw')
+    expect(canonicalIanaTimeZone('US/Eastern')).toBe('America/New_York')
+    expect(canonicalIanaTimeZone('UTC')).toBe('UTC')
+  })
+
+  it('returns null for offsets, abbreviations and lower-case ids', () => {
+    expect(canonicalIanaTimeZone('+05:00')).toBeNull()
+    expect(canonicalIanaTimeZone('EST')).toBeNull()
+    expect(canonicalIanaTimeZone('europe/warsaw')).toBeNull()
   })
 })

@@ -50,12 +50,20 @@ export function Checkbox({
   description,
   ...props
 }: CheckboxProps) {
+  // A box with no visible label sits in a 40px ledger line. Growing the root
+  // to 44px (`target-min-h`) and top-aligning it (`items-start` + `py-1` +
+  // `mt-px`) parks the square on the rule above. The 44px target is the
+  // `target-min` pseudo-element, which does not change layout height.
+  const isBare = children === undefined && description === undefined
   return (
     <RACCheckbox
       {...props}
       className={composeTw(
         className,
-        'group/checkbox flex items-start gap-2.5 cursor-pointer target-min-h py-1',
+        'group/checkbox flex cursor-pointer',
+        isBare
+          ? 'items-center target-min'
+          : 'items-start gap-2.5 target-min-h py-1',
         'text-label text-ink select-none',
         'data-[disabled]:cursor-not-allowed data-[disabled]:text-ink-2 data-[disabled]:opacity-70',
       )}
@@ -65,7 +73,8 @@ export function Checkbox({
           <span
             aria-hidden="true"
             className={cn(
-              'mt-px grid size-[1.125rem] shrink-0 place-items-center rounded-sm border',
+              'grid size-[1.125rem] shrink-0 place-items-center rounded-sm border',
+              isBare ? null : 'mt-px',
               transitionBase,
               isSelected || isIndeterminate
                 ? 'border-accent bg-accent text-on-accent'

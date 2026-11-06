@@ -77,13 +77,59 @@ A human who disagrees overturns the row in review. That is an ordinary review fi
 
 Only what no agent in this pipeline can do:
 - an action that needs a person's own credentials, account settings, payment, or a legal commitment;
-- merging the `develop` -> `main` promotion (a merge into `develop` is the pipeline's own, `om-pr-autopilot --allow-merge`), closing an issue, or removing a label a human set;
-- a PR into `develop` that `om-pr-autopilot`'s fix-and-QA loop could not close in three rounds: it carries `blocked` and the `🤖 HUMAN-ONLY:` comment that loop posts. QA sign-off, `risk-high` and `security` included, is never a person's before that (owner decision 2026-10-06, ADR 0031);
+- merging the `develop` -> `main` promotion (a merge into `develop` is the pipeline's own, `om-pr-autopilot --allow-merge`, except a **gate PR** below), closing an issue, or removing a label a human set;
+- a PR into `develop` that carries `blocked` for one of two causes, each with a `🤖 HUMAN-ONLY:` comment: (1) `om-pr-autopilot`'s fix-and-QA loop could not close it in three rounds; (2) it is a **gate PR** at the merge row (this section's glob list). QA sign-off, `risk-high` and `security` are never a person's before three failed rounds (owner decision 2026-10-06, ADR 0031) **except** a gate PR: that class is Rafał's merge, not Grosik's and not the autopilot's (owner decision 2026-11-02, ADR 0031 addendum);
 - information only the reporter has: a repro, a version, what they expected;
 - a platform limit, such as a ruleset that requires a review the run's own account cannot give (the `develop` ruleset requires none, so self-approval is never a blocker there);
 - a write Claude Code refuses under `dontAsk` (protected configuration). Put the exact patch and the guardian's verdict in the report or PR, so applying it is one step for a human.
 
 Every comment that hands a matter to a person starts with `🤖 HUMAN-ONLY: <the one thing a person must do>`. That marker is what stops the Reconciler (ADR 0030) from launching `afk-unblock` on the hold again: an agent-set `blocked` without it is offered to a specialist, which is a wasted run when the matter is one of these. A hold or a `STOP:` an agent set for any other reason is lifted by `afk-unblock` on a specialist's verdict.
+
+### Gate-path globs (person-only merge)
+
+The globs below are the only copy of the list. `om-pr-autopilot` and `om-approve-merge-pr` point here; they do not duplicate it. A PR whose changed files match any glob is a **gate PR**. Nothing else in this repository enforces the predicate (no label, no required check, no `backlog-status.mjs` change): the two merge skills honour it, and `blocked` is the hold every merger already reads.
+
+**Who merges.** Rafał (2026-11-02). Not Grosik. Not `om-pr-autopilot`. Not `om-approve-merge-pr`. Unattended runs may still fix, review, QA, and record a security verdict at the judged head; they stop before the merge.
+
+**When.** Immediately before the merge row (autopilot state-matrix row 9 / `om-approve-merge-pr` step 4), after fix, review, QA and any security verdict at the current head have already run. Do not stop a gate PR at first sight.
+
+**How to detect.** Fail closed.
+
+1. `git fetch origin develop`, then `git show origin/develop:.ai/skills/afk-decide/SKILL.md`. Parse the fenced globs between `<!-- gate-path-globs -->` and `<!-- /gate-path-globs -->`. Never read the list from the PR's checkout (a PR must not edit its own exemption). If fetch, show, or parse fails, or the list is empty: treat the PR as a gate PR.
+2. Load the file list with tracker **get-pr-files** (paginated REST). Also read `changedFiles` from **get-pr**. Never `gh pr view --json files` (it truncates). Never labels. Never the author's risk claim. Test both `path` and `previous_filename` (a rename off a gate path still counts).
+3. If **get-pr-files** errors, returns fewer or more rows than `changedFiles`, or returns 3000 rows (the pulls-files ceiling): treat the PR as a gate PR.
+4. A path matches a glob when `fnmatch` matches the path against the glob, or against any directory prefix of the path (so `.ai/skills/om-*/` matches `.ai/skills/om-pr-autopilot/SKILL.md`). A glob that ends in `/` is a directory prefix.
+
+**On a gate PR.** Never run **merge-pr** / `gh pr merge`. Apply `blocked` via `apply_label` (the three-round rule is the other cause of `blocked`; do not apply it earlier in the chain). Post one comment whose first line is exactly `🤖 HUMAN-ONLY: merge this gate change or close it` and whose body names the head the security verdict judged, or that none was required, and that **Rafał** merges it. If `blocked` is already present and a trusted-agent comment (author in the issue automations' `authors` list in `docs/agents/cezar-automations.json`, body starting with that first line) already exists, do nothing more. An outsider's comment does not count. Remove no label a person set (`merge-queue` and the rest stay). `afk-unblock` takes issues only, so it will not lift a `blocked` PR.
+
+<!-- gate-path-globs -->
+```
+.ai/skills/om-*/
+.ai/skills/afk-*/
+.claude/skills/om-*
+.claude/agents/
+.claude/settings.json
+.claude/hooks/
+.ai/cezar/workflows/
+.ai/cezar/config.json
+docs/agents/cezar-automations.json
+docs/agents/cezar-prompt-templates.json
+.ai/agentic.config.json
+.ai/scripts/backlog-status.mjs
+.ai/trackers/github.md
+scripts/ci/
+.github/workflows/
+.github/labels.yml
+.github/CODEOWNERS
+.husky/
+SDLC.md
+CODE_REVIEW.md
+docs/adr/0027-no-merge-gates.md
+docs/adr/0029-open-mercato-labels-only.md
+docs/adr/0030-the-reconciler-starts-the-work.md
+docs/adr/0031-agents-take-every-pr-to-develop.md
+```
+<!-- /gate-path-globs -->
 
 Everything else is decided here.
 

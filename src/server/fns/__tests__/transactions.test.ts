@@ -80,7 +80,6 @@ const CREATE_INPUT = {
   accountId: 'acc-a',
   direction: 'expense',
   amountMinor: 12_50,
-  currencyCode: 'PLN',
   bookedOn: '2026-03-10',
 } as const
 
@@ -94,6 +93,7 @@ const FOREIGN_KEYS = {
   importSourceHash: 'hash-1',
   categorizationSource: 'rule',
   createdByUserId: 'user-b',
+  currencyCode: 'PLN',
 } as const
 
 let world: BudgetWorld

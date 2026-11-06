@@ -66,7 +66,7 @@ import type { Budget } from '#/server/db/types'
 import type { TenantScope } from '#/server/repos/base'
 import type { BudgetCategoryRef, BudgetSpend } from '#/server/repos/budgets'
 import type { MaterialisedPeriod } from '#/server/repos/budget-periods'
-import type { ConversionContext } from '#/server/repos/transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 import type { Utilisation } from './utilisation'
 
 /** One row of the rollover ledger: what a period opened with, spent, and handed on. */

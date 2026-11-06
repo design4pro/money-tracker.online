@@ -34,3 +34,20 @@ export function unsubscribeKeys(): UnsubscribeKeys | null {
     previous: readString('UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS'),
   }
 }
+
+/**
+ * Salt for `hashRecipient`. Unset, the notification-email handler requeues and does not send:
+ * a hash written under no key cannot be correlated with a later bounce.
+ */
+export function emailHashSalt(): string | null {
+  return readString('EMAIL_HASH_SALT')
+}
+
+/**
+ * Resend's Standard Webhooks signing secret.
+ *
+ * Absent, `POST /api/webhooks/resend` answers 503 rather than accepting an unverified body.
+ */
+export function resendWebhookSecret(): string | null {
+  return readString('RESEND_WEBHOOK_SECRET')
+}

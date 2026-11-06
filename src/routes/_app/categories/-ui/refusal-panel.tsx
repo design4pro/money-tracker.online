@@ -17,12 +17,12 @@ import type { Refusal, RefusalCall } from '../-lib/refusal'
  * quoted and preceded by a noun because a Polish name cannot be declined inside a sentence. There
  * is no `detail`, so no disclosure and no server text.
  *
- * ## One live region, so this is a labelled region
+ * ## A labelled region, never a nested alert
  *
- * The route's `role="alert"` wrapper is the live region; a panel that was an alert as well would be
- * a second, nested one. The route keys this component by a counter that increments on every
- * refusal, so an identical repeat mounts a new node and is meant to be announced again (an intent,
- * not a verified screen-reader behaviour: `docs/ACCESSIBILITY.md` §5.4).
+ * The panel is `mode="region"` and the route does not wrap it in `role="alert"`: that pairing was
+ * a nested alert and region, and a wrapper that stayed mounted did not announce an identical
+ * repeat. The route keys this component by a counter that increments on every refusal, so a
+ * repeat mounts a new node. It does not steal focus from a keyboard dragger.
  *
  * ## It scrolls, and never takes focus
  *
@@ -36,6 +36,7 @@ const TITLE_KEYS = {
   move: 'categories.move.refused',
   reorder: 'categories.move.refused',
   restore: 'categories.restore.refused',
+  seed: 'categories.seed.failed',
 } as const satisfies Readonly<Record<RefusalCall, MessageKey>>
 
 export function RefusalPanel({ refusal }: { refusal: Refusal }) {
@@ -43,11 +44,14 @@ export function RefusalPanel({ refusal }: { refusal: Refusal }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest' })
+    // `start`, not `nearest`: a panel that already peeks into the viewport under the sticky
+    // header is "nearest" to staying there. `scroll-mt-16` matches `<html>`'s `scroll-pt-16`
+    // so the heading comes to rest below the 64px bar (WCAG 2.2 §2.4.11).
+    ref.current?.scrollIntoView({ block: 'start' })
   }, [])
 
   return (
-    <div ref={ref}>
+    <div ref={ref} className="scroll-mt-16">
       <ErrorPanel
         mode="region"
         headingLevel={2}

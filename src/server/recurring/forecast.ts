@@ -77,6 +77,33 @@ function isClosed(status: RecurringPeriodStatus | undefined): boolean {
   return status === 'paid' || status === 'skipped'
 }
 
+function calendarYearOf(day: string): string {
+  return day.slice(0, 4)
+}
+
+/**
+ * Whether this occurrence is already settled.
+ *
+ * Exact `period_start` wins. For an annual series, a paid or skipped row in the
+ * same calendar year also wins: an anchor-month edit keeps that history and must
+ * not open a second expected payment for the year.
+ */
+function occurrenceIsClosed(
+  occurrencePeriodStart: string,
+  input: SeriesForecastInput,
+  byPeriod: ReadonlyMap<string, RecurringPeriodStatus>,
+): boolean {
+  const exact = byPeriod.get(occurrencePeriodStart)
+  if (exact !== undefined) return isClosed(exact)
+  if (input.schedule.frequency !== 'annual') return false
+  const year = calendarYearOf(occurrencePeriodStart)
+  return input.periods.some(
+    (period) =>
+      isClosed(period.derivedStatus) &&
+      calendarYearOf(period.periodStart) === year,
+  )
+}
+
 function expectedOpen(
   input: SeriesForecastInput,
   from: string,
@@ -88,7 +115,7 @@ function expectedOpen(
   )
   let total = 0
   for (const occurrence of occurrences(input.schedule, { from, through })) {
-    if (isClosed(byPeriod.get(occurrence.periodStart))) continue
+    if (occurrenceIsClosed(occurrence.periodStart, input, byPeriod)) continue
     if (!Number.isInteger(input.expectedAmountMinor)) {
       throw new Error('forecast amounts must be integer minor units')
     }

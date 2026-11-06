@@ -39,16 +39,33 @@
  * 6. **An expected amount is a plan, not a fact.** `expected_amount_minor` has no
  *    `ref_amount_minor` and never acquires one here: it has no rate and no booking date until
  *    something settles it, and converting a plan at today's rate is how a person's expectations
- *    quietly change with the exchange rate. Reports sum transactions; they never sum this column.
+ *    quietly change with the exchange rate. Reports sum transactions; they never sum this column,
+ *    except the dashboard cash-flow **planned** series (`docs/plans/13-recurring.md` 13-S1
+ *    exception, issue #840), which sums native expected amounts in
+ *    {@link sumPlannedPeriodsByMonth} and converts them at read time — never here, never stored.
  */
 
-import { and, asc, desc, eq, gte, inArray, lte, ne, or, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 
 import { parseDate } from '@internationalized/date'
 
 import { BOOKS } from '#/lib/enums'
-import { asMinor } from '#/lib/money'
+import { asCurrencyCode, asMinor } from '#/lib/money'
 import {
   RECURRING_DUTY_CODES,
   RECURRING_FREQUENCIES,
@@ -74,12 +91,14 @@ import {
   createScope,
   createTenantRepository,
   createTenantTableAccess,
+  inIds,
+  runTenantBatch,
   tenantFilter,
 } from './base'
 import { ConflictError, NotFoundError } from './errors'
 
 import type { SQL } from 'drizzle-orm'
-import type { Minor } from '#/lib/money'
+import type { CurrencyCode, Minor } from '#/lib/money'
 import type {
   RECURRING_CANDIDATE_STATUSES,
   RECURRING_LINK_STATUSES,
@@ -96,7 +115,12 @@ import type {
   RecurringPeriod,
   RecurringSeries,
 } from '#/server/db/types'
-import type { Database, KeyedTenantTable, TenantScope } from './base'
+import type {
+  Database,
+  KeyedTenantTable,
+  TenantScope,
+  TenantStatement,
+} from './base'
 
 /* -------------------------------------------------------------------------- */
 /* Errors                                                                     */
@@ -117,7 +141,7 @@ export class RecurringAutomationConflictError extends ConflictError {
   }
 }
 
-/** Thrown when a period is asked to be paid by a transaction that is already settling another. */
+/** Thrown when a period is already paid by a different transaction. */
 export class RecurringPeriodSettledError extends ConflictError {
   readonly seriesId: string
   readonly periodStart: string
@@ -126,6 +150,25 @@ export class RecurringPeriodSettledError extends ConflictError {
     super(
       `The period starting ${periodStart} of series ${seriesId} is already settled; revert it before settling it again.`,
     )
+    this.seriesId = seriesId
+    this.periodStart = periodStart
+  }
+}
+
+/**
+ * Thrown when a transaction already settles another period. One receipt pays one occurrence —
+ * attaching it to a second period is how a series goes quiet while two months claim the same money.
+ */
+export class RecurringTransactionLinkedError extends ConflictError {
+  readonly transactionId: string
+  readonly seriesId: string
+  readonly periodStart: string
+
+  constructor(transactionId: string, seriesId: string, periodStart: string) {
+    super(
+      `Transaction ${transactionId} already settles another period; revert that period before using it for ${periodStart} of series ${seriesId}.`,
+    )
+    this.transactionId = transactionId
     this.seriesId = seriesId
     this.periodStart = periodStart
   }
@@ -420,6 +463,28 @@ function periodKey(seriesId: string, periodStart: string): SQL {
   return and(
     eq(recurringPeriods.seriesId, seriesId),
     eq(recurringPeriods.periodStart, periodStart),
+  ) as SQL
+}
+
+function linkKey(seriesId: string, transactionId: string): SQL {
+  return and(
+    eq(recurringLinks.seriesId, seriesId),
+    eq(recurringLinks.transactionId, transactionId),
+  ) as SQL
+}
+
+/** Any other period already pointing at this receipt — same series or another. */
+function otherPeriodSettledBy(
+  seriesId: string,
+  periodStart: string,
+  transactionId: string,
+): SQL {
+  return and(
+    eq(recurringPeriods.settledTransactionId, transactionId),
+    or(
+      ne(recurringPeriods.seriesId, seriesId),
+      ne(recurringPeriods.periodStart, periodStart),
+    ),
   ) as SQL
 }
 
@@ -825,6 +890,88 @@ function addDaysIso(day: string, days: number): string {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Reads — dashboard whole-month plan                                          */
+/* -------------------------------------------------------------------------- */
+
+const plannedPeriodWindowSchema = z
+  .strictObject({
+    from: z.iso.date(),
+    to: z.iso.date(),
+  })
+  .refine((window) => window.to > window.from, {
+    message: 'the range ends before it starts',
+    path: ['to'],
+  })
+
+export type PlannedPeriodWindow = z.input<typeof plannedPeriodWindowSchema>
+
+/**
+ * Native expected amounts due in `[from, to)`, grouped by due date, direction and currency.
+ *
+ * **Does not convert.** The dashboard composes `resolveRate` on each `dueOn` and `convert` at
+ * read time. Skipped periods are out. Unpaid periods of a paused or completed series are out;
+ * paid periods of those series stay in (they were the month's plan once they settled).
+ */
+export interface PlannedPeriodSum {
+  readonly monthKey: string
+  readonly dueOn: string
+  readonly direction: TransactionDirection
+  readonly currencyCode: CurrencyCode
+  readonly amountMinor: Minor
+}
+
+export async function sumPlannedPeriodsByMonth(
+  scope: TenantScope,
+  input: PlannedPeriodWindow,
+): Promise<ReadonlyArray<PlannedPeriodSum>> {
+  const parsed = plannedPeriodWindowSchema.parse(input)
+  const liveUnpaid =
+    and(
+      eq(recurringSeries.isActive, true),
+      isNull(recurringSeries.completedAt),
+    ) ?? eq(recurringSeries.isActive, true)
+  const rows = await scope.db
+    .select({
+      dueOn: recurringPeriods.dueOn,
+      direction: recurringSeries.direction,
+      currencyCode: recurringSeries.expectedCurrencyCode,
+      total: sql<number>`coalesce(sum(${recurringPeriods.expectedAmountMinor}), 0)`,
+    })
+    .from(recurringPeriods)
+    .innerJoin(
+      recurringSeries,
+      tenantFilter(
+        scope,
+        recurringSeries,
+        eq(recurringSeries.id, recurringPeriods.seriesId),
+      ),
+    )
+    .where(
+      tenantFilter(
+        scope,
+        recurringPeriods,
+        gte(recurringPeriods.dueOn, parsed.from),
+        lt(recurringPeriods.dueOn, parsed.to),
+        inArray(recurringPeriods.status, ['upcoming', 'overdue', 'paid']),
+        or(eq(recurringPeriods.status, 'paid'), liveUnpaid),
+      ),
+    )
+    .groupBy(
+      recurringPeriods.dueOn,
+      recurringSeries.direction,
+      recurringSeries.expectedCurrencyCode,
+    )
+
+  return rows.map((row) => ({
+    monthKey: `${row.dueOn.slice(0, 7)}-01`,
+    dueOn: row.dueOn,
+    direction: row.direction as TransactionDirection,
+    currencyCode: asCurrencyCode(row.currencyCode),
+    amountMinor: asMinor(Number(row.total)),
+  }))
+}
+
+/* -------------------------------------------------------------------------- */
 /* Reads — links                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -917,6 +1064,93 @@ export async function listSeriesLinkDetails(
     isBalanceAdjustment: row.isBalanceAdjustment,
     transferKind: row.transferKind,
     note: row.note,
+  }))
+}
+
+export const sumSeriesSpendThisYearSchema = z.strictObject({
+  today: z.iso.date(),
+  seriesIds: z.array(idSchema),
+})
+export type SumSeriesSpendThisYearInput = z.input<
+  typeof sumSeriesSpendThisYearSchema
+>
+
+/** One series' calendar-year spending, in that series' own currency. */
+export interface SeriesSpendThisYear {
+  readonly seriesId: string
+  readonly currencyCode: string
+  readonly spentThisYearMinor: Minor
+}
+
+/**
+ * Calendar-year spending for the given series, as one integer sum each.
+ *
+ * The overview asks "what went out this year", not "show every receipt". The join is bounded to
+ * `today`'s calendar year and to the same transaction policy the per-series forecast uses
+ * (`#/server/recurring/forecast`): linked **expense** rows in the series currency, not planned,
+ * not a correction, not a transfer, not an `unlinked` pointer. The linked rows themselves are not
+ * returned. Detail history stays on {@link listSeriesLinkDetails}.
+ *
+ * Both halves of the join are scoped: a link planted in this workspace that points at another
+ * workspace's transaction is not a payment here, and a foreign series id is not a key we sum.
+ */
+export async function sumSeriesSpendThisYear(
+  scope: TenantScope,
+  input: SumSeriesSpendThisYearInput,
+): Promise<ReadonlyArray<SeriesSpendThisYear>> {
+  const parsed = sumSeriesSpendThisYearSchema.parse(input)
+  const seriesIds = [...new Set(parsed.seriesIds)]
+  if (seriesIds.length === 0) return []
+
+  const today = parseDate(parsed.today)
+  const yearStart = today.set({ month: 1, day: 1 }).toString()
+  const yearEnd = today.set({ month: 12, day: 31 }).toString()
+
+  const rows = await scope.db
+    .select({
+      seriesId: recurringLinks.seriesId,
+      currencyCode: recurringSeries.expectedCurrencyCode,
+      total: sql<number>`coalesce(sum(${transactions.amountMinor}), 0)`,
+    })
+    .from(recurringLinks)
+    .innerJoin(
+      transactions,
+      tenantFilter(
+        scope,
+        transactions,
+        eq(transactions.id, recurringLinks.transactionId),
+      ),
+    )
+    .innerJoin(
+      recurringSeries,
+      tenantFilter(
+        scope,
+        recurringSeries,
+        eq(recurringSeries.id, recurringLinks.seriesId),
+      ),
+    )
+    .where(
+      tenantFilter(
+        scope,
+        recurringLinks,
+        inIds(recurringLinks.seriesId, seriesIds),
+        ne(recurringLinks.status, 'unlinked'),
+        eq(recurringSeries.direction, 'expense'),
+        eq(transactions.direction, 'expense'),
+        eq(transactions.currencyCode, recurringSeries.expectedCurrencyCode),
+        eq(transactions.isPlanned, false),
+        eq(transactions.isBalanceAdjustment, false),
+        eq(transactions.transferKind, 'none'),
+        gte(transactions.bookedOn, yearStart),
+        lte(transactions.bookedOn, yearEnd),
+      ),
+    )
+    .groupBy(recurringLinks.seriesId, recurringSeries.expectedCurrencyCode)
+
+  return rows.map((row) => ({
+    seriesId: row.seriesId,
+    currencyCode: row.currencyCode,
+    spentThisYearMinor: asMinor(Number(row.total)),
   }))
 }
 
@@ -1183,12 +1417,38 @@ export async function insertMissingPeriods(
 }
 
 /**
+ * Drops unpaid open periods (`upcoming` / stored `overdue`) of one series.
+ *
+ * Paid and skipped rows are history and stay. An anchor edit rebuilds the open
+ * set against the new schedule; this is the delete half of that rebuild, and
+ * {@link insertMissingPeriods} writes the replacement dates.
+ */
+export async function removeUnpaidOpenPeriods(
+  scope: TenantScope,
+  seriesId: string,
+): Promise<number> {
+  const id = idSchema.parse(seriesId)
+  await getSeries(scope, id)
+  return periodAccess.removeWhere(
+    scope,
+    and(
+      eq(recurringPeriods.seriesId, id),
+      inArray(recurringPeriods.status, ['upcoming', 'overdue']),
+    ) as SQL,
+  )
+}
+
+/**
  * Settles a period with a transaction that already exists.
  *
  * **It links; it does not create, and it copies no amount.** The transaction keeps what was
  * actually paid and the period keeps what was expected, which is what lets a variable bill show
  * its variance instead of pretending every month cost the same. Minting a transaction is
  * `auto_record`'s job or the person's own; this is neither.
+ *
+ * **One receipt, one period.** A transaction that already settles another occurrence is refused
+ * with {@link RecurringTransactionLinkedError}. The period row and its link are written in one
+ * {@link runTenantBatch}: a failure between them cannot leave a period paid with no evidence.
  *
  * No ledger rebuild is enqueued: nothing about any account's balance changed.
  */
@@ -1214,25 +1474,109 @@ export async function markPaid(
     throw new RecurringPeriodSettledError(parsed.seriesId, parsed.periodStart)
   }
 
-  const now = new Date()
-  // The period's `expected_amount_minor` is **not** rewritten and the transaction's
-  // `amount_minor` is **not** read into it. Both figures stay where they are; the difference is
-  // `periodVarianceMinor` at read, and is stored nowhere.
-  await periodAccess.updateWhere(
+  const linkedElsewhere = await periodAccess.findOne(
     scope,
-    periodKey(parsed.seriesId, parsed.periodStart),
-    {
-      status: 'paid',
-      settledTransactionId: parsed.transactionId,
-      updatedAt: now,
-    },
+    otherPeriodSettledBy(
+      parsed.seriesId,
+      parsed.periodStart,
+      parsed.transactionId,
+    ),
   )
-  await upsertLink(scope, {
+  if (linkedElsewhere !== null) {
+    throw new RecurringTransactionLinkedError(
+      parsed.transactionId,
+      parsed.seriesId,
+      parsed.periodStart,
+    )
+  }
+
+  const now = new Date()
+  const linkStatement = await linkUpsertStatement(scope, {
     seriesId: parsed.seriesId,
     transactionId: parsed.transactionId,
     matchSource: parsed.matchSource,
     now,
   })
+  // Idempotent same pair: the period is already this receipt. Still write the link in case a
+  // previous crash paid the period and died before the evidence row existed.
+  if (
+    existing.status === 'paid' &&
+    existing.settledTransactionId === parsed.transactionId
+  ) {
+    await runTenantBatch(scope, [linkStatement])
+    return
+  }
+
+  // The period's `expected_amount_minor` is **not** rewritten and the transaction's
+  // `amount_minor` is **not** read into it. Both figures stay where they are; the difference is
+  // `periodVarianceMinor` at read, and is stored nowhere.
+  //
+  // The `notExists` sits in the UPDATE so two requests cannot attach the same receipt to two
+  // periods: the second write matches nothing rather than overwriting. `ne(status, 'paid')` is
+  // the same defence `markSkipped` uses against a tab that settled the period in between.
+  const [updated] = await runTenantBatch(scope, [
+    periodAccess.updateWhereStatement(
+      scope,
+      and(
+        periodKey(parsed.seriesId, parsed.periodStart),
+        ne(recurringPeriods.status, 'paid'),
+        notExists(
+          scope.db
+            .select({ periodStart: recurringPeriods.periodStart })
+            .from(recurringPeriods)
+            .where(
+              tenantFilter(
+                scope,
+                recurringPeriods,
+                otherPeriodSettledBy(
+                  parsed.seriesId,
+                  parsed.periodStart,
+                  parsed.transactionId,
+                ),
+              ),
+            ),
+        ),
+      ) as SQL,
+      {
+        status: 'paid',
+        settledTransactionId: parsed.transactionId,
+        updatedAt: now,
+      },
+    ),
+    linkStatement,
+  ])
+  if (updated.length > 0) return
+
+  const current = await periodAccess.findOne(
+    scope,
+    periodKey(parsed.seriesId, parsed.periodStart),
+  )
+  if (
+    current?.status === 'paid' &&
+    current.settledTransactionId === parsed.transactionId
+  ) {
+    return
+  }
+  if (
+    (await periodAccess.findOne(
+      scope,
+      otherPeriodSettledBy(
+        parsed.seriesId,
+        parsed.periodStart,
+        parsed.transactionId,
+      ),
+    )) !== null
+  ) {
+    throw new RecurringTransactionLinkedError(
+      parsed.transactionId,
+      parsed.seriesId,
+      parsed.periodStart,
+    )
+  }
+  if (current?.status === 'paid') {
+    throw new RecurringPeriodSettledError(parsed.seriesId, parsed.periodStart)
+  }
+  throw new NotFoundError('recurring period', parsed.periodStart)
 }
 
 /**
@@ -1318,7 +1662,7 @@ export async function revertPeriod(
 }
 
 /** Adds the link, or reactivates the one that is already there. Idempotent by primary key. */
-async function upsertLink(
+async function linkUpsertStatement(
   scope: TenantScope,
   input: {
     readonly seriesId: string
@@ -1326,24 +1670,22 @@ async function upsertLink(
     readonly matchSource: RecurringMatchSource
     readonly now: Date
   },
-): Promise<void> {
-  const where = and(
-    eq(recurringLinks.seriesId, input.seriesId),
-    eq(recurringLinks.transactionId, input.transactionId),
-  ) as SQL
+): Promise<TenantStatement> {
+  const where = linkKey(input.seriesId, input.transactionId)
   const existing = await linkAccess.findOne(scope, where)
   if (existing === null) {
-    await linkAccess.insert(scope, {
-      seriesId: input.seriesId,
-      transactionId: input.transactionId,
-      matchSource: input.matchSource,
-      status: 'active',
-      createdAt: input.now,
-      updatedAt: input.now,
-    })
-    return
+    return linkAccess.insertManyStatement(scope, [
+      {
+        seriesId: input.seriesId,
+        transactionId: input.transactionId,
+        matchSource: input.matchSource,
+        status: 'active',
+        createdAt: input.now,
+        updatedAt: input.now,
+      },
+    ])
   }
-  await linkAccess.updateWhere(scope, where, {
+  return linkAccess.updateWhereStatement(scope, where, {
     status: 'active',
     matchSource: input.matchSource,
     updatedAt: input.now,

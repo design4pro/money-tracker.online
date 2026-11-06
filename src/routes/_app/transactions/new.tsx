@@ -262,7 +262,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
    *
    * Typed router targets only, built from the closed shape `returnTargetOf` yields: there is no
    * href to assemble and no URL to follow, so the address cannot send anybody anywhere but the
-   * recurring screens and the planned list.
+   * recurring screens, the planned list, and a liability schedule.
    */
   const goBack = useCallback(
     (target: ReturnTarget) => {
@@ -287,6 +287,12 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
               series: target.seriesId,
             },
           })
+        case 'loan':
+          return void navigate({
+            to: '/loans/$loanId',
+            params: { loanId: target.loanId },
+            search: { markPaid: target.sequence },
+          })
       }
     },
     [navigate],
@@ -309,9 +315,6 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
       readonly addAnother: boolean
     }) => {
       const { entry } = input
-      const account = reference.accounts.find(
-        (option) => option.id === entry.accountId,
-      )
       return createTransaction({
         data: {
           policies: WRITE_POLICIES,
@@ -321,7 +324,6 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
             // Already `Minor` — an integer count of the currency's own minor units. Nothing on this
             // path parses a string or divides by a hundred.
             amountMinor: input.amountMinor,
-            currencyCode: account?.currencyCode ?? reference.baseCurrencyCode,
             bookedOn: entry.bookedOn,
             categoryId: entry.categoryId,
             payeeId: entry.payeeId,

@@ -109,6 +109,12 @@ auth tables, not the session (ADR 0011, Amendment).
   (`src/server/observability/__tests__/request-fields.test.ts`). Replacing
   `UNSUBSCRIBE_TOKEN_SECRET` without carrying the old value into
   `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS` revokes every outstanding link at once.
+- **Recipient hashes, not addresses.** `email_deliveries.to_hash` and
+  `email_suppressions.email_hash` are HMAC-SHA-256 of the folded address, keyed by
+  `EMAIL_HASH_SALT`. The salt is never rotated: a new value cannot match a bounce against a hash
+  written under the old one. Those tables never store the address. `RESEND_WEBHOOK_SECRET` signs
+  `POST /api/webhooks/resend`; unset, the endpoint answers 503 and never accepts an unverified
+  body. There is no un-suppress path.
 
 ---
 
@@ -177,7 +183,16 @@ filename leaves this system in an error report.**
   (`ConflictError` takes a sentence, and `AliasTakenError` and `InvitationAddresseeError` interpolate
   a value), which is why the scrubber, and not the constructor, is what keeps the value out.
 
-### 6.2 File access
+### 6.2 What notification email may never see
+
+**No amount and no transaction data leaves this system in a notification or digest email**
+(ADR 0035). The mail names the event and links into the app. Integer minor units, locale-formatted
+money, payee / account / category amounts, and transaction rows stay in the app and in stored
+`payload_json`. Auth mail (verify, reset, invitation) never carried amounts; it stays that way.
+Secrets for the provider (Resend and related) are owner-added; they are not in the repository, not
+in logs, and not in a pull request.
+
+### 6.3 File access
 
 Every object in R2 is served **only** through `/api/files/$id`, which resolves the row in the
 caller's tenant scope and then streams from R2, supporting `Range`. **No bucket has public access and
@@ -213,13 +228,13 @@ Uploads are content-type checked, size-capped by the workspace's storage quota, 
 tenant-prefixed key. For R2 writes the order is **object first, quota assert second, compensating
 delete on throw** — the reverse leaves a quota consumed by an object that does not exist.
 
-### 6.3 Export
+### 6.4 Export
 
 Full JSON and CSV export is available on **every plan including free**, with no upsell in the path.
 An export artefact lands in R2 with an `expires_at`, is served through a tenant-checked route, and
 is pruned by the nightly cron. An export link is not a capability URL: it re-checks the session.
 
-### 6.4 Retention and deletion
+### 6.5 Retention and deletion
 
 | Data                | Retention                                                                 |
 | ------------------- | ------------------------------------------------------------------------- |
@@ -236,7 +251,7 @@ is pruned by the nightly cron. An export link is not a capability URL: it re-che
 and its R2 objects on the stated schedule; it is not a soft flag that leaves the data resident
 forever. Deleting an account deletes the personal workspace it owns.
 
-### 6.5 Sub-processors
+### 6.6 Sub-processors
 
 | Processor  | Purpose                                   | Data                                    |
 | ---------- | ----------------------------------------- | --------------------------------------- |
@@ -302,7 +317,7 @@ A new sub-processor is a change to both, plus customer notice.
   documented as a product limitation, not sold as a security feature.
 - **Backups are not restore-tested on a schedule.** The nightly logical backup exists; a periodic
   restore drill does not yet.
-- **A refused attachment row has no in-app repair.** See §6.2 for the operator procedure.
+- **A refused attachment row has no in-app repair.** See §6.3 for the operator procedure.
 
 Each of these is a real gap. They are listed here so that nobody has to discover them during an
 incident, and so that no marketing copy implies otherwise.

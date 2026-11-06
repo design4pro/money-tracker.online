@@ -37,7 +37,7 @@
  * the day one is revised. {@link resolvePrefs} is what makes that invisible to a caller.
  */
 
-import { eq, inArray, isNull } from 'drizzle-orm'
+import { eq, gte, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { NOTIFICATION_KIND_IDS } from '#/lib/enums'
@@ -66,6 +66,7 @@ const prefRepo = createTenantTableAccess(
 /* -------------------------------------------------------------------------- */
 
 const userId = z.string().trim().min(1).max(64)
+const rowId = z.string().trim().min(1).max(64)
 const kindSchema = z.enum(NOTIFICATION_KIND_IDS)
 
 export const notificationPrefSchema = z.strictObject({
@@ -152,6 +153,36 @@ export async function pageForReader(
     // Parsing rejects a limit above `MAX_PAGE_SIZE`; clamping is for the absent one.
     limit: clampPageSize(parsed.limit),
     cursor: parsed.cursor ?? null,
+  })
+}
+
+/** One notification in this workspace, or `null`. Used by the email handler to load the row. */
+export async function getNotification(
+  scope: TenantScope,
+  id: string,
+): Promise<NotificationRow | null> {
+  return notificationRepo.findById(scope, rowId.parse(id))
+}
+
+const sinceSchema = z.date()
+
+/**
+ * Unread notifications for one member of this workspace, written at or after `since`.
+ *
+ * The nightly digest is the caller: it asks about an addressee, not about the cron principal,
+ * which is why `forUserId` is a parameter rather than `scope.ctx.userId`.
+ */
+export async function listUnreadForSince(
+  scope: TenantScope,
+  forUserId: string,
+  since: Date,
+): Promise<ReadonlyArray<NotificationRow>> {
+  return notificationRepo.findMany(scope, {
+    where: allOf(
+      eq(notifications.userId, userId.parse(forUserId)),
+      isNull(notifications.readAt),
+      gte(notifications.createdAt, sinceSchema.parse(since)),
+    ),
   })
 }
 

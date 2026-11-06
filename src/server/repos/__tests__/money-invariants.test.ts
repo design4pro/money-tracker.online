@@ -31,15 +31,21 @@ import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 import {
   asCurrencyCode,
   asMinor,
   asRateE10,
   minorUnitDigits,
+  formatMoney,
   parseMoney,
   subtractMinor,
 } from '#/lib/money'
+import { createTranslator, loadCatalogue } from '#/lib/i18n'
+import { renderEmail } from '#/server/email/render'
+import { digestEmail } from '#/server/email/templates/digest'
+import { notificationEmail } from '#/server/email/templates/notification'
 import { listEnabledCurrencies } from '#/server/catalog/currencies'
 import { projectCompletion } from '#/server/goals/project'
 import { runAutoRecord } from '#/server/recurring/auto-record'
@@ -57,6 +63,7 @@ import {
   exchangeRates,
   loanInstalments,
   organizationCurrencies,
+  recurringLinks,
   transactionSplits,
   transactions,
 } from '#/server/db/schema'
@@ -76,7 +83,16 @@ import { pageForReader } from '#/server/repos/notifications'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
 import { createLogger, createMemorySink } from '#/server/observability/logger'
 
-import { adjustAccountBalance, updateAccount } from '../accounts'
+import {
+  AccountCurrencyLockedError,
+  adjustAccountBalance,
+  getAccount,
+  updateAccount,
+} from '../accounts'
+import { rebuildAccountBalance } from '../account-balances'
+import { createPatGrant } from '../agent-grants'
+import { invokeMcpTool } from '#/server/mcp/tools'
+import { MemoryMcpKv } from '#/server/mcp/kv'
 import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
 import {
@@ -88,14 +104,21 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   spendingByCategory,
   updateCategory,
 } from '../categories'
 import { ConflictError } from '../errors'
 import {
+  RecurringTransactionLinkedError,
   createSeries,
   listPeriods as listSeriesPeriods,
+  markPaid,
+  markSkipped,
+  pauseSeries,
   periodVarianceMinor,
+  sumPlannedPeriodsByMonth,
+  sumSeriesSpendThisYear,
 } from '../recurring'
 import {
   listPeriods,
@@ -124,11 +147,14 @@ import { ledgerPageFor } from '#/server/transactions/ledger-page'
 import {
   countTransactions,
   pageTransactions,
+  sumPlannedTransactionsByMonth,
   sumTransactions,
 } from '../transaction-queries'
+import { convertExpectedAmount } from '#/server/transactions/display-expected'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
 import {
-  computeRefAmount,
   createTransaction,
+  deleteTransaction,
   findAccountCurrencyMismatches,
   getTransaction,
   updateTransaction,
@@ -147,7 +173,11 @@ import type { PlannedScreenInput } from '#/routes/_app/transactions/-server/plan
 import type * as BaseModule from '../base'
 import type { MatchingRules, PeriodView } from '../recurring'
 import type { TenantScope } from '../scope'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type {
+  CreateTransactionInput,
+  TransactionPolicies,
+} from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 vi.mock('../base', async (importOriginal) => {
   const actual = await importOriginal<typeof BaseModule>()
@@ -283,7 +313,6 @@ const INPUT = {
   accountId: 'acc-a',
   direction: 'expense',
   amountMinor: 12_345,
-  currencyCode: 'PLN',
   bookedOn: BOOKED_ON,
 } as const
 
@@ -298,7 +327,7 @@ describe('1 — ref_amount is written once, at booked_on’s rate', () => {
       scope,
       policies: EVERYTHING,
       conversion: march,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
     expect(created.refAmountMinor).toBe(53_353)
 
@@ -329,7 +358,6 @@ describe('1 — ref_amount is written once, at booked_on’s rate', () => {
       input: {
         ...INPUT,
         accountId: 'acc-eur',
-        currencyCode: 'EUR',
         bookedOn: BOOKED_ON,
       },
     })
@@ -388,7 +416,6 @@ describe('3 — rate_e10 travels on the row', () => {
       input: {
         ...INPUT,
         accountId: 'acc-eur',
-        currencyCode: 'EUR',
         amountMinor: 12_345,
       },
     })
@@ -487,7 +514,7 @@ describe('6 — changing booked_on recomputes, and it is a write', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     const moved = await updateTransaction({
@@ -508,7 +535,7 @@ describe('6 — changing booked_on recomputes, and it is a write', () => {
       scope,
       policies: EVERYTHING,
       conversion: book,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     const resolveRate = vi.fn(async () => asRateE10(1))
@@ -977,6 +1004,66 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
     expect(Number.isInteger(forecast.next12MonthsMinor)).toBe(true)
   })
 
+  it('sums overview spent this year as a bounded integer aggregate, not a conversion', async () => {
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    await seedTransaction(world.db, {
+      id: 'overview-spend-this-year',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'overview-spend-last-year',
+      refAmountMinor: 100_00,
+      bookedOn: '2025-12-31',
+    })
+    await world.db.insert(recurringLinks).values([
+      {
+        organizationId: 'org-a',
+        seriesId: series.id,
+        transactionId: 'overview-spend-this-year',
+        createdAt: new Date('2026-03-15T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+      },
+      {
+        organizationId: 'org-a',
+        seriesId: series.id,
+        transactionId: 'overview-spend-last-year',
+        createdAt: new Date('2026-03-15T10:00:00.000Z'),
+        updatedAt: new Date('2026-03-15T10:00:00.000Z'),
+      },
+    ])
+
+    budgetExecuted.length = 0
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today: '2026-06-15',
+      seriesIds: [series.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: series.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 100_00,
+      },
+    ])
+    expect(Number.isInteger(rows[0]?.spentThisYearMinor)).toBe(true)
+    expect(
+      budgetExecuted.some(
+        (query) =>
+          query.includes('sum(') &&
+          query.includes('booked_on') &&
+          !query.includes('exchange_rates'),
+      ),
+    ).toBe(true)
+  })
+
   it('makes the match tolerance an integer window in minor units, inclusive at its edge', () => {
     const series = {
       id: 'ser-a',
@@ -1022,6 +1109,142 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
     expect(medianOf([100_00, 110_00, 120_00, 130_00])).toBe(110_00)
     expect(medianOf([100_00, 100_01])).toBe(100_00)
     expect(Number.isInteger(medianOf([1, 2, 4]))).toBe(true)
+  })
+
+  it('refuses a second period for a transaction that already settled one', async () => {
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 250_000,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      accountId: 'acc-a',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-03-15',
+      ahead: 0,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-03-15',
+    )
+    const first = periods.at(0)
+    const second = periods.at(1)
+    if (first === undefined || second === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-one-receipt',
+      refAmountMinor: 250_000,
+      bookedOn: first.dueOn,
+    })
+
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: first.periodStart,
+      transactionId: 'txn-one-receipt',
+    })
+
+    await expect(
+      markPaid(world.scope, {
+        seriesId: series.id,
+        periodStart: second.periodStart,
+        transactionId: 'txn-one-receipt',
+      }),
+    ).rejects.toBeInstanceOf(RecurringTransactionLinkedError)
+
+    const after = await listSeriesPeriods(world.scope, series.id, '2026-03-15')
+    expect(
+      after.find((row) => row.periodStart === first.periodStart)
+        ?.settledTransactionId,
+    ).toBe('txn-one-receipt')
+    expect(
+      after.find((row) => row.periodStart === second.periodStart)?.status,
+    ).not.toBe('paid')
+  })
+
+  it('deletes a settled receipt without recomputing ref_amount_minor or the expected amount', async () => {
+    // docs/MONEY.md §3.1: ref_amount_minor moves only when that row’s amount, currency or
+    // booked_on is written, or on a whole-workspace re-denomination. Deleting a different
+    // receipt is neither. expected_amount_minor is the plan and is not a conversion.
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 250_000,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      accountId: 'acc-a',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-03-15',
+      ahead: 0,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-03-15',
+    )
+    const settled = periods.at(0)
+    const otherPeriod = periods.at(1)
+    if (settled === undefined || otherPeriod === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-receipt',
+      refAmountMinor: 4_999,
+      bookedOn: settled.dueOn,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-untouched',
+      refAmountMinor: 8_888,
+      bookedOn: '2026-03-02',
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+      transactionId: 'txn-receipt',
+    })
+    const [untouchedBefore] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, 'txn-untouched'))
+
+    budgetExecuted.length = 0
+    await deleteTransaction({
+      scope: world.scope,
+      policies: EVERYTHING,
+      id: 'txn-receipt',
+    })
+
+    const [untouchedAfter] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, 'txn-untouched'))
+    expect(untouchedAfter).toEqual(untouchedBefore)
+    expect(untouchedAfter?.refAmountMinor).toBe(8_888)
+    expect(untouchedAfter?.rateE10).toBe(10_000_000_000)
+    const after = await listSeriesPeriods(world.scope, series.id, '2026-03-15')
+    expect(
+      after.find((row) => row.periodStart === settled.periodStart),
+    ).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+      expectedAmountMinor: 250_000,
+    })
+    expect(
+      after.find((row) => row.periodStart === otherPeriod.periodStart),
+    ).toEqual(otherPeriod)
+    expect(
+      budgetExecuted.some((query) => query.includes('exchange_rates')),
+    ).toBe(false)
+    expect(
+      budgetExecuted.some((query) => /update "transactions"/i.test(query)),
+    ).toBe(false)
   })
 })
 
@@ -1254,7 +1477,7 @@ describe('12 — a split allocates the parent’s figures and never re-converts'
       conversion: conversionOf('PLN', [
         [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
       ]),
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
   }
 
@@ -1359,7 +1582,7 @@ describe('13 — a refund is subtracted on read and never written to the origina
       scope,
       policies: EVERYTHING,
       conversion: MARCH_AND_APRIL(),
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
   }
 
@@ -1372,7 +1595,6 @@ describe('13 — a refund is subtracted on read and never written to the origina
         ...INPUT,
         accountId: 'acc-eur',
         direction: 'income',
-        currencyCode: 'EUR',
         amountMinor,
         bookedOn,
       },
@@ -1951,7 +2173,6 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
         input: {
           ...INPUT,
           accountId: 'acc-eur',
-          currencyCode: 'EUR',
           bookedOn: '2026-03-17',
         },
       }),
@@ -1970,7 +2191,7 @@ describe('18 — no settled row is dated after the latest calendar day on Earth'
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     await expect(
@@ -2109,7 +2330,7 @@ describe('19 — a transaction is in its account’s currency', () => {
     return scope.db.select().from(transactions).orderBy(transactions.id)
   }
 
-  it('refuses a create whose currency is not the account’s, naming both, before any rate or write', async () => {
+  it('stamps a create with the account’s currency and refuses a caller-supplied code before any rate or write', async () => {
     const resolveRate = vi.fn(async () => asRateE10(43_218_000_000))
     executed.length = 0
 
@@ -2117,33 +2338,27 @@ describe('19 — a transaction is in its account’s currency', () => {
       scope,
       policies: EVERYTHING,
       conversion: { baseCurrencyCode: asCurrencyCode('PLN'), resolveRate },
-      input: { ...INPUT, accountId: 'acc-a', currencyCode: 'EUR' },
+      input: {
+        ...INPUT,
+        accountId: 'acc-a',
+        currencyCode: 'EUR',
+      } as CreateTransactionInput,
     }).catch((error: unknown) => error)
 
-    expect(failure).toBeInstanceOf(ConflictError)
-    expect((failure as ConflictError).message).toContain('EUR')
-    expect((failure as ConflictError).message).toContain('PLN')
-    // No rate was asked for, no row exists, and the ledger was not told anything moved.
+    expect(failure).toBeInstanceOf(z.ZodError)
     expect(resolveRate).not.toHaveBeenCalled()
     expect(executed.filter((query) => /^\s*insert/i.test(query))).toEqual([])
     expect(await storedRows()).toEqual([])
     expect(touchLedgerAccount).not.toHaveBeenCalled()
-  })
 
-  it('refuses the same mismatch whatever the policies say', async () => {
-    await expect(
-      createTransaction({
-        scope,
-        policies: {
-          planned: 'exclude',
-          adjustments: 'exclude',
-          transfers: 'exclude',
-          completeness: 'complete',
-        },
-        conversion: book(),
-        input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'PLN' },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError)
+    const created = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion: book(),
+      input: { ...INPUT, accountId: 'acc-a' },
+    })
+    expect(created.currencyCode).toBe('PLN')
+    expect(created.refAmountMinor).toBe(12_345)
   })
 
   it('accepts a foreign-currency account written in its own currency, converted at booked_on’s rate', async () => {
@@ -2151,7 +2366,7 @@ describe('19 — a transaction is in its account’s currency', () => {
       scope,
       policies: EVERYTHING,
       conversion: book(),
-      input: { ...INPUT, accountId: 'acc-eur', currencyCode: 'EUR' },
+      input: { ...INPUT, accountId: 'acc-eur' },
     })
 
     expect(created).toMatchObject({
@@ -2187,70 +2402,6 @@ describe('19 — a transaction is in its account’s currency', () => {
     expect(touchLedgerAccount).not.toHaveBeenCalled()
   })
 
-  it('refuses an update that patches the currency onto an account in another currency', async () => {
-    const created = await createTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      input: INPUT,
-    })
-    const before = await storedRows()
-
-    await expect(
-      updateTransaction({
-        scope,
-        policies: EVERYTHING,
-        conversion: book(),
-        id: created.id,
-        patch: { currencyCode: 'EUR' },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError)
-    expect(await storedRows()).toEqual(before)
-  })
-
-  it('refuses an update that changes the account and the currency to a pair that still disagrees', async () => {
-    const created = await createTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      input: INPUT,
-    })
-
-    await expect(
-      updateTransaction({
-        scope,
-        policies: EVERYTHING,
-        conversion: book(),
-        id: created.id,
-        patch: { accountId: 'acc-eur', currencyCode: 'PLN' },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError)
-  })
-
-  it('takes an update that moves the pair to one that agrees, re-anchoring at booked_on’s rate', async () => {
-    const created = await createTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      input: INPUT,
-    })
-
-    const moved = await updateTransaction({
-      scope,
-      policies: EVERYTHING,
-      conversion: book(),
-      id: created.id,
-      patch: { accountId: 'acc-eur', currencyCode: 'EUR' },
-    })
-
-    expect(moved).toMatchObject({
-      accountId: 'acc-eur',
-      currencyCode: 'EUR',
-      refAmountMinor: 53_353,
-      rateE10: 43_218_000_000,
-    })
-  })
-
   it('lets a legacy mismatched row take an edit that does not move it to a mismatching pair', async () => {
     const id = await seedLegacyMismatch()
 
@@ -2259,8 +2410,7 @@ describe('19 — a transaction is in its account’s currency', () => {
       policies: EVERYTHING,
       conversion: book(),
       id,
-      // The detail screen re-sends the pair it already holds on every save.
-      patch: { note: 'still here', accountId: 'acc-a', currencyCode: 'EUR' },
+      patch: { note: 'still here', accountId: 'acc-a' },
     })
     expect(noted).toMatchObject({
       note: 'still here',
@@ -2369,32 +2519,43 @@ describe('19 — a transaction is in its account’s currency', () => {
   })
 })
 
-describe('20 — changing an account’s currency leaves rows the detection can see', () => {
-  it('reports a row booked in the old currency after updateAccount changes the account’s currency', async () => {
+describe('20 — changing an account’s currency is refused once it has history', () => {
+  it('does not rewrite a booked row, and detection stays empty because the account currency did not move', async () => {
     const world = await createBudgetWorld()
     const conversion = conversionOf('PLN', [
       [`EUR:PLN:${BOOKED_ON}`, 43_218_000_000],
     ])
-    await createTransaction({
+    const booked = await createTransaction({
       scope: world.scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...INPUT, accountId: 'acc-a', currencyCode: 'PLN' },
+      input: { ...INPUT, accountId: 'acc-a' },
     })
     await expect(
       findAccountCurrencyMismatches(world.scope),
     ).resolves.toMatchObject({ count: 0 })
 
-    await updateAccount(
-      world.scope,
-      'acc-a',
-      { currencyCode: 'EUR' },
-      conversion,
-    )
+    await expect(
+      updateAccount(world.scope, 'acc-a', { currencyCode: 'EUR' }, conversion),
+    ).rejects.toBeInstanceOf(AccountCurrencyLockedError)
 
-    const report = await findAccountCurrencyMismatches(world.scope)
-    expect(report.count).toBe(1)
-    expect(report.sample.at(0)?.accountId).toBe('acc-a')
+    const [account] = await world.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, 'acc-a'))
+    const [row] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, booked.id))
+    expect(account?.currencyCode).toBe('PLN')
+    expect(row).toMatchObject({
+      amountMinor: booked.amountMinor,
+      currencyCode: booked.currencyCode,
+      refAmountMinor: booked.refAmountMinor,
+    })
+    await expect(
+      findAccountCurrencyMismatches(world.scope),
+    ).resolves.toMatchObject({ count: 0 })
   })
 })
 
@@ -2606,6 +2767,7 @@ describe('22 — a category write never touches an amount', () => {
     await restoreCategory(world.scope, 'cat-home')
     await deleteCategory(world.scope, 'cat-unused')
     await deleteCategory(world.scope, created.id)
+    await seedStandardCategories(world.scope, { locale: 'en' })
     await listCategories(world.scope, { includeArchived: true })
     await getCategory(world.scope, 'cat-food')
     await spendingByCategory(world.scope, {
@@ -2879,5 +3041,314 @@ describe('23 — an imported loan schedule is integer amounts with paid-requires
     )
     expect(source).not.toMatch(/\bMath\.(pow|floor|ceil|round)\b/)
     expect(source).not.toMatch(/\/\s*\d*(?:00|100)\b/)
+  })
+})
+
+describe('24 — notification email is not a money surface', () => {
+  const payload = {
+    spentMinor: 205_000,
+    availableMinor: 200_000,
+    overspentMinor: 5_000,
+    budgetName: 'Groceries',
+    currencyCode: 'PLN',
+  } as const
+
+  it('renders event name and deep link with no minor units or formatted money', async () => {
+    const t = createTranslator('en', await loadCatalogue('en'))
+    const { subject, element } = notificationEmail(
+      {
+        kind: 'budget.exceeded',
+        locale: 'en',
+        actionHref: 'https://app.example.test/budgets/budget-1',
+        workspaceName: 'Haushalt',
+      },
+      t,
+    )
+    const { html, text } = await renderEmail(element)
+    const drawn = formatMoney('en', {
+      amountMinor: asMinor(payload.spentMinor),
+      currencyCode: asCurrencyCode(payload.currencyCode),
+    })
+
+    expect(subject).toBe('Spent budgets')
+    expect(html).toContain('/budgets/budget-1')
+    expect(text).toContain('/budgets/budget-1')
+    for (const part of [html, text, subject]) {
+      expect(part).not.toContain(String(payload.spentMinor))
+      expect(part).not.toContain(String(payload.availableMinor))
+      expect(part).not.toContain(payload.budgetName)
+      expect(part).not.toContain(drawn)
+    }
+  })
+
+  it('renders a digest of event names and links with no amounts or totals', async () => {
+    const t = createTranslator('en', await loadCatalogue('en'))
+    const { subject, element } = digestEmail(
+      {
+        locale: 'en',
+        workspaceName: 'Haushalt',
+        items: [
+          {
+            kind: 'budget.threshold_crossed',
+            href: 'https://app.example.test/budgets/budget-1',
+          },
+          {
+            kind: 'goal.reached',
+            href: 'https://app.example.test/goals/goal-1',
+          },
+        ],
+      },
+      t,
+    )
+    const { html, text } = await renderEmail(element)
+    const drawn = formatMoney('en', {
+      amountMinor: asMinor(payload.spentMinor),
+      currencyCode: asCurrencyCode(payload.currencyCode),
+    })
+
+    expect(subject).toBe('2 updates from Haushalt')
+    expect(html).toContain('/budgets/budget-1')
+    expect(html).toContain('/goals/goal-1')
+    expect(text).toContain('/budgets/budget-1')
+    for (const part of [html, text, subject]) {
+      expect(part).not.toContain(String(payload.spentMinor))
+      expect(part).not.toContain(payload.budgetName)
+      expect(part).not.toContain(drawn)
+      expect(part).not.toMatch(/total/i)
+    }
+  })
+})
+
+describe('16 — dashboard whole-month plan never joins actuals', () => {
+  const WINDOW = { from: '2026-04-01', to: '2026-05-01' } as const
+  const FLOW: TransactionPolicies = {
+    planned: 'exclude',
+    adjustments: 'include',
+    transfers: 'exclude',
+    completeness: 'any',
+  }
+
+  it('keeps actual totals byte-identical when a plan exists beside them', async () => {
+    const world = await createBudgetWorld()
+    await seedTransaction(world.db, {
+      id: 'posted',
+      refAmountMinor: 80_00,
+      bookedOn: '2026-04-12',
+    })
+    const without = await sumTransactions({
+      scope: world.scope,
+      policies: FLOW,
+      filters: { from: '2026-04-01', to: '2026-04-30' },
+      historyFloor: null,
+      baseCurrencyCode: asCurrencyCode('PLN'),
+    })
+    await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-row',
+      refAmountMinor: 40_00,
+      bookedOn: '2026-04-20',
+      isPlanned: true,
+    })
+    const withPlan = await sumTransactions({
+      scope: world.scope,
+      policies: FLOW,
+      filters: { from: '2026-04-01', to: '2026-04-30' },
+      historyFloor: null,
+      baseCurrencyCode: asCurrencyCode('PLN'),
+    })
+    expect(JSON.stringify(withPlan)).toBe(JSON.stringify(without))
+    expect(withPlan).toMatchObject({
+      incomeMinor: 0,
+      expenseMinor: 80_00,
+    })
+  })
+
+  it('keeps a paid period in the plan at expected_amount_minor and counts the settlement once in actual', async () => {
+    const world = await createBudgetWorld()
+    const series = await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-04-15',
+    )
+    const april = periods.find((period) => period.dueOn.startsWith('2026-04'))
+    if (april === undefined) throw new Error('expected an April period')
+    await seedTransaction(world.db, {
+      id: 'settled-rent',
+      refAmountMinor: 250_00,
+      bookedOn: '2026-04-10',
+    })
+    const before = await sumPlannedPeriodsByMonth(world.scope, WINDOW)
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: april.periodStart,
+      transactionId: 'settled-rent',
+    })
+    const after = await sumPlannedPeriodsByMonth(world.scope, WINDOW)
+    expect(after).toEqual(before)
+    expect(after[0]?.amountMinor).toBe(250_00)
+    const actual = await sumTransactions({
+      scope: world.scope,
+      policies: FLOW,
+      filters: { from: '2026-04-01', to: '2026-04-30' },
+      historyFloor: null,
+      baseCurrencyCode: asCurrencyCode('PLN'),
+    })
+    expect(actual.expenseMinor).toBe(250_00)
+  })
+
+  it('excludes skipped periods and transfers from the plan', async () => {
+    const world = await createBudgetWorld()
+    const series = await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-04-15',
+    )
+    const april = periods.find((period) => period.dueOn.startsWith('2026-04'))
+    if (april === undefined) throw new Error('expected an April period')
+    await markSkipped(world.scope, {
+      seriesId: series.id,
+      periodStart: april.periodStart,
+    })
+    expect(await sumPlannedPeriodsByMonth(world.scope, WINDOW)).toEqual([])
+
+    await seedTransaction(world.db, {
+      id: 'plan-xfer',
+      refAmountMinor: 50_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+      transferKind: 'internal',
+      transferId: 'xfer-1',
+    })
+    expect(
+      await sumPlannedTransactionsByMonth({
+        scope: world.scope,
+        ...WINDOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('omits unpaid periods of a paused series and keeps paid ones', async () => {
+    const world = await createBudgetWorld()
+    const series = await seedSeries(world.scope, '2026-04-15', {
+      expectedAmountMinor: 250_00,
+    })
+    await pauseSeries(world.scope, series.id)
+    expect(await sumPlannedPeriodsByMonth(world.scope, WINDOW)).toEqual([])
+  })
+
+  it('converts an expected amount at due_on and treats a missing rate as a gap, not zero', async () => {
+    const converted = await convertExpectedAmount(
+      {
+        amountMinor: asMinor(100_00),
+        currencyCode: asCurrencyCode('EUR'),
+        dueOn: '2026-04-10',
+        baseCurrencyCode: asCurrencyCode('PLN'),
+      },
+      async ({ date }) =>
+        date === '2026-04-10' ? asRateE10(43_000_000_000) : null,
+    )
+    expect(converted).toBe(430_00)
+
+    const gap = await convertExpectedAmount(
+      {
+        amountMinor: asMinor(100_00),
+        currencyCode: asCurrencyCode('EUR'),
+        dueOn: '2026-04-10',
+        baseCurrencyCode: asCurrencyCode('PLN'),
+      },
+      async () => null,
+    )
+    expect(gap).toBeNull()
+  })
+
+  it('stamps was_planned on create and keeps it through the flip to posted', async () => {
+    const conversion = conversionOf('PLN', [])
+    const planned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, isPlanned: true },
+    })
+    expect(planned.wasPlanned).toBe(true)
+    const posted = await updateTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      id: planned.id,
+      patch: { isPlanned: false },
+    })
+    expect(posted).toMatchObject({ isPlanned: false, wasPlanned: true })
+    const neverPlanned = await createTransaction({
+      scope,
+      policies: EVERYTHING,
+      conversion,
+      input: { ...INPUT, amountMinor: 50_00 },
+    })
+    expect(neverPlanned.wasPlanned).toBe(false)
+    expect(
+      await sumPlannedTransactionsByMonth({
+        scope,
+        from: '2026-03-01',
+        to: '2026-04-01',
+      }),
+    ).toEqual([
+      {
+        monthKey: '2026-03-01',
+        direction: 'expense',
+        amountMinor: planned.refAmountMinor,
+      },
+    ])
+  })
+})
+
+describe('MCP write tools keep balances equal to the rebuilt ledger', () => {
+  it('N synthetic create_transaction calls match rebuildAccountBalance', async () => {
+    await scope.db.insert(organizationCurrencies).values({
+      organizationId: 'org-a',
+      currencyCode: 'PLN',
+      isBase: true,
+      addedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+    const minted = await createPatGrant(
+      scope,
+      {
+        name: 'mcp writer',
+        scopes: ['transactions:write', 'transactions:read'],
+        environment: 'stg',
+      },
+      new Date('2026-03-15T10:00:00.000Z'),
+    )
+    const ctx = {
+      scopes: ['transactions:write', 'transactions:read'] as const,
+      scope,
+      grantId: minted.grant.id,
+      userId: scope.ctx.userId,
+      kv: new MemoryMcpKv(),
+    }
+    const amounts = [11_00, 22_00, 33_00] as const
+    for (const amountMinor of amounts) {
+      const result = await invokeMcpTool(ctx, 'create_transaction', {
+        accountId: 'acc-a',
+        direction: 'expense',
+        amountMinor,
+        bookedOn: BOOKED_ON,
+        policies: EVERYTHING,
+      })
+      expect(result.ok).toBe(true)
+    }
+    await rebuildAccountBalance(scope.db, 'acc-a')
+    const account = await getAccount(scope, 'acc-a')
+    const expected =
+      (account.initialBalanceMinor as number) -
+      amounts.reduce((sum, amount) => sum + amount, 0)
+    expect(account.currentBalanceMinor).toBe(expected)
   })
 })

@@ -345,11 +345,10 @@ const messages = {
   'accounts.group.delete.action': 'Delete group',
   'accounts.group.delete.title': 'Delete {name}?',
   'accounts.group.delete.body': {
-    one: '{count} account leaves this group. None is deleted. Sub-groups become top-level groups.',
-    other:
-      '{count} accounts leave this group. None is deleted. Sub-groups become top-level groups.',
+    one: '{count} account leaves this group. None is deleted.',
+    other: '{count} accounts leave this group. None is deleted.',
   },
-  'accounts.group.delete.bodyEmpty': 'Sub-groups become top-level groups.',
+  'accounts.group.delete.subgroups': 'Sub-groups become top-level groups.',
   'accounts.group.delete.rules':
     'Rules that use this group will be paused until you pick another.',
   'accounts.count': {
@@ -446,7 +445,7 @@ const messages = {
   'accounts.form.create.body':
     'A name and a currency are all that is required. The rest can wait.',
   'accounts.form.edit.body':
-    'Changing the currency or the opening balance re-values this account’s whole history.',
+    'The currency can change only while this account has no entries. Booked amounts stay in the currency they were recorded in.',
   'accounts.form.error.title': 'The account was not saved',
   'accounts.field.openedOn': 'Opening date',
   'accounts.field.openedOn.help':
@@ -455,6 +454,10 @@ const messages = {
     'A positive figure. Leave it empty when there is no limit.',
   'accounts.field.currency.help':
     'Only the currencies your household holds are offered.',
+  'accounts.field.currency.locked':
+    'This account already has entries, so its currency cannot change.',
+  'accounts.currency.locked':
+    'This account already has entries, so its currency cannot change. Those entries stay in the currency they were recorded in.',
   /* -- Accounts: correcting a balance ------------------------------------- */
   'accounts.adjust.body':
     'State what the balance should be. The difference is written as an entry you can find, edit and export.',
@@ -823,6 +826,12 @@ const messages = {
   'refunds.dialog.error.title': 'The refund was not linked',
   'refunds.dialog.error.refused':
     'Nothing was changed. This refund cannot be linked as it is. Check the transaction, its amount, its currency and its direction, then try again.',
+  'refunds.dialog.error.direction':
+    'Nothing was changed. A refund has to point the opposite way to the original. Pick a transaction of the other kind, or record this as something outside the household.',
+  'refunds.dialog.error.currency':
+    'Nothing was changed. A refund and what it refunds have to be in the same currency. Pick a matching currency, or record this as something outside the household.',
+  'refunds.dialog.error.over':
+    'Nothing was changed. This would give back more than was paid. Pick a larger original, or a smaller refund.',
   'refunds.suggest.loading': 'Looking for what this refunds…',
   'refunds.suggest.empty':
     'Nothing with the same payee in the last 90 days is large enough to be what this refunds.',
@@ -917,7 +926,15 @@ const messages = {
   'categories.error.title': 'Could not load your categories',
   'categories.empty.title': 'No categories yet',
   'categories.empty.body':
-    'A category answers "what was this for". Add the first one and the reports have something to group by.',
+    'A category answers "what was this for". Start from a ready-made set you can rename, recolour or archive, or add your own.',
+  'categories.seed.action': 'Add the standard set',
+  'categories.seed.failed': 'The standard set could not be added',
+  'categories.toast.seeded': {
+    one: 'Added {count} category.',
+    other: 'Added {count} categories.',
+  },
+  'categories.toast.seeded.none':
+    'Nothing new was added. The standard set already exists here; archived categories are under "Show archived categories".',
   'categories.archive.title': 'Archive {name}?',
   'categories.archive.body':
     'It stops being offered on new entries, and anything already filed under it keeps its label. Subcategories are archived with it. You can restore it at any time.',
@@ -1021,6 +1038,8 @@ const messages = {
   'dashboard.period.label': 'Period',
   'dashboard.income': 'Money in',
   'dashboard.expenses': 'Money out',
+  'dashboard.plannedIncome': 'Planned in',
+  'dashboard.plannedExpenses': 'Planned out',
   'dashboard.net': 'Difference',
   'dashboard.comparedToPrevious': '{change} against the previous period',
   'dashboard.widget.netWorth': 'Net worth',
@@ -1062,6 +1081,14 @@ const messages = {
   'dashboard.cashFlow.shareOfIncome': '{share} of the {amount} that came in',
   'dashboard.cashFlow.context':
     'Selected period: {month}. Earlier months are context.',
+  'dashboard.cashFlow.plannedNote':
+    'Planned amounts are the whole month’s plan, not only what is still unpaid.',
+  'dashboard.cashFlow.convertedNote':
+    'Planned amounts in other currencies are converted at each due date’s rate, not today’s.',
+  'dashboard.cashFlow.rateMissingNote':
+    'Some planned amounts have no exchange rate for their due date, so they are listed in their own currency and omitted from the chart total.',
+  'dashboard.cashFlow.plannedInHeader': 'Planned in',
+  'dashboard.cashFlow.plannedOutHeader': 'Planned out',
   'dashboard.cashFlow.empty.title': 'No money moved in this period',
   'dashboard.cashFlow.empty.body':
     'Record an expense, or pick a longer period.',
@@ -1432,8 +1459,19 @@ const messages = {
     frame states why it arrived, and the body says in one line what to do. `{app}` is filled from
     `app.name` rather than typed, so a rename lands in twelve strings at once.
   */
+  'email.layout.footer.reason':
+    'You are getting this because you are a member of {workspace} on {app}.',
   'email.layout.footer.reasonAccount':
     'You are getting this because of activity on your {app} account.',
+  'email.layout.footer.unsubscribe': 'Stop these emails',
+  'email.notification.action': 'Open in {app}',
+  'email.notification.body': 'Open {app} to see what happened.',
+  'email.digest.subject': {
+    one: '{count} update from {workspace}',
+    other: '{count} updates from {workspace}',
+  },
+  'email.digest.heading': 'Your daily summary',
+  'email.digest.intro': 'Here is what happened in {workspace} in the last day.',
   'email.auth.greeting': 'Hi {name},',
   /*
     Stated once, in the frame of every auth email, because the failure it prevents is a person
@@ -1621,6 +1659,75 @@ const messages = {
     'The two-level tree every entry is filed under.',
   'settings.payees.description':
     'Who the money went to, and the names an import should fold into them.',
+  'settings.agents.title': 'Connected agents',
+  'settings.agents.subtitle':
+    'Tokens and apps that may read or change this workspace.',
+  'settings.agents.empty': 'No agents have access to this workspace yet.',
+  'settings.agents.mcpUrl': 'MCP URL',
+  'settings.agents.createToken': 'Create a personal token',
+  'settings.agents.createTitle': 'Create a personal token',
+  'settings.agents.createSubmit': 'Create token',
+  'settings.agents.tokenName': 'Name',
+  'settings.agents.scopesLabel': 'Access',
+  'settings.agents.tokenOnce':
+    'Copy this token now. It will not be shown again. Treat it like a password.',
+  'settings.agents.kind.pat': 'Personal token',
+  'settings.agents.kind.oauth': 'OAuth app',
+  'settings.agents.revoke': 'Revoke',
+  'settings.agents.revoke.action': 'Revoke {name}',
+  'settings.agents.revoke.title': 'Revoke {name}?',
+  'settings.agents.revoke.body':
+    'The next tool call with this grant fails. This does not delete rows it already wrote.',
+  'settings.agents.revoke.confirm': 'Revoke access',
+  'settings.agents.revoked': 'Access for {name} was revoked.',
+  'settings.agents.edit': 'Edit settings',
+  'settings.agents.edit.action': 'Edit settings for {name}',
+  'settings.agents.edit.title': 'Settings for {name}',
+  'settings.agents.edit.saved': 'Access for {name} was updated.',
+  'settings.agents.edit.scopesRequired': 'Choose at least one permission.',
+  'settings.agents.locked':
+    'Agent access is part of Plus and Household. The free plan does not include it.',
+  'settings.agents.locked.cta': 'See plans',
+  'settings.agents.membersOnly': 'Only an owner or admin can connect an agent.',
+  'settings.agents.error.title': 'Connected agents did not load',
+  'settings.agents.column.name': 'Name',
+  'settings.agents.column.kind': 'Kind',
+  'settings.agents.column.scopes': 'Access',
+  'settings.agents.column.lastUsed': 'Last used',
+  'settings.agents.column.actions': 'Actions',
+  'settings.agents.neverUsed': 'Never',
+  'settings.agents.list.label': 'Grants with access to this workspace',
+  'settings.agents.scope.accounts.read': 'Read accounts',
+  'settings.agents.scope.accounts.write': 'Create and change accounts',
+  'settings.agents.scope.accounts.delete': 'Delete accounts',
+  'settings.agents.scope.transactions.read': 'Read entries',
+  'settings.agents.scope.transactions.write': 'Create and change entries',
+  'settings.agents.scope.transactions.delete': 'Delete entries',
+  'settings.agents.scope.categories.read': 'Read categories',
+  'settings.agents.scope.categories.write': 'Create and change categories',
+  'settings.agents.scope.categories.delete': 'Delete categories',
+  'settings.agents.scope.payees.read': 'Read payees',
+  'settings.agents.scope.payees.write': 'Create and change payees',
+  'settings.agents.scope.payees.delete': 'Delete payees',
+  'settings.agents.scope.recurring.read': 'Read recurring series',
+  'settings.agents.scope.recurring.write': 'Create and change recurring series',
+  'settings.agents.scope.recurring.delete': 'Delete recurring series',
+  'settings.agents.scope.budgets.read': 'Read budgets',
+  'settings.agents.scope.budgets.write': 'Create and change budgets',
+  'settings.agents.scope.budgets.delete': 'Delete budgets',
+  'oauth.consent.title': 'Allow {clientName}?',
+  'oauth.consent.body':
+    'This app is asking to use {workspaceName}. It cannot see any other workspace.',
+  'oauth.consent.requested': 'Choose access',
+  'oauth.consent.scopeHint':
+    'Reading starts on. Creating, changing, and deleting stay off until you turn them on.',
+  'oauth.consent.revokeHint':
+    'You can revoke this later under Settings → Connected agents.',
+  'oauth.consent.allow': 'Allow',
+  'oauth.consent.deny': 'Deny',
+  'oauth.consent.error.title': 'This consent request did not finish',
+  'oauth.consent.missingClient':
+    'This consent link is missing the app it is for. Go back and try the connection again.',
 
   /* -- Plans and billing -------------------------------------------------- */
   // The catalogue in `src/lib/plans.ts` holds the numbers; these are the words
@@ -1652,6 +1759,11 @@ const messages = {
   'plans.feature.household.roles':
     'Owners and admins decide who may change what',
   'plans.feature.household.storage': 'Five gigabytes of receipts',
+  'plans.feature.mcp': 'Connect agents through MCP',
+  'mcp.preview.delete.transaction': 'Delete entry {id}?',
+  'mcp.preview.delete.category': 'Delete category {id}?',
+  'mcp.preview.delete.payee': 'Delete payee {id}?',
+  'mcp.preview.delete.recurring': 'Delete recurring series {id}?',
   'plans.interval.monthly': 'Monthly',
   'plans.interval.yearly': 'Yearly',
   'plans.price.monthly': '{amount} a month',
@@ -1772,6 +1884,10 @@ const messages = {
   'members.error.seatsFull':
     'This plan has no seat left. Move up a plan, or withdraw an invitation first.',
   'members.error.generic': 'That did not work. Nothing was changed.',
+  'members.toast.roleFailed': 'Could not change {name}’s role',
+  'members.toast.resendFailed':
+    'Could not send the invitation to {email} again',
+  'members.toast.revokeFailed': 'Could not withdraw the invitation to {email}',
 
   /* -- Accepting an invitation -------------------------------------------- */
   'invite.title': 'Join {workspace}',
@@ -1858,11 +1974,16 @@ const messages = {
   'recurring.filter.label': 'Show',
   'recurring.filter.active': 'Active',
   'recurring.filter.all': 'All, including paused',
+  'recurring.filter.results': {
+    one: '{count} series',
+    other: '{count} series',
+  },
 
   'book.filter.label': 'Book',
   'book.filter.all': 'All',
   'book.business': 'Business',
   'book.personal': 'Personal',
+  'book.value': 'Book: {book}',
   'book.field.label': 'Book',
   'book.field.description':
     'Whether this series belongs to the business or to personal finances.',
@@ -2488,7 +2609,7 @@ const messages = {
   'loans.schedule.caption':
     'Each row is one expected payment. Paid means it points at a recorded transaction.',
   'loans.schedule.missing':
-    'This liability has no schedule. That should not happen; try again or delete it.',
+    'This liability has no schedule. Try again, or go back to all liabilities.',
   'loans.schedule.title': 'Instalment schedule',
   'loans.schedule.sequence': 'No.',
   'loans.schedule.due': 'Due',
@@ -2828,6 +2949,7 @@ const messages = {
     '{name} is deleted for good. The entry itself is untouched.',
   'attachments.confirm.action': 'Remove',
   'attachments.toast.deleted': 'Receipt removed',
+  'attachments.toast.deleteFailed': '{name} was not removed',
   /* -- Why an import refused a row (19-S2) ---------------------------------- */
   // One key per `import_row_errors.code`. The row is written once and read back
   // in whatever language the person is using then, so the column stores the key

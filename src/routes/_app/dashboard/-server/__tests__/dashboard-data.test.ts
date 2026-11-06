@@ -203,4 +203,20 @@ describe('the figures', () => {
     expect(data.cashFlow.netMinor).toBe(-2_000)
     expect(data.range).toEqual({ from: '2026-08-01', to: '2026-08-31' })
   })
+
+  it('keeps those actuals when a planned row sits in the same month', async () => {
+    await scope.db.insert(transactions).values({
+      ...expense('txn-planned', '2026-08-18', 9_999),
+      isPlanned: true,
+      wasPlanned: true,
+    })
+    const data = await load()
+    expect(data.cashFlow.expenseMinor).toBe(2_000)
+    expect(data.cashFlow.incomeMinor).toBe(0)
+    const august = data.cashFlow.buckets.find(
+      (bucket) => bucket.key === '2026-08-01',
+    )
+    expect(august?.plannedExpenseMinor).toBe(9_999)
+    expect(august?.expenseMinor).toBe(2_000)
+  })
 })

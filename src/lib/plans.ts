@@ -154,6 +154,14 @@ export function isQuotaMetric(value: unknown): value is QuotaMetric {
 export type PlanLimits = Readonly<Record<QuotaMetric, number>>
 
 /**
+ * Boolean capabilities a plan includes or does not. Distinct from {@link PlanLimits}: a locked
+ * feature is not a zero ceiling (writes would still be readable); it is absent from the product.
+ */
+export const PLAN_FEATURES = ['mcp'] as const
+export type PlanFeature = (typeof PLAN_FEATURES)[number]
+export type PlanFeatures = Readonly<Record<PlanFeature, boolean>>
+
+/**
  * One purchasable line: the provider's price and the product it belongs to.
  *
  * `amountMinor` is in `currency`'s own minor units and is **display data** — the charge is made
@@ -174,6 +182,7 @@ export interface PlanDefinition {
   readonly taglineKey: MessageKey
   /** The sentences the pricing and billing screens list under the tier, in order. */
   readonly featureKeys: ReadonlyArray<MessageKey>
+  readonly features: PlanFeatures
   readonly limits: PlanLimits
   /** `null` on the free tier: there is nothing to buy, so there is no price to state. */
   readonly prices: Readonly<Record<BillingInterval, PlanPrice>> | null
@@ -216,6 +225,7 @@ export const PLANS: Readonly<Record<PlanId, PlanDefinition>> = {
       'plans.feature.free.planning',
       'plans.feature.export',
     ],
+    features: { mcp: false },
     limits: {
       members: 1,
       accounts: 3,
@@ -244,7 +254,9 @@ export const PLANS: Readonly<Record<PlanId, PlanDefinition>> = {
       'plans.feature.plus.currencies',
       'plans.feature.plus.rules',
       'plans.feature.plus.storage',
+      'plans.feature.mcp',
     ],
+    features: { mcp: true },
     limits: {
       members: 1,
       accounts: UNLIMITED,
@@ -284,7 +296,9 @@ export const PLANS: Readonly<Record<PlanId, PlanDefinition>> = {
       'plans.feature.household.roles',
       'plans.feature.household.storage',
       'plans.feature.export',
+      'plans.feature.mcp',
     ],
+    features: { mcp: true },
     limits: {
       members: 6,
       accounts: UNLIMITED,
@@ -327,6 +341,10 @@ export const DEFAULT_PLAN_ID: PlanId = 'free'
 
 export function planLimits(planId: PlanId): PlanLimits {
   return PLANS[planId].limits
+}
+
+export function planFeatures(planId: PlanId): PlanFeatures {
+  return PLANS[planId].features
 }
 
 /** The price line for one tier and interval, or `null` on the free tier. */

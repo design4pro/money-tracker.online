@@ -120,7 +120,10 @@ export function AttachmentList({
       setPending(null)
       onDeleted()
     } catch (error) {
-      toast.error(t(failureOf(error).message.key))
+      toast.error(
+        t('attachments.toast.deleteFailed', { name: pending.originalName }),
+        { description: t(failureOf(error).message.key) },
+      )
     } finally {
       setIsDeleting(false)
     }

@@ -18,8 +18,11 @@ One addition to the stabilization loop's exit criteria:
   (the repo override of `om-auto-review-pr` says how). An open thread the stage declined is settled the
   way that override says, by a specialist's verdict, before the loop ends; only a thread still open
   after that ends it with `changes-requested`, never `merge-queue`, and counts as a failed round of
-  `om-pr-autopilot`'s loop. After a fix for a `qa-failed` the QA panel set is pushed, remove that
-  label so QA runs again on the new head (ADR 0031).
+  `om-pr-autopilot`'s loop. After a fix for a `qa-failed` is pushed, run
+  `node .ai/scripts/qa-panel-failed.mjs --repo {owner}/{repo} --pr {n}` and remove `qa-failed` only
+  when `isPanelQaFailed` is true (the latest `labeled qa-failed` event is followed by a
+  `🤖 QA-PANEL-FAILED head:<sha>` marker). Otherwise leave the label: it is a person's, and removing
+  it would bypass the stop in ADR 0031. The script is the only definition of that predicate.
 
 The live `develop` and `main` rulesets both set `required_review_thread_resolution: true`, so an
 open thread blocks the merge. The criterion above also keeps the skill from reporting an

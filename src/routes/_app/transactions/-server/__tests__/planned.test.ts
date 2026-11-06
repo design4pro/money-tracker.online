@@ -68,7 +68,10 @@ vi.mock('#/server/auth/guards', () => ({
   },
 }))
 
-vi.mock('#/server/clock', () => ({ serverToday: () => '2026-04-15' }))
+vi.mock('#/server/clock', () => ({
+  serverToday: () => 'UTC-SHOULD-NOT-BE-USED',
+  workspaceCivilDay: () => '2026-04-15',
+}))
 
 vi.mock('cloudflare:workers', () => ({ env: {} }))
 
@@ -137,7 +140,10 @@ describe('loadPlannedScreen', () => {
   it('proves membership once on the first page and hands that one scope to both reads', async () => {
     const page = await loadPlannedScreen(planned(null))
 
-    expect(page).toMatchObject({ expectations: { state: 'shown' } })
+    expect(page).toMatchObject({
+      today: TODAY,
+      expectations: { state: 'shown' },
+    })
     expect(seen.requireOrgCalls).toBe(1)
     expect(seen.ledgerScopes).toHaveLength(1)
     expect(seen.upcomingScopes).toHaveLength(1)

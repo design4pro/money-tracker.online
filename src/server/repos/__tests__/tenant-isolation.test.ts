@@ -40,7 +40,7 @@ import { isNotFound } from '@tanstack/react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { asCurrencyCode } from '#/lib/money'
-import { organization, user } from '#/server/db/auth-schema'
+import { member, organization, user } from '#/server/db/auth-schema'
 import { buildEnvelope } from '#/server/errors/envelope'
 import { classifyFailure } from '#/server/errors/classify'
 import { rethrowAsNotFound } from '#/server/fns/not-found'
@@ -48,6 +48,7 @@ import {
   accountGroupMembers,
   accountGroups,
   accounts,
+  agentGrants,
   attachments,
   budgetCategories,
   categories,
@@ -59,6 +60,7 @@ import {
   rules,
   transactions,
 } from '#/server/db/schema'
+import { listedMcpToolNames } from '#/server/mcp/catalog'
 import { forecastSeries } from '#/server/recurring/forecast'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { plannedScreenFor } from '#/routes/_app/transactions/-server/planned-data'
@@ -92,6 +94,7 @@ import {
   moveCategory,
   reorderCategories,
   restoreCategory,
+  seedStandardCategories,
   spendingByCategory,
   updateCategory,
 } from '../categories'
@@ -114,23 +117,50 @@ import {
 } from './budget-harness'
 import {
   countUnread,
+  getNotification,
   insertNotification,
   listPrefsFor,
+  listUnreadForSince,
   markRead,
   pageForReader,
   upsertPref,
 } from '../notifications'
 import {
+  claimDelivery,
+  countSince,
+  getDelivery,
+  insertDelivery,
+  listDeferredOlderThan,
+  listDeferredSince,
+  listStale,
+  markDelivery,
+  markDeliveryByProviderMessage,
+} from '../email-deliveries'
+import { isSuppressed, suppress } from '../email-suppressions'
+import * as emailSuppressions from '../email-suppressions'
+import {
+  createOauthGrant,
+  createPatGrant,
+  findOauthGrantByClient,
+  findPatGrantByTokenHash,
+  listGrants,
+  revokeGrant,
+  scopesOfGrant,
+  updateAgentGrant,
+} from '../agent-grants'
+import { insertAgentAudit, listAgentAudit } from '../agent-audit'
+import {
   createAccountGroup,
   deleteAccountGroup,
   getAccountBalanceOn,
   listAccountGroups,
+  moveAccountGroup,
   moveAccountToGroup,
   reorderAccountGroups,
   setAccountGroupMembers,
   updateAccountGroup,
 } from '../accounts'
-import { isMember, memberScopeFor } from '../members'
+import { isMember, memberEmail, memberScopeFor } from '../members'
 import { applyUnsubscribe } from '#/server/email/unsubscribe'
 import { signUnsubscribeToken } from '#/server/email/unsubscribe-token'
 import { notify } from '#/server/notify/dispatch'
@@ -157,6 +187,9 @@ import {
   listPeriods as listSeriesPeriods,
   listSeriesLinkDetails,
   markPaid,
+  removeUnpaidOpenPeriods,
+  sumPlannedPeriodsByMonth,
+  sumSeriesSpendThisYear,
 } from '../recurring'
 import {
   getWorkspaceTimezone,
@@ -168,11 +201,13 @@ import {
   getLoan,
   listCalendarInstalments,
   listInstalments,
+  listInstalmentsForLoans,
   listLoans,
   listSettledTransactionIds,
   markInstalmentPaid,
   updateLoan,
 } from '../loans'
+import { assertMayAdminister } from '../administer'
 import { createTenantRepository, runTenantBatch, tenantFilter } from '../base'
 import {
   ForbiddenError,
@@ -192,10 +227,12 @@ import {
   getTransaction,
   updateTransaction,
 } from '../transactions'
+import { sumPlannedTransactionsByMonth } from '../transaction-queries'
 
 import type { BudgetWorld } from './budget-harness'
 import type { TenantScope } from '../scope'
-import type { ConversionContext, TransactionPolicies } from '../transactions'
+import type { TransactionPolicies } from '../transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 /* -------------------------------------------------------------------------- */
 /* Harness                                                                     */
@@ -643,6 +680,30 @@ describe('account groups cannot be reached or aimed across a workspace boundary'
   it('reorderAccountGroups refuses an order that names B’s group', async () => {
     await expectRefused(reorderAccountGroups(a, [B_GROUP, A_GROUP]))
     await expectRefused(reorderAccountGroups(a, [B_GROUP]))
+  })
+
+  it('moveAccountGroup refuses a foreign group, a foreign parent and a foreign id in the order', async () => {
+    await expectRefused(
+      moveAccountGroup(a, {
+        id: B_GROUP,
+        parentId: null,
+        orderedIds: [B_GROUP],
+      }),
+    )
+    await expectRefused(
+      moveAccountGroup(a, {
+        id: A_GROUP,
+        parentId: B_GROUP,
+        orderedIds: [A_GROUP],
+      }),
+    )
+    await expectRefused(
+      moveAccountGroup(a, {
+        id: A_GROUP,
+        parentId: null,
+        orderedIds: [A_GROUP, B_GROUP],
+      }),
+    )
   })
 })
 
@@ -1187,6 +1248,7 @@ describe('no repository forks the tenant predicate', () => {
   it('covers every repository in the directory, so the check cannot lose its subject', () => {
     const names = repositorySources().map((file) => file.name)
     expect(names).toContain('accounts.ts')
+    expect(names).toContain('administer.ts')
     expect(names).toContain('transactions.ts')
     expect(names).toContain('transaction-queries.ts')
     expect(names).toContain('workspace-currencies.ts')
@@ -1232,6 +1294,45 @@ describe('no repository forks the tenant predicate', () => {
     // tenant column by design — it also composes `tenantFilter` for everything that does, so it
     // is not an exemption here, it simply passes.
     expect(offenders.map((file) => file.name)).toEqual([])
+  })
+})
+
+describe('the shared administer gate counts only this workspace’s members', () => {
+  it('lets a member through a solo workspace even when another workspace is shared', async () => {
+    const world = await createBudgetWorld()
+    await world.db.insert(user).values({
+      id: 'user-c',
+      name: 'C',
+      email: 'c@example.com',
+      emailVerified: true,
+      createdAt: budgetWorldNow,
+      updatedAt: budgetWorldNow,
+    })
+    await world.db.insert(member).values({
+      id: 'mem-b2',
+      organizationId: 'org-b',
+      userId: 'user-c',
+      role: 'member',
+      createdAt: budgetWorldNow,
+    })
+
+    const soloMember = createScope(world.db, {
+      userId: 'user-a',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    harnessExecuted.length = 0
+    await expect(
+      assertMayAdminister(soloMember, 'edit an account'),
+    ).resolves.toBeUndefined()
+
+    const memberCounts = harnessExecuted.filter((statement) =>
+      statement.includes('from "member"'),
+    )
+    expect(memberCounts.length).toBeGreaterThan(0)
+    for (const statement of memberCounts) {
+      expect(statement).toContain('organization_id')
+    }
   })
 })
 
@@ -1483,7 +1584,6 @@ describe('the transaction write path cannot reach or be aimed across a workspace
     accountId: 'acc-a',
     direction: 'expense',
     amountMinor: 12_345,
-    currencyCode: 'PLN',
     bookedOn: '2026-03-10',
   } as const
   const categoryRepo = createTenantRepository(categories, 'category')
@@ -1759,6 +1859,7 @@ describe('the transaction write path cannot reach or be aimed across a workspace
       organizationId: 'org-a',
       createdByUserId: 'user-a',
       accountId: 'acc-a',
+      currencyCode: 'PLN',
       categoryId: 'cat-a',
       payeeId: 'pay-a',
     })
@@ -2100,6 +2201,32 @@ describe('categories cannot be reached or be aimed across a workspace boundary',
     expect(theirs.categories.map((slice) => slice.categoryId)).toEqual([
       FOREIGN.parent,
     ])
+  })
+
+  it('A seeding the standard set leaves B’s tree byte-identical, and B holding food does not make A skip it', async () => {
+    await world.db.insert(categories).values({
+      id: 'cat-b-food-slug',
+      organizationId: 'org-b',
+      name: 'Jedzenie',
+      slug: 'food',
+      color: '#0f7b62',
+      kind: 'expense',
+      position: 10,
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+    const before = await rowsAtStake()
+
+    const result = await seedStandardCategories(world.scope, { locale: 'en' })
+
+    expect(result.created).toBe(36)
+    expect(result.skipped).toBe(0)
+    const after = await rowsAtStake()
+    expect(after.bCategories).toEqual(before.bCategories)
+    expect(after.bTransactions).toEqual(before.bTransactions)
+    const aFood = after.aCategories.filter((row) => row.slug === 'food')
+    expect(aFood).toHaveLength(1)
+    expect(aFood[0]?.organizationId).toBe('org-a')
   })
 })
 
@@ -2712,23 +2839,37 @@ describe('workspace timezone cannot be aimed across a workspace boundary', () =>
     harnessExecuted.length = 0
     await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
 
-    const updates = harnessExecuted.filter((query) =>
-      /update\s+"organization_settings"/i.test(query),
+    const writes = harnessExecuted.filter((query) =>
+      /(insert\s+into|update)\s+"organization_settings"/i.test(query),
     )
-    expect(updates).not.toHaveLength(0)
-    for (const statement of updates) {
+    expect(writes).not.toHaveLength(0)
+    for (const statement of writes) {
       expect(statement).toContain('organization_id')
     }
-    expect(
-      harnessExecuted.filter((query) =>
-        /insert\s+into\s+"organization_settings"/i.test(query),
-      ),
-    ).toHaveLength(0)
 
     expect(await getWorkspaceTimezone(world.scope)).toBe('Pacific/Honolulu')
     expect(await getWorkspaceTimezone(world.otherScope)).toBe(
       'Pacific/Auckland',
     )
+  })
+
+  it('stores the canonical Intl id rather than a link name', async () => {
+    await setWorkspaceTimezone(world.scope, { timezone: 'US/Eastern' })
+    expect(await getWorkspaceTimezone(world.scope)).toBe('America/New_York')
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
+  })
+
+  it('creates the row with insert-on-conflict instead of a read that decides the write', async () => {
+    harnessExecuted.length = 0
+    await setWorkspaceTimezone(world.scope, { timezone: 'Pacific/Honolulu' })
+
+    const sql = harnessExecuted.join('\n')
+    expect(sql).toMatch(/insert\s+into\s+"organization_settings"/i)
+    expect(sql).toMatch(/on conflict/i)
+    expect(sql).not.toMatch(
+      /select[\s\S]*insert\s+into\s+"organization_settings"/i,
+    )
+    expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
   })
 
   it('updates only A’s existing row when both workspaces already have one', async () => {
@@ -2744,9 +2885,11 @@ describe('workspace timezone cannot be aimed across a workspace boundary', () =>
   })
 
   it('refuses a timezone that is not an IANA name, without writing B', async () => {
-    await expect(
-      setWorkspaceTimezone(world.scope, { timezone: 'Not/AZone' }),
-    ).rejects.toThrow()
+    for (const timezone of ['Not/AZone', '+05:00', 'EST', 'europe/warsaw']) {
+      await expect(
+        setWorkspaceTimezone(world.scope, { timezone }),
+      ).rejects.toThrow()
+    }
     expect(await getWorkspaceTimezone(world.otherScope)).toBe('Europe/Warsaw')
   })
 })
@@ -2787,6 +2930,10 @@ describe('notifications cannot be read, counted or marked across a workspace bou
     // B's row is untouched, as B sees it.
     expect(await countUnread(world.otherScope)).toBe(1)
     expect((await pageForReader(world.otherScope)).items[0].readAt).toBeNull()
+    expect(await listUnreadForSince(world.scope, 'user-b', AT)).toEqual([])
+    expect(
+      await listUnreadForSince(world.otherScope, 'user-b', AT),
+    ).toHaveLength(1)
   })
 
   it('lets two workspaces hold the same dedupe key, because the index is scoped', async () => {
@@ -2894,6 +3041,22 @@ describe('notifications cannot be read, counted or marked across a workspace bou
     expect((await listPrefsFor(world.scope, 'user-a')).size).toBe(0)
   })
 
+  it('never lets A load B’s notification by id', async () => {
+    const theirs = await insertNotification(
+      world.otherScope,
+      {
+        userId: 'user-b',
+        kind: KIND,
+        payloadJson: '{"v":1}',
+        dedupeKey: 'by-id',
+      },
+      AT,
+    )
+    expect(theirs).not.toBeNull()
+    expect(await getNotification(world.scope, theirs!.id)).toBeNull()
+    expect(await getNotification(world.otherScope, theirs!.id)).not.toBeNull()
+  })
+
   it('scopes every statement the notification repository runs', async () => {
     harnessExecuted.length = 0
     await insertNotification(
@@ -2929,6 +3092,203 @@ describe('notifications cannot be read, counted or marked across a workspace bou
   })
 })
 
+describe('email deliveries cannot be read, claimed, marked or listed across a workspace boundary', () => {
+  const AT = new Date('2026-03-15T10:00:00.000Z')
+  const KIND = 'budget.exceeded' as const
+
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  async function queuedIn(
+    scope: typeof world.scope,
+    userId: string,
+    dedupeKey: string,
+  ) {
+    const row = await insertDelivery(
+      scope,
+      { userId, kind: KIND, notificationId: null, dedupeKey },
+      AT,
+    )
+    expect(row).not.toBeNull()
+    return row!
+  }
+
+  it('never lets A get, claim, mark or list B’s delivery', async () => {
+    const theirs = await queuedIn(world.otherScope, 'user-b', 'notification:b')
+
+    expect(await getDelivery(world.scope, theirs.id)).toBeNull()
+    expect(await claimDelivery(world.scope, theirs.id)).toBeNull()
+    expect(
+      await markDelivery(world.scope, theirs.id, { status: 'failed' }),
+    ).toBeNull()
+    expect(
+      await markDeliveryByProviderMessage(world.scope, {
+        id: theirs.id,
+        providerMessageId: 'email_b',
+        status: 'bounced',
+      }),
+    ).toBeNull()
+    expect(await countSince(world.scope, AT)).toBe(0)
+    expect(await listStale(world.scope, AT, new Date(0))).toEqual([])
+    expect(await listDeferredSince(world.scope, AT)).toEqual([])
+    expect(await listDeferredOlderThan(world.scope, AT)).toEqual([])
+
+    expect(await getDelivery(world.otherScope, theirs.id)).toMatchObject({
+      status: 'queued',
+    })
+    expect(await countSince(world.otherScope, AT)).toBe(1)
+  })
+
+  it('marks bounced only when this workspace, this id and this provider message agree', async () => {
+    const mine = await queuedIn(
+      world.scope,
+      'user-a',
+      'notification:provider-a',
+    )
+    await markDelivery(world.scope, mine.id, {
+      status: 'sent',
+      providerMessageId: 'email_a',
+    })
+    const theirs = await queuedIn(
+      world.otherScope,
+      'user-b',
+      'notification:provider-b',
+    )
+    await markDelivery(world.otherScope, theirs.id, {
+      status: 'sent',
+      providerMessageId: 'email_b',
+    })
+
+    expect(
+      await markDeliveryByProviderMessage(world.scope, {
+        id: mine.id,
+        providerMessageId: 'email_wrong',
+        status: 'bounced',
+      }),
+    ).toBeNull()
+    expect(
+      await markDeliveryByProviderMessage(world.scope, {
+        id: theirs.id,
+        providerMessageId: 'email_b',
+        status: 'bounced',
+      }),
+    ).toBeNull()
+    expect(
+      await markDeliveryByProviderMessage(world.otherScope, {
+        id: theirs.id,
+        providerMessageId: 'email_b',
+        status: 'complained',
+      }),
+    ).toMatchObject({ status: 'complained' })
+
+    expect(await getDelivery(world.scope, mine.id)).toMatchObject({
+      status: 'sent',
+    })
+    expect(await getDelivery(world.otherScope, theirs.id)).toMatchObject({
+      status: 'complained',
+    })
+  })
+
+  it('never lets A list B’s deferred rows by age', async () => {
+    expect(
+      await insertDelivery(
+        world.otherScope,
+        {
+          userId: 'user-b',
+          kind: KIND,
+          notificationId: null,
+          dedupeKey: 'notification:deferred-b',
+          status: 'deferred',
+        },
+        AT,
+      ),
+    ).not.toBeNull()
+
+    expect(await listDeferredOlderThan(world.scope, AT)).toEqual([])
+    expect(await listDeferredSince(world.scope, AT)).toEqual([])
+    expect(await listDeferredOlderThan(world.otherScope, AT)).toHaveLength(1)
+  })
+
+  it('lets two workspaces hold the same digest key, because the index is scoped', async () => {
+    const dedupeKey = 'digest:2026-09-20'
+    expect(
+      await insertDelivery(
+        world.scope,
+        { userId: 'user-a', kind: 'digest', dedupeKey },
+        AT,
+      ),
+    ).not.toBeNull()
+    expect(
+      await insertDelivery(
+        world.otherScope,
+        { userId: 'user-b', kind: 'digest', dedupeKey },
+        AT,
+      ),
+    ).not.toBeNull()
+    expect(await countSince(world.scope, AT)).toBe(1)
+    expect(await countSince(world.otherScope, AT)).toBe(1)
+  })
+
+  it('drops a second insert of the same key in one workspace', async () => {
+    const input = {
+      userId: 'user-a' as const,
+      kind: KIND,
+      dedupeKey: 'notification:same',
+    }
+    expect(await insertDelivery(world.scope, input, AT)).not.toBeNull()
+    expect(await insertDelivery(world.scope, input, AT)).toBeNull()
+    expect(await countSince(world.scope, AT)).toBe(1)
+  })
+
+  it('scopes every statement the delivery repository runs', async () => {
+    harnessExecuted.length = 0
+    const row = await queuedIn(world.scope, 'user-a', 'notification:a')
+    await getDelivery(world.scope, row.id)
+    await claimDelivery(world.scope, row.id)
+    await markDelivery(world.scope, row.id, { status: 'failed' })
+    await markDeliveryByProviderMessage(world.scope, {
+      id: row.id,
+      providerMessageId: 'email_scoped',
+      status: 'bounced',
+    })
+    await countSince(world.scope, AT)
+    await listStale(world.scope, AT, new Date(0))
+    await listDeferredSince(world.scope, AT)
+    await listDeferredOlderThan(world.scope, AT)
+
+    const statements = harnessExecuted.filter((statement) =>
+      statement.includes('email_deliveries'),
+    )
+    expect(statements.length).toBeGreaterThan(0)
+    for (const statement of statements.filter(
+      (candidate) => !candidate.startsWith('insert'),
+    )) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+})
+
+describe('email suppressions are platform data, not a scoped reader', () => {
+  it('exports no TenantScope-taking function', () => {
+    expect(Object.keys(emailSuppressions).sort()).toEqual([
+      'isSuppressed',
+      'suppress',
+    ])
+    expect(isSuppressed.length).toBe(2)
+    expect(suppress.length).toBe(4)
+  })
+
+  it('looks up by hash with no workspace column to leak', async () => {
+    const world = await createBudgetWorld()
+    await suppress(world.db, 'abc123hash', 'complained', budgetWorldNow)
+    expect(await isSuppressed(world.db, 'abc123hash')).toBe(true)
+    expect(await isSuppressed(world.db, 'other')).toBe(false)
+  })
+})
+
 describe('membership is a question about one workspace at a time', () => {
   let world: BudgetWorld
 
@@ -2941,6 +3301,8 @@ describe('membership is a question about one workspace at a time', () => {
     await expect(isMember(world.scope, 'user-b')).resolves.toBe(false)
     await expect(isMember(world.otherScope, 'user-b')).resolves.toBe(true)
     await expect(isMember(world.otherScope, 'user-a')).resolves.toBe(false)
+    expect(await memberEmail(world.scope, 'user-b')).toBeNull()
+    expect(await memberEmail(world.otherScope, 'user-b')).toBe('b@example.com')
   })
 
   it('scopes the lookup, so the answer cannot come from another workspace’s row', async () => {
@@ -3073,6 +3435,116 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
 
   beforeEach(async () => {
     world = await createBudgetWorld()
+  })
+
+  it('releases only the caller’s paid period when that caller deletes the receipt', async () => {
+    const today = '2026-04-15'
+    const policies = {
+      planned: 'include' as const,
+      adjustments: 'include' as const,
+      transfers: 'include' as const,
+      completeness: 'any' as const,
+    }
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-a-release',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-release',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-release',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-release',
+    })
+    const theirPeriodsBefore = await listSeriesPeriods(
+      world.otherScope,
+      theirs.id,
+      today,
+    )
+    const theirLinksBefore = await listSeriesLinkDetails(
+      world.otherScope,
+      theirs.id,
+    )
+
+    await deleteTransaction({
+      scope: world.scope,
+      policies,
+      id: 'txn-a-release',
+    })
+
+    expect(await listSeriesPeriods(world.otherScope, theirs.id, today)).toEqual(
+      theirPeriodsBefore,
+    )
+    expect(await listSeriesLinkDetails(world.otherScope, theirs.id)).toEqual(
+      theirLinksBefore,
+    )
+    expect(
+      (await listSeriesPeriods(world.scope, mine.id, today)).find(
+        (row) => row.periodStart === myPeriod.periodStart,
+      ),
+    ).toMatchObject({ status: 'upcoming', settledTransactionId: null })
+
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies,
+        id: 'txn-b-release',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await listSeriesPeriods(world.otherScope, theirs.id, today)).toEqual(
+      theirPeriodsBefore,
+    )
+    expect(await listSeriesLinkDetails(world.otherScope, theirs.id)).toEqual(
+      theirLinksBefore,
+    )
   })
 
   it('sums only the caller’s linked transactions for spent this year', async () => {
@@ -3237,6 +3709,137 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     await expect(
       listSeriesLinkDetails(world.scope, theirs.id),
     ).resolves.toEqual([])
+  })
+
+  it('does not add another workspace’s year spend through the overview aggregate', async () => {
+    const today = '2026-04-15'
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-a-overview-spend',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-overview-spend',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-overview-spend',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-overview-spend',
+    })
+    await world.db.insert(recurringLinks).values({
+      organizationId: 'org-a',
+      seriesId: mine.id,
+      transactionId: 'txn-b-overview-spend',
+      createdAt: NOW,
+      updatedAt: NOW,
+    })
+
+    const rows = await sumSeriesSpendThisYear(world.scope, {
+      today,
+      seriesIds: [mine.id, theirs.id],
+    })
+    expect(rows).toEqual([
+      {
+        seriesId: mine.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 100_00,
+      },
+    ])
+    await expect(
+      sumSeriesSpendThisYear(world.otherScope, {
+        today,
+        seriesIds: [theirs.id],
+      }),
+    ).resolves.toEqual([
+      {
+        seriesId: theirs.id,
+        currencyCode: 'PLN',
+        spentThisYearMinor: 777_00,
+      },
+    ])
+  })
+})
+
+describe('removing unpaid periods cannot touch another workspace', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('refuses B’s series id from A’s scope and leaves B’s unpaid rows', async () => {
+    const today = '2026-04-15'
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    const before = await listSeriesPeriods(world.otherScope, theirs.id, today)
+    expect(before.length).toBeGreaterThan(0)
+
+    await expect(
+      removeUnpaidOpenPeriods(world.scope, theirs.id),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const after = await listSeriesPeriods(world.otherScope, theirs.id, today)
+    expect(after.map((period) => period.periodStart)).toEqual(
+      before.map((period) => period.periodStart),
+    )
   })
 })
 
@@ -3697,6 +4300,35 @@ describe('loans cannot be reached across a workspace boundary', () => {
     ).rejects.toThrow()
   })
 
+  it('batches instalments for its own loans only, even when a foreign id is named', async () => {
+    const own = await createLoan(world.scope, {
+      name: 'Loan A',
+      currencyCode: 'PLN',
+      instalmentMinor: 50_00,
+      paymentDay: 10,
+      openedOn: '2026-01-01',
+      instalments: [{ dueOn: '2026-02-10', amountMinor: 50_00 }],
+    })
+
+    const mixed = await listInstalmentsForLoans(world.scope, {
+      loanIds: [own.id, loanBId],
+      today: '2026-03-01',
+    })
+    expect(mixed.map((row) => row.loanId)).toEqual([own.id])
+    expect(JSON.stringify(mixed)).not.toContain(loanBId)
+
+    const foreignOnly = await listInstalmentsForLoans(world.scope, {
+      loanIds: [loanBId],
+    })
+    expect(foreignOnly).toEqual([])
+
+    const other = await listInstalmentsForLoans(world.otherScope, {
+      loanIds: [loanBId, own.id],
+    })
+    expect(other.map((row) => row.loanId)).toEqual([loanBId, loanBId])
+    expect(JSON.stringify(other)).not.toContain(own.id)
+  })
+
   it('refuses to settle its own instalment with another workspace’s transaction', async () => {
     const own = await createLoan(world.scope, {
       name: 'Loan A',
@@ -3767,5 +4399,541 @@ describe('loans cannot be reached across a workspace boundary', () => {
     expect(mine).toHaveLength(1)
     expect(mine[0]?.id).not.toBe(loanBId)
     expect(JSON.stringify(mine)).not.toContain(loanBId)
+  })
+})
+
+describe('the dashboard plan aggregates cannot leak another workspace’s rows', () => {
+  let world: BudgetWorld
+
+  beforeEach(async () => {
+    world = await createBudgetWorld()
+  })
+
+  it('sums A’s planned periods and never B’s, even when months and currencies match', async () => {
+    const window = { from: '2026-04-01', to: '2026-05-01' }
+    for (const [scope, suffix] of [
+      [world.scope, 'a'],
+      [world.otherScope, 'b'],
+    ] as const) {
+      const series = await createSeries(scope, {
+        name: 'Rent',
+        expectedAmountMinor: suffix === 'a' ? 250_00 : 777_00,
+        expectedCurrencyCode: 'PLN',
+        startDate: '2026-04-10',
+        accountId: `acc-${suffix}`,
+      })
+      await materializeSeries(scope, {
+        seriesId: series.id,
+        today: '2026-04-01',
+        ahead: 1,
+      })
+    }
+
+    const mine = await sumPlannedPeriodsByMonth(world.scope, window)
+    const theirs = await sumPlannedPeriodsByMonth(world.otherScope, window)
+
+    expect(mine.map((row) => row.amountMinor)).toEqual([250_00])
+    expect(theirs.map((row) => row.amountMinor)).toEqual([777_00])
+    expect(JSON.stringify(mine)).not.toContain('777')
+  })
+
+  it('sums A’s one-off plan rows and never B’s', async () => {
+    await seedTransaction(world.db, {
+      id: 'plan-a',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+    await seedTransaction(world.db, {
+      id: 'plan-b',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-04-21',
+      isPlanned: true,
+    })
+
+    const mine = await sumPlannedTransactionsByMonth({
+      scope: world.scope,
+      from: '2026-04-01',
+      to: '2026-05-01',
+    })
+    const theirs = await sumPlannedTransactionsByMonth({
+      scope: world.otherScope,
+      from: '2026-04-01',
+      to: '2026-05-01',
+    })
+
+    expect(mine).toEqual([
+      { monthKey: '2026-04-01', direction: 'expense', amountMinor: 100_00 },
+    ])
+    expect(theirs).toEqual([
+      { monthKey: '2026-04-01', direction: 'expense', amountMinor: 777_00 },
+    ])
+  })
+})
+
+describe('agent grants cannot be listed or revoked across a workspace boundary', () => {
+  const scopes = ['accounts:read'] as const
+
+  it('lists only the caller’s workspace, and the SQL always carries organization_id', async () => {
+    const world = await createBudgetWorld()
+    await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    harnessExecuted.length = 0
+    const listed = await listGrants(world.scope)
+    expect(listed.map((grant) => grant.name)).toEqual(['A inspector'])
+    expect(listed[0]?.tokenPrefix).toMatch(/^mto_stg_[a-z0-9]+\.$/)
+    expect(JSON.stringify(listed)).not.toMatch(/tokenHash/)
+
+    const theirs = await listGrants(world.otherScope)
+    expect(theirs.map((grant) => grant.name)).toEqual(['B inspector'])
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "agent_grants"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
+  })
+
+  it('does not revoke B’s grant from A’s scope, and B’s secret still resolves', async () => {
+    const world = await createBudgetWorld()
+    const mintedB = await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    await expect(
+      revokeGrant(world.scope, { grantId: mintedB.grant.id }, budgetWorldNow),
+    ).rejects.toBeInstanceOf(NotFoundError)
+
+    const still = await findPatGrantByTokenHash(world.db, mintedB.secret)
+    expect(still?.id).toBe(mintedB.grant.id)
+    expect(still?.organizationId).toBe('org-b')
+  })
+
+  it('does not update another workspace’s grant, and a member cannot update', async () => {
+    const world = await createBudgetWorld()
+    await addSecondMember(world.db)
+    const mintedB = await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    const mintedA = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    await expect(
+      updateAgentGrant(
+        world.scope,
+        {
+          grantId: mintedB.grant.id,
+          name: 'Taken',
+          scopes: ['transactions:write'],
+        },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    const stillB = await findPatGrantByTokenHash(world.db, mintedB.secret)
+    expect(stillB?.name).toBe('B inspector')
+    expect(scopesOfGrant(stillB!)).toEqual(['accounts:read'])
+
+    const memberScope = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    await expect(
+      updateAgentGrant(
+        memberScope,
+        {
+          grantId: mintedA.grant.id,
+          name: 'Taken',
+          scopes: ['transactions:write'],
+        },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+    expect(
+      (await findPatGrantByTokenHash(world.db, mintedA.secret))?.name,
+    ).toBe('A inspector')
+  })
+
+  it('replaces name and scopes on the live row the next tool list reads', async () => {
+    const world = await createBudgetWorld()
+    const minted = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    const updated = await updateAgentGrant(
+      world.scope,
+      {
+        grantId: minted.grant.id,
+        name: 'Renamed',
+        scopes: ['transactions:write', 'accounts:read', 'accounts:read'],
+      },
+      budgetWorldNow,
+    )
+    expect(updated.name).toBe('Renamed')
+    expect(updated.scopes).toEqual(['accounts:read', 'transactions:write'])
+    expect(updated.lastUsedAt).toBeNull()
+    expect(updated.tokenPrefix).toBe(minted.grant.tokenPrefix)
+    const row = await findPatGrantByTokenHash(world.db, minted.secret)
+    expect(row?.id).toBe(minted.grant.id)
+    expect(listedMcpToolNames(scopesOfGrant(row!))).toContain(
+      'create_transaction',
+    )
+    expect(listedMcpToolNames(scopesOfGrant(row!))).not.toContain(
+      'confirm_delete',
+    )
+
+    const oauth = await createOauthGrant(
+      world.scope,
+      { name: 'Connector', clientId: 'client-a', scopes: ['accounts:read'] },
+      budgetWorldNow,
+    )
+    const widened = await updateAgentGrant(
+      world.scope,
+      {
+        grantId: oauth.id,
+        name: 'Connector',
+        scopes: ['transactions:delete'],
+      },
+      budgetWorldNow,
+    )
+    expect(widened.clientId).toBe('client-a')
+    expect(widened.scopes).toEqual(['transactions:delete'])
+    const loaded = await findOauthGrantByClient(world.db, {
+      userId: 'user-a',
+      clientId: 'client-a',
+      organizationId: 'org-a',
+    })
+    expect(scopesOfGrant(loaded!)).toEqual(['transactions:delete'])
+    expect(listedMcpToolNames(scopesOfGrant(loaded!))).toContain(
+      'confirm_delete',
+    )
+    expect(listedMcpToolNames(scopesOfGrant(loaded!))).toContain(
+      'delete_transaction',
+    )
+
+    await revokeGrant(world.scope, { grantId: minted.grant.id }, budgetWorldNow)
+    await expect(
+      updateAgentGrant(
+        world.scope,
+        {
+          grantId: minted.grant.id,
+          name: 'Back',
+          scopes: ['accounts:read'],
+        },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await findPatGrantByTokenHash(world.db, minted.secret)).toBeNull()
+  })
+
+  it('refuses a member who tries to mint or list, and a revoked secret stops resolving', async () => {
+    const world = await createBudgetWorld()
+    await addSecondMember(world.db)
+    const memberScope = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+
+    await expect(
+      createPatGrant(
+        memberScope,
+        { name: 'nope', scopes: [...scopes], environment: 'stg' },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+    await expect(listGrants(memberScope)).rejects.toBeInstanceOf(ForbiddenError)
+
+    const minted = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    expect(minted.secret).toMatch(/^mto_stg_[a-z0-9]+\.[A-Za-z0-9_-]+$/)
+    expect(
+      await findPatGrantByTokenHash(world.db, minted.secret),
+    ).not.toBeNull()
+
+    await revokeGrant(world.scope, { grantId: minted.grant.id }, budgetWorldNow)
+    expect(await findPatGrantByTokenHash(world.db, minted.secret)).toBeNull()
+    expect(await findPatGrantByTokenHash(world.db, 'not-a-token')).toBeNull()
+  })
+
+  it('does not resolve B’s OAuth client as A’s grant', async () => {
+    const world = await createBudgetWorld()
+    await createOauthGrant(
+      world.otherScope,
+      {
+        name: 'B connector',
+        clientId: 'client-b',
+        scopes: [...scopes],
+      },
+      budgetWorldNow,
+    )
+
+    expect(
+      await findOauthGrantByClient(world.db, {
+        userId: 'user-a',
+        clientId: 'client-b',
+      }),
+    ).toBeNull()
+    const theirs = await findOauthGrantByClient(world.db, {
+      userId: 'user-b',
+      clientId: 'client-b',
+    })
+    expect(theirs?.organizationId).toBe('org-b')
+    expect(theirs?.kind).toBe('oauth')
+  })
+
+  it('replaces scopes on re-consent and keeps the other workspace’s row', async () => {
+    const world = await createBudgetWorld()
+    const older = new Date('2026-01-01T00:00:00.000Z')
+    const newer = new Date('2026-06-01T00:00:00.000Z')
+    const first = await createOauthGrant(
+      world.scope,
+      { name: 'Reader', clientId: 'client-a', scopes: ['accounts:read'] },
+      older,
+    )
+    const replaced = await createOauthGrant(
+      world.scope,
+      {
+        name: 'Writer',
+        clientId: 'client-a',
+        scopes: ['accounts:read', 'transactions:write', 'transactions:delete'],
+      },
+      newer,
+    )
+    expect(replaced.id).toBe(first.id)
+    expect(replaced.scopes).toEqual([
+      'accounts:read',
+      'transactions:delete',
+      'transactions:write',
+    ])
+
+    const live = await listGrants(world.scope)
+    expect(
+      live.filter(
+        (grant) => grant.clientId === 'client-a' && grant.revokedAt === null,
+      ),
+    ).toHaveLength(1)
+
+    await world.db.insert(member).values({
+      id: 'mem-a-in-b',
+      organizationId: 'org-b',
+      userId: 'user-a',
+      role: 'owner',
+      createdAt: budgetWorldNow,
+    })
+    const aInB = createScope(world.db, {
+      userId: 'user-a',
+      organizationId: 'org-b',
+      role: 'owner',
+    })
+    await createOauthGrant(
+      aInB,
+      { name: 'Other house', clientId: 'client-a', scopes: ['payees:read'] },
+      newer,
+    )
+    await createOauthGrant(
+      world.otherScope,
+      { name: 'B connector', clientId: 'client-a', scopes: ['budgets:read'] },
+      newer,
+    )
+
+    const claimed = await findOauthGrantByClient(world.db, {
+      userId: 'user-a',
+      clientId: 'client-a',
+      organizationId: 'org-a',
+    })
+    expect(scopesOfGrant(claimed!)).toEqual([
+      'accounts:read',
+      'transactions:delete',
+      'transactions:write',
+    ])
+    expect(listedMcpToolNames(scopesOfGrant(claimed!)).toSorted()).toEqual(
+      [
+        'confirm_delete',
+        'create_transaction',
+        'delete_transaction',
+        'get_balances',
+        'list_accounts',
+        'update_transaction',
+      ].toSorted(),
+    )
+    expect(
+      scopesOfGrant(
+        (await findOauthGrantByClient(world.db, {
+          userId: 'user-a',
+          clientId: 'client-a',
+          organizationId: 'org-b',
+        }))!,
+      ),
+    ).toEqual(['payees:read'])
+    expect(
+      await findOauthGrantByClient(world.db, {
+        userId: 'user-a',
+        clientId: 'client-a',
+      }),
+    ).toBeNull()
+    expect(
+      await findOauthGrantByClient(world.db, {
+        userId: 'user-a',
+        clientId: 'client-a',
+        organizationId: 'org-missing',
+      }),
+    ).toBeNull()
+    expect(
+      scopesOfGrant(
+        (await findOauthGrantByClient(world.db, {
+          userId: 'user-b',
+          clientId: 'client-a',
+          organizationId: 'org-b',
+        }))!,
+      ),
+    ).toEqual(['budgets:read'])
+
+    await world.db.insert(agentGrants).values([
+      {
+        id: 'legacy-older',
+        organizationId: 'org-a',
+        userId: 'user-a',
+        kind: 'oauth',
+        name: 'Legacy',
+        clientId: 'client-legacy',
+        tokenHash: null,
+        tokenPrefix: null,
+        scopes: JSON.stringify(['accounts:read']),
+        createdAt: older,
+        revokedAt: null,
+        lastUsedAt: null,
+      },
+      {
+        id: 'legacy-newer',
+        organizationId: 'org-a',
+        userId: 'user-a',
+        kind: 'oauth',
+        name: 'Legacy newer',
+        clientId: 'client-legacy',
+        tokenHash: null,
+        tokenPrefix: null,
+        scopes: JSON.stringify(['transactions:write', 'transactions:delete']),
+        createdAt: newer,
+        revokedAt: null,
+        lastUsedAt: null,
+      },
+      {
+        id: 'legacy-revoked',
+        organizationId: 'org-a',
+        userId: 'user-a',
+        kind: 'oauth',
+        name: 'Legacy revoked',
+        clientId: 'client-legacy',
+        tokenHash: null,
+        tokenPrefix: null,
+        scopes: JSON.stringify(['categories:delete']),
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+        revokedAt: newer,
+        lastUsedAt: null,
+      },
+    ])
+    const legacy = await findOauthGrantByClient(world.db, {
+      userId: 'user-a',
+      clientId: 'client-legacy',
+      organizationId: 'org-a',
+    })
+    expect(legacy?.id).toBe('legacy-newer')
+    expect(listedMcpToolNames(scopesOfGrant(legacy!))).toEqual(
+      expect.arrayContaining([
+        'create_transaction',
+        'update_transaction',
+        'delete_transaction',
+        'confirm_delete',
+      ]),
+    )
+    expect(listedMcpToolNames(scopesOfGrant(legacy!))).not.toContain(
+      'delete_category',
+    )
+  })
+})
+
+describe('agent audit cannot be listed across a workspace boundary', () => {
+  const scopes = ['accounts:read'] as const
+
+  it('lists only the caller’s workspace, and the SQL always carries organization_id', async () => {
+    const world = await createBudgetWorld()
+    const mintedA = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    const mintedB = await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    await insertAgentAudit(
+      world.scope,
+      {
+        grantId: mintedA.grant.id,
+        userId: 'user-a',
+        tool: 'list_accounts',
+        verb: 'read',
+        resource: 'accounts',
+        resourceId: 'acc-a',
+        outcome: 'ok',
+      },
+      budgetWorldNow,
+    )
+    await insertAgentAudit(
+      world.otherScope,
+      {
+        grantId: mintedB.grant.id,
+        userId: 'user-b',
+        tool: 'list_accounts',
+        verb: 'read',
+        resource: 'accounts',
+        resourceId: 'acc-b',
+        outcome: 'ok',
+      },
+      budgetWorldNow,
+    )
+
+    harnessExecuted.length = 0
+    const listed = await listAgentAudit(world.scope)
+    expect(listed.map((row) => row.resourceId)).toEqual(['acc-a'])
+    expect(JSON.stringify(listed)).not.toContain('acc-b')
+
+    const theirs = await listAgentAudit(world.otherScope)
+    expect(theirs.map((row) => row.resourceId)).toEqual(['acc-b'])
+
+    const reads = harnessExecuted.filter((statement) =>
+      statement.includes('from "agent_audit_log"'),
+    )
+    expect(reads.length).toBeGreaterThan(0)
+    for (const statement of reads) {
+      expect(statement).toContain('organization_id')
+    }
   })
 })

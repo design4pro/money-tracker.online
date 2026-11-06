@@ -227,7 +227,8 @@ migration strategy.
 `budgetName`, `seriesName`, the goal's `name`. "Therapy", "Alimony to Anna" and "Divorce lawyer" are
 ordinary series names. That text is already stored in its own table and readable by every member of
 the workspace, so duplicating it into a notification row grants no new access — but it does copy it
-into a second place, and at `21-S2` into an email body leaving the platform. No email address, no
+into a second place. ADR 0035 forbids copying that payload into an email body leaving the
+platform: notification mail names the event and links into the app. No email address, no
 token and no payload content reaches a log: failures log the kind and the `organizationId` only.
 
 **Retention is deferred, deliberately.** `notifications` rows accumulate with no purge. That is a
@@ -618,3 +619,10 @@ phase (`docs/SPEC.md` §8).
   `21-S3` learns what a reader expects to still see. File an issue when this merges.
 - **The reader API** (`listNotifications`, `countUnread`, `markRead`, `getPrefs`, `setPref`) — moves
   to `21-S3` with the surfaces that call it (Q7).
+
+## Amendment — email does not copy `payload_json` (ADR 0035)
+
+The Sensitive data section originally said 21-S2 would copy user-authored names and amounts into an
+email body leaving the platform. Owner decision 2026-11-02 (Rafał Wolak): notification mail is
+event name + deep link only. The in-app row still holds the payload. Living design:
+`.ai/specs/2026-09-19-transactional-email-resend.md` A13 and ADR 0035.

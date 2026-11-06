@@ -1,10 +1,7 @@
-import { Link } from '@tanstack/react-router'
-
-import { buttonVariants } from '#/components/ui'
-import { cn } from '#/lib/cn'
 import { useTranslate } from '#/lib/i18n'
 import { QUOTA_METRIC_LABEL_KEYS } from '#/lib/plans'
 
+import { ButtonLink } from './button-link'
 import { DashboardLink } from './dashboard-link'
 import { ErrorPanel } from './error-panel'
 import { FailureReference, hasOpaqueIdShape } from './failure-reference'
@@ -42,12 +39,6 @@ export const RECOVERY_OF: Readonly<Record<FailureKind, Recovery>> = {
   internal: 'internal',
 }
 
-/** The billing link is painted as a button for the same reasons as `DashboardLink`. */
-const PRIMARY_LINK = cn(
-  buttonVariants({ variant: 'primary' }),
-  'no-underline hover:bg-accent-hover hover:shadow-elevated active:translate-y-px',
-)
-
 export interface FailurePanelProps {
   /** What `readFailure(error)` returned. Only `kind` and `message` are read. */
   failure: FailureEnvelope
@@ -69,7 +60,11 @@ export interface FailurePanelProps {
    * shell, so the panel never decides by itself whether anyone is signed in.
    */
   homeHref?: string
-  /** Wording for the `retryable` recovery, which may be the call site's. **Catalogue copy.** */
+  /**
+   * Wording for the heading. Used for every recovery when the call site passes one, so a screen
+   * reader hears the action that failed (`internal`, `quota` and `feature_locked` included). The
+   * `retryable` recovery also uses {@link body}. **Catalogue copy.**
+   */
   title?: ReactNode
   body?: ReactNode
   className?: string
@@ -86,10 +81,10 @@ export interface FailurePanelProps {
  *
  * | Recovery         | Rendered                                                                |
  * | ---------------- | ----------------------------------------------------------------------- |
- * | `retryable`      | Retry, beside the form and never instead of it, so input survives.      |
- * | `quota`          | A link to billing, the sentence and "Limit reached: {metric}."          |
- * | `feature_locked` | A link to billing and the sentence; it names nothing else.              |
- * | `internal`       | The sentence, Retry if given, a link home if given, a reference if given |
+ * | `retryable`      | Call-site title and body when given, Retry beside the form.             |
+ * | `quota`          | Call-site title when given, the sentence and "Limit reached: {metric}." |
+ * | `feature_locked` | Call-site title when given, the sentence, a link to billing.            |
+ * | `internal`       | Call-site title when given, the sentence, Retry / home / reference.     |
  *
  * The record decides which extras appear, not whether Retry is meaningful: `retryable` and
  * `internal` show Retry when the caller passes `onRetry`.
@@ -128,7 +123,7 @@ export function FailurePanel({
         <ErrorPanel
           {...frame}
           tone="warning"
-          title={t('failure.quota.title')}
+          title={title ?? t('failure.quota.title')}
           // Two translated strings in one paragraph, never one concatenated message.
           body={
             <>
@@ -147,7 +142,7 @@ export function FailurePanel({
         <ErrorPanel
           {...frame}
           tone="warning"
-          title={t('failure.featureLocked.title')}
+          title={title ?? t('failure.featureLocked.title')}
           body={sentence}
           actions={<BillingLink />}
         />
@@ -166,7 +161,7 @@ export function FailurePanel({
       return (
         <ErrorPanel
           {...frame}
-          title={t('empty.error.title')}
+          title={title ?? t('empty.error.title')}
           body={sentence}
           onRetry={onRetry}
           isRetrying={isRetrying}
@@ -188,8 +183,8 @@ export function FailurePanel({
 function BillingLink() {
   const t = useTranslate()
   return (
-    <Link to="/settings/billing" className={PRIMARY_LINK}>
+    <ButtonLink to="/settings/billing" variant="primary">
       {t('billing.title')}
-    </Link>
+    </ButtonLink>
   )
 }

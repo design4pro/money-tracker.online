@@ -59,7 +59,9 @@ import type { Account } from '#/server/db/types'
  * The base currency plus every currency an existing account already uses. Each of those is
  * necessarily one the workspace holds, so the list cannot produce a `CurrencyNotHeldError` — the
  * failure a picker built from the full ISO table would produce on its first use. The day the
- * workspace-currency server function exists, this prop is where it plugs in.
+ * workspace-currency server function exists, this prop is where it plugs in. On an edit, when
+ * {@link AccountFormDialogProps.currencyLocked} is set, the picker is disabled: booked entries
+ * stay in the currency they were recorded in (`docs/MONEY.md` §3.1).
  */
 export interface AccountFormDialogProps {
   isOpen: boolean
@@ -72,6 +74,11 @@ export interface AccountFormDialogProps {
   currencyOptions: ReadonlyArray<string>
   /** The workspace base currency — the default for a new account. */
   baseCurrencyCode: string
+  /**
+   * When true, the currency picker is disabled. The server also refuses a currency change on an
+   * account that already has entries; this is the same fact, shown before submit.
+   */
+  currencyLocked?: boolean
   onSaved: (account: Account, mode: 'created' | 'updated') => void
 }
 
@@ -124,6 +131,7 @@ export function AccountFormDialog({
   initialCategory,
   currencyOptions,
   baseCurrencyCode,
+  currencyLocked = false,
   onSaved,
 }: AccountFormDialogProps) {
   const t = useTranslate()
@@ -235,6 +243,14 @@ export function AccountFormDialog({
                     failure={failure}
                     placement="after-action"
                     title={t('accounts.form.error.title')}
+                    body={
+                      isEdit &&
+                      failure.kind === 'conflict' &&
+                      account !== null &&
+                      draft.currencyCode !== account.currencyCode
+                        ? t('accounts.currency.locked')
+                        : undefined
+                    }
                   />
                 )}
 
@@ -272,8 +288,13 @@ export function AccountFormDialog({
 
                   <Select
                     label={t('accounts.field.currency')}
-                    description={t('accounts.field.currency.help')}
+                    description={t(
+                      currencyLocked
+                        ? 'accounts.field.currency.locked'
+                        : 'accounts.field.currency.help',
+                    )}
                     selectedKey={draft.currencyCode}
+                    isDisabled={currencyLocked}
                     onSelectionChange={(key: Key | null) => {
                       if (key !== null) {
                         patch({ currencyCode: String(key) })

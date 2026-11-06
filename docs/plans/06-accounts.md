@@ -73,9 +73,14 @@ includeExcluded })`, `getAccount(id)`, `createAccount(input)`, `updateAccount(id
 - **Authorisation.** `requireOrg()` in every server function. `updateAccount` and `deleteAccount`
   additionally require `owner | admin` when the workspace has more than one member.
 - **Ledger batching.** `createAccount` (with a non-zero `initial_balance_minor`), `updateAccount`
-  (when `currency_code` or `initial_balance_minor` changes) and `restoreAccount` all run inside
-  `runWithLedgerBatch`, which enqueues one rebuild for the touched account after the write settles.
-  Changing an account's currency changes every `ref_` value in its history.
+  (when `currency_code` or `initial_balance_minor` changes on a path that is allowed) and
+  `restoreAccount` all run inside `runWithLedgerBatch`, which enqueues one rebuild for the touched
+  account after the write settles.
+- **Currency lock.** `updateAccount` refuses a `currency_code` change once the account has any
+  transactions. Booked rows keep `amount_minor`, `currency_code` and `ref_amount_minor`
+  (`docs/MONEY.md` §3.1). Empty accounts may still change currency; that re-derives only the
+  account row's opening `ref_` columns. It is not a workspace-base re-denomination. Already
+  mismatched rows are reported by `findAccountCurrencyMismatches` (#695) and are not rewritten.
 
 ### UI (route, components)
 
@@ -125,7 +130,8 @@ Cases in `money-invariants.test.ts`:
 ### Verification
 
 - Command gate: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
-- `accounts.test.ts`: delete-refuses-with-history; the currency must be held by the workspace;
+- `accounts.test.ts`: delete-refuses-with-history; currency change refused once there are
+  transactions, allowed on an empty account; the currency must be held by the workspace;
   reorder is a single batched write; the quota call site fires before the insert.
 - Browser evidence: `/accounts` with the seeded five-account workspace, both themes, at **360 / 1280 /
   2560 px** — six frames — plus the **empty state** and the **reorder menu open**, which are the two
@@ -291,8 +297,8 @@ product decision that could change without a migration.
 ### Server (repo, server function, Zod)
 
 - **Repository.** `src/server/repos/accounts.ts`: `listAccountGroups`, `createAccountGroup`,
-  `updateAccountGroup`, `deleteAccountGroup`, `setAccountGroupMembers`, `reorderAccountGroups`
-  and `moveAccountToGroup`. Deleting a group removes its memberships, promotes its child groups
+  `updateAccountGroup`, `deleteAccountGroup`, `setAccountGroupMembers`, `reorderAccountGroups`,
+  `moveAccountGroup` and `moveAccountToGroup`. Deleting a group removes its memberships, promotes its child groups
   and pauses rules referencing it; accounts and their other memberships survive. A move changes
   only the source row's membership, preserving any membership in another group.
 - The same module exports `adjustAccountBalance(scope, { accountId, targetMinor, bookedOn, note },
@@ -303,8 +309,8 @@ conversion)`. It computes the delta against the account's balance **on that date
 - `getAccountBalanceOn(scope, { accountId, on })` returns `{ balanceMinor }` through the same private
   `balanceOn` helper the adjustment uses, never the cached balance.
 - **Server functions.** `src/server/fns/accounts.ts` exposes `listAccountGroups` and
-  `getAccountBalanceOn` as GETs; the group writes, `moveAccountToGroup` and `adjustAccountBalance`
-  are POSTs.
+  `getAccountBalanceOn` as GETs; the group writes, `moveAccountGroup`, `moveAccountToGroup` and
+  `adjustAccountBalance` are POSTs.
 - **Zod.** Strict schemas are validated at the server-function boundary and parsed again in the
   repository. `adjustBalanceSchema` uses `minorSchema` for `targetMinor` and `bookableDaySchema`
   for `bookedOn`; `getAccountBalanceOnSchema` uses the same date schema for `on`.
@@ -341,7 +347,8 @@ later stage does not add one silently.
 ### Tenant isolation test
 
 `src/server/repos/__tests__/tenant-isolation.test.ts` covers group reads and writes with foreign
-group, parent and account ids, `moveAccountToGroup` with foreign ids even on no-ops, and
+group, parent and account ids, `moveAccountGroup` with a foreign group, parent or id in the order,
+`moveAccountToGroup` with foreign ids even on no-ops, and
 `getAccountBalanceOn` with a foreign account. Foreign references return `NotFoundError` and the
 other workspace's data stays unchanged. `accounts.test.ts` also covers adjustment isolation.
 

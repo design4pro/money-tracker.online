@@ -14,6 +14,7 @@ import {
   BILLING_INTERVALS,
   MissingProductError,
   PLANS,
+  PLAN_FEATURES,
   PLAN_IDS,
   PLAN_LIST,
   QUOTA_METRICS,
@@ -22,6 +23,7 @@ import {
   UNLIMITED,
   isPlanId,
   isQuotaMetric,
+  planFeatures,
   planForProductId,
   planLimits,
   priceFor,
@@ -73,6 +75,22 @@ describe('every tier sells every metered resource', () => {
 
   it('lists the tiers cheapest first', () => {
     expect(PLAN_LIST.map((plan) => plan.id)).toEqual([...PLAN_IDS])
+  })
+})
+
+describe('boolean features', () => {
+  it('locks MCP on free and includes it on paid plans', () => {
+    expect(planFeatures('free').mcp).toBe(false)
+    expect(planFeatures('plus').mcp).toBe(true)
+    expect(planFeatures('household').mcp).toBe(true)
+  })
+
+  it('declares every named feature on every tier', () => {
+    for (const planId of PLAN_IDS) {
+      expect(Object.keys(PLANS[planId].features).toSorted()).toEqual(
+        [...PLAN_FEATURES].toSorted(),
+      )
+    }
   })
 })
 

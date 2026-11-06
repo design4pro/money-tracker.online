@@ -104,8 +104,8 @@ export class ForbiddenError extends RepositoryError {
  * is *which rule* was broken, and that rule is usually about two rows rather than about one table.
  */
 export class ConflictError extends RepositoryError {
-  constructor(message: string) {
-    super(message, 'CONFLICT')
+  constructor(message: string, code: string = 'CONFLICT') {
+    super(message, code)
   }
 }
 

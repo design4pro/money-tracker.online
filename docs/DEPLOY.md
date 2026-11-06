@@ -22,7 +22,7 @@ staging before production takes a card.
 ## 0. Prerequisites
 
 ```bash
-node --version              # 24.x or newer
+node --version              # matches `.nvmrc` (24.x or newer; engines.node warns only)
 pnpm --version              # 10.15.0
 pnpm install --frozen-lockfile
 pnpm exec wrangler --version
@@ -223,6 +223,9 @@ pnpm exec wrangler secret put APPLE_CLIENT_ID
 pnpm exec wrangler secret put APPLE_CLIENT_SECRET
 pnpm exec wrangler secret put APPLE_APP_BUNDLE_IDENTIFIER
 pnpm exec wrangler secret put EMAIL_API_KEY             # Resend
+pnpm exec wrangler secret put RESEND_WEBHOOK_SECRET     # Resend bounce/complaint webhook
+pnpm exec wrangler secret put EMAIL_HASH_SALT           # recipient hashes; never rotate
+pnpm exec wrangler secret put UNSUBSCRIBE_TOKEN_SECRET  # unsubscribe links
 pnpm exec wrangler secret put CLOUDFLARE_ACCOUNT_ID     # backup cron
 pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN      # backup cron, D1:read only
 pnpm exec wrangler secret put D1_DATABASE_ID            # backup cron
@@ -239,6 +242,9 @@ pnpm exec wrangler secret put SENTRY_DSN
 | `POLAR_ACCESS_TOKEN` / `_WEBHOOK_SECRET` | `BillingConfigError` on the first Upgrade click; the webhook answers 400                                                                                                |
 | `POLAR_SERVER`                           | Same. **There is deliberately no default** — defaulting to production would let a sandbox key hit real money, and defaulting to sandbox would silently take no payments |
 | `EMAIL_API_KEY`                          | Queued mail fails loudly to the dead-letter queue rather than being dropped silently                                                                                    |
+| `RESEND_WEBHOOK_SECRET`                  | `POST /api/webhooks/resend` answers 503 and never accepts a body                                                                                                        |
+| `EMAIL_HASH_SALT`                        | Notification mail stays queued; a verified bounce/complaint webhook answers 503 rather than writing a hash it could not later match                                     |
+| `UNSUBSCRIBE_TOKEN_SECRET`               | Every unsubscribe link is invalid; the one-click endpoint answers 400                                                                                                   |
 | `CLOUDFLARE_*` / `D1_DATABASE_ID`        | The nightly backup logs a skip and continues. **No backups exist**                                                                                                      |
 | `FX_API_KEY`                             | Falls back to the keyless provider. Not needed unless a keyed provider is chosen                                                                                        |
 | `SENTRY_DSN`                             | Nothing is reported. Errors still classify and redact correctly                                                                                                         |
@@ -324,12 +330,56 @@ asserts `/api/health` answers exactly `200`; behind Access it answers `302`, so 
 deploy job fails on a healthy deploy. §11 has the detail and the two ways out. Staging is
 unaffected.
 
-**Before plan 22 ships billing, Polar's webhook needs its own bypass application.** Access is
-default-deny, so a `POST` from Polar to `/api/webhooks/polar` gets the 302 above and the webhook
-fails silently. `planned.travel` solves this with a separate application scoped to the webhook path
-carrying a `Bypass` policy, ordered ahead of the site-wide one; mirror that rather than widening the
-site policy. This is written down here because the failure looks like "Polar is not sending
-webhooks", not like an access-control problem.
+**Polar's and Resend's webhooks each need their own bypass application.** Access is
+default-deny, so a `POST` from Polar to `/api/webhooks/polar` or from Resend to
+`/api/webhooks/resend` gets the 302 above and the webhook fails silently. `planned.travel` solves
+this with a separate application scoped to the webhook path carrying a `Bypass` policy, ordered
+ahead of the site-wide one; mirror that rather than widening the site policy. Rafał sets the Resend
+webhook secret and the Access bypass **after this path merges**. This is written down here because
+the failure looks like "the provider is not sending webhooks", not like an access-control problem.
+
+**MCP protocol endpoints need the same Bypass pattern.** MCP clients (Inspector, Claude, ChatGPT,
+Grok Bot) present a bearer grant, not an Access JWT. Production Access will 302 them the same way
+it 302s Polar. Create separate Bypass applications ordered ahead of the site-wide `money-tracker.online`
+app. Do **not** Bypass `/login`, `/api/auth/oauth2/authorize`, or `/consent` — those are human
+pages, and until Access is removed site-wide only the `team` policy can complete OAuth consent in
+production. Staging has no Access, so Inspector and connectors can be developed there first.
+Personal tokens minted on a session that already passed Access (or on staging) then call `/api/mcp`
+without Access.
+
+**Better Auth OAuth and discovery (what the Worker serves).** The issuer is
+`https://money-tracker.online/api/auth` (`AUTH_BASE_PATH` in `src/server/auth/config.ts`). Better
+Auth `mcp()` mounts OAuth 2.1 on that base path:
+
+| Surface                                                                        | Path                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authorize (human; stays behind Access)                                         | `/api/auth/oauth2/authorize`                                                                                                                                                                |
+| Token, DCR, revoke, introspect                                                 | `/api/auth/oauth2/token`, `/api/auth/oauth2/register`, `/api/auth/oauth2/revoke`, `/api/auth/oauth2/introspect`                                                                             |
+| JWKS (MCP access tokens are JWTs; `jwt()` precedes `mcp()` in the plugin list) | `/api/auth/jwks` (`jwksUrl()` in `src/server/mcp/resource.ts`)                                                                                                                              |
+| Protected-resource metadata (RFC 9728)                                         | `/.well-known/oauth-protected-resource/api/mcp` (`mcpResourceMetadataUrl()` in the same file)                                                                                               |
+| Authorization-server metadata (RFC 8414)                                       | `/.well-known/oauth-authorization-server/api/auth` (Better Auth issuer-inserted path; served because `src/server/worker.ts` forwards every `/.well-known/*` request to `handleAuthRequest`) |
+| Streamable HTTP MCP                                                            | `/api/mcp` (`MCP_ROUTE` in `src/server/mcp/resource.ts`, route in `src/routes/api/mcp.ts`)                                                                                                  |
+
+Bare `/.well-known/oauth-authorization-server` (without the `/api/auth` suffix) is **not** served —
+production answers **404**. Do not point Bypass or client configuration at it.
+
+`src/routes/oauth2/$.ts` also mounts `/oauth2/*` to the same auth handler, but Better Auth
+publishes issuer-relative paths under `/api/auth/oauth2/*`. With Access ordered as below,
+`/oauth2/token` and `/oauth2/register` still receive **302** to Cloudflare Access while the live
+protocol endpoints under `/api/auth/oauth2/*` answer on the Worker (for example **415** / **400**
+on `POST` without a valid body, not **404**). Treat `/api/auth/oauth2/*` as the source of truth
+for runbooks and Bypass rules.
+
+This repository does not create the Access applications. A person does that in the Zero Trust
+dashboard. **As of 2026-11-05 production** the Bypass (Everyone) applications ahead of the site-wide
+`money-tracker.online` app use these path prefixes:
+
+| Application name (suggested)           | Path prefix to Bypass (Bypass, Everyone)                                                                                             | Why                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `money-tracker.online MCP`             | `/api/mcp`                                                                                                                           | Streamable HTTP. Clients have no Access JWT.          |
+| `money-tracker.online MCP OAuth token` | `/api/auth/oauth2/token`, `/api/auth/oauth2/register`, `/api/auth/oauth2/revoke`, `/api/auth/oauth2/introspect`                      | Token, DCR, revoke, and introspection without Access. |
+| `money-tracker.online MCP JWKS`        | `/api/auth/jwks`                                                                                                                     | JWT verification for MCP bearer tokens.               |
+| `money-tracker.online MCP well-known`  | `/.well-known/oauth-protected-resource*` and `/.well-known/oauth-authorization-server*` (covers `/api/mcp` and `/api/auth` variants) | RFC 9728 / RFC 8414 discovery without Access.         |
 
 ---
 
@@ -557,8 +607,29 @@ though the parent shows `verified`.
 Staging therefore sends as `no-reply@money-tracker.online` and distinguishes itself in the display
 name, not in the domain. The alternative - adding `staging.money-tracker.online` as a second Resend
 domain with its own DKIM and SPF records on the zone - is deliberately not taken: a second sending
-domain is a second reputation to warm and a second set of records to keep correct, for no benefit
-beyond a cosmetic sender address on an environment no customer receives mail from.
+domain is a second reputation to warm and a second set of records to keep correct.
+
+Staging receives **full** notification delivery through the same templates and send path as
+production (ADR 0035). There is no staging-stripped body and no staging-disabled notification flag.
+Provider secrets (Resend and related) are owner-added with `wrangler secret put … --env staging`;
+they are not in the repository. When those secrets are unset, the existing no-provider path applies.
+
+### Bounce and complaint webhook
+
+Endpoint `https://money-tracker.online/api/webhooks/resend` (and the staging equivalent). In Resend,
+create a webhook for `email.bounced` and `email.complained`, then copy the signing secret into
+`RESEND_WEBHOOK_SECRET` with `wrangler secret put` (production and `--env staging`). Do not put the
+value in the repository, a log, or a pull request.
+
+The handler verifies a Standard Webhooks HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${raw}`
+with a 300s tolerance (the same verifier as Polar; Resend's `svix-*` headers are mapped onto it).
+Status codes:
+
+- **401** — unsigned or badly signed. Empty body. Never processed.
+- **503** — `RESEND_WEBHOOK_SECRET` (or, on a suppressible event, `EMAIL_HASH_SALT`) is unset. The
+  provider should retry once the secret is in place.
+- **200** — accepted, including a transient bounce, an unknown event type, a redelivery, and a
+  payload whose tags match no delivery (the suppression still lands).
 
 A DMARC record already exists on the apex and is a leftover from another provider:
 

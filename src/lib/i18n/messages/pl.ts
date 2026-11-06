@@ -355,13 +355,12 @@ const messages = {
   'accounts.group.delete.action': 'Usuń grupę',
   'accounts.group.delete.title': 'Usunąć grupę {name}?',
   'accounts.group.delete.body': {
-    one: '{count} konto opuszcza tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
-    few: '{count} konta opuszczą tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
-    many: '{count} kont opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
-    other:
-      '{count} konta opuści tę grupę. Żadne nie zostanie usunięte. Podgrupy trafią na poziom główny.',
+    one: '{count} konto opuszcza tę grupę. Żadne nie zostanie usunięte.',
+    few: '{count} konta opuszczą tę grupę. Żadne nie zostanie usunięte.',
+    many: '{count} kont opuści tę grupę. Żadne nie zostanie usunięte.',
+    other: '{count} konta opuści tę grupę. Żadne nie zostanie usunięte.',
   },
-  'accounts.group.delete.bodyEmpty': 'Podgrupy trafią na poziom główny.',
+  'accounts.group.delete.subgroups': 'Podgrupy trafią na poziom główny.',
   'accounts.group.delete.rules':
     'Reguły używające tej grupy zostaną wstrzymane, dopóki nie wybierzesz innej.',
   'accounts.count': {
@@ -468,7 +467,7 @@ const messages = {
   'accounts.form.create.body':
     'Wymagana jest tylko nazwa i waluta. Resztę możesz uzupełnić później.',
   'accounts.form.edit.body':
-    'Zmiana waluty albo stanu początkowego przelicza całą historię tego konta.',
+    'Walutę można zmienić tylko wtedy, gdy na koncie nie ma jeszcze wpisów. Zaksięgowane kwoty zostają w walucie, w której je zapisano.',
   'accounts.form.error.title': 'Nie udało się zapisać konta',
   'accounts.field.openedOn': 'Data otwarcia',
   'accounts.field.openedOn.help':
@@ -477,6 +476,10 @@ const messages = {
     'Kwota dodatnia. Zostaw puste, jeśli konto nie ma limitu.',
   'accounts.field.currency.help':
     'Proponujemy tylko waluty, które ma Twój dom.',
+  'accounts.field.currency.locked':
+    'Na tym koncie są już wpisy, więc jego waluty nie można zmienić.',
+  'accounts.currency.locked':
+    'Na tym koncie są już wpisy, więc jego waluty nie można zmienić. Te wpisy zostają w walucie, w której je zapisano.',
   /* -- Accounts: correcting a balance ------------------------------------- */
   'accounts.adjust.body':
     'Podaj, ile powinno być na koncie. Różnicę zapiszemy jako zwykły wpis, który znajdziesz, poprawisz i pobierzesz razem z resztą.',
@@ -858,6 +861,12 @@ const messages = {
   'refunds.dialog.error.title': 'Nie powiązaliśmy zwrotu',
   'refunds.dialog.error.refused':
     'Nic się nie zmieniło. Tego zwrotu nie da się powiązać w tej postaci. Sprawdź transakcję, jej kwotę, walutę i kierunek, a potem spróbuj ponownie.',
+  'refunds.dialog.error.direction':
+    'Nic się nie zmieniło. Zwrot musi iść w przeciwną stronę niż oryginał. Wybierz transakcję drugiego rodzaju albo zapisz to jako coś spoza domu.',
+  'refunds.dialog.error.currency':
+    'Nic się nie zmieniło. Zwrot i to, czego dotyczy, muszą być w tej samej walucie. Wybierz pasującą walutę albo zapisz to jako coś spoza domu.',
+  'refunds.dialog.error.over':
+    'Nic się nie zmieniło. To oddałoby więcej, niż zapłacono. Wybierz większy oryginał albo mniejszy zwrot.',
   'refunds.suggest.loading': 'Szukamy, czego dotyczy ten zwrot…',
   'refunds.suggest.empty':
     'Żaden wydatek u tego samego odbiorcy z ostatnich 90 dni nie jest dość duży, aby to był jego zwrot.',
@@ -961,7 +970,17 @@ const messages = {
   'categories.error.title': 'Nie udało się wczytać kategorii',
   'categories.empty.title': 'Nie masz jeszcze kategorii',
   'categories.empty.body':
-    'Kategoria odpowiada na pytanie „na co to było”. Dodaj pierwszą, a raporty będą miały według czego grupować.',
+    'Kategoria odpowiada na pytanie „na co to poszło”. Zacznij od gotowego zestawu, który możesz zmieniać, przemalować lub zarchiwizować, albo dodaj własną.',
+  'categories.seed.action': 'Dodaj zestaw standardowy',
+  'categories.seed.failed': 'Nie udało się dodać zestawu standardowego',
+  'categories.toast.seeded': {
+    one: 'Dodaliśmy {count} kategorię.',
+    few: 'Dodaliśmy {count} kategorie.',
+    many: 'Dodaliśmy {count} kategorii.',
+    other: 'Dodaliśmy {count} kategorii.',
+  },
+  'categories.toast.seeded.none':
+    'Nic nowego nie dodaliśmy. Zestaw standardowy już tu jest; zarchiwizowane kategorie znajdziesz pod „Pokaż zarchiwizowane kategorie”.',
   'categories.archive.title': 'Zarchiwizować kategorię {name}?',
   'categories.archive.body':
     'Przestaniemy ją proponować przy nowych wpisach, a wszystko, co już do niej przypisano, zachowa swoją etykietę. Podkategorie archiwizują się razem z nią. Możesz ją przywrócić w każdej chwili.',
@@ -1067,6 +1086,8 @@ const messages = {
   'dashboard.period.label': 'Okres',
   'dashboard.income': 'Wpływy',
   'dashboard.expenses': 'Wydatki',
+  'dashboard.plannedIncome': 'Zaplanowane wpływy',
+  'dashboard.plannedExpenses': 'Zaplanowane wydatki',
   'dashboard.net': 'Różnica',
   'dashboard.comparedToPrevious': '{change} względem poprzedniego okresu',
   'dashboard.widget.netWorth': 'Wartość netto',
@@ -1108,6 +1129,14 @@ const messages = {
   'dashboard.cashFlow.shareOfIncome': '{share} z {amount} wpływów',
   'dashboard.cashFlow.context':
     'Wybrany okres: {month}. Wcześniejsze miesiące to kontekst.',
+  'dashboard.cashFlow.plannedNote':
+    'Kwoty zaplanowane to plan całego miesiąca, nie tylko to, co jeszcze nieopłacone.',
+  'dashboard.cashFlow.convertedNote':
+    'Kwoty zaplanowane w innych walutach są przeliczane po kursie z dnia wymagalności, nie z dzisiaj.',
+  'dashboard.cashFlow.rateMissingNote':
+    'Część zaplanowanych kwot nie ma kursu na dzień wymagalności, więc są wypisane w swojej walucie i pominięte w sumie wykresu.',
+  'dashboard.cashFlow.plannedInHeader': 'Zaplanowane wpływy',
+  'dashboard.cashFlow.plannedOutHeader': 'Zaplanowane wydatki',
   'dashboard.cashFlow.empty.title': 'W tym okresie nic się nie wydarzyło',
   'dashboard.cashFlow.empty.body': 'Zapisz wydatek albo wybierz dłuższy okres.',
   'dashboard.spending.other': 'Pozostałe',
@@ -1480,8 +1509,22 @@ const messages = {
     catalogue that cannot ask who is reading must not guess. That is why the reset line reads
     "Jeśli to nie Ty prosisz" rather than the past tense, which would have to pick one form.
   */
+  'email.layout.footer.reason':
+    'Dostajesz tę wiadomość, bo należysz do domu {workspace} w {app}.',
   'email.layout.footer.reasonAccount':
     'Dostajesz tę wiadomość, bo na Twoim koncie {app} coś się wydarzyło.',
+  'email.layout.footer.unsubscribe': 'Zatrzymaj te e-maile',
+  'email.notification.action': 'Otwórz w {app}',
+  'email.notification.body': 'Otwórz {app}, aby zobaczyć, co się stało.',
+  'email.digest.subject': {
+    one: '{count} aktualizacja z domu {workspace}',
+    few: '{count} aktualizacje z domu {workspace}',
+    many: '{count} aktualizacji z domu {workspace}',
+    other: '{count} aktualizacji z domu {workspace}',
+  },
+  'email.digest.heading': 'Twoje dzienne podsumowanie',
+  'email.digest.intro':
+    'Oto co wydarzyło się w domu {workspace} w ciągu ostatniej doby.',
   'email.auth.greeting': 'Cześć {name},',
   'email.auth.singleUse': 'Ten link zadziała tylko raz i wkrótce wygaśnie.',
   'email.auth.verifyEmail.subject': 'Potwierdź swój adres w {app}',
@@ -1659,6 +1702,78 @@ const messages = {
     'Dwupoziomowe drzewo, do którego trafia każdy wpis.',
   'settings.payees.description':
     'Komu trafiły pieniądze oraz nazwy, które import ma z nimi scalać.',
+  'settings.agents.title': 'Połączone agenty',
+  'settings.agents.subtitle':
+    'Tokeny i aplikacje, które mogą czytać albo zmieniać dane tej przestrzeni.',
+  'settings.agents.empty':
+    'Żaden agent nie ma jeszcze dostępu do tej przestrzeni.',
+  'settings.agents.mcpUrl': 'Adres MCP',
+  'settings.agents.createToken': 'Utwórz token osobisty',
+  'settings.agents.createTitle': 'Utwórz token osobisty',
+  'settings.agents.createSubmit': 'Utwórz token',
+  'settings.agents.tokenName': 'Nazwa',
+  'settings.agents.scopesLabel': 'Dostęp',
+  'settings.agents.tokenOnce':
+    'Skopiuj ten token teraz. Nie pokażemy go drugi raz. Traktuj go jak hasło.',
+  'settings.agents.kind.pat': 'Token osobisty',
+  'settings.agents.kind.oauth': 'Aplikacja OAuth',
+  'settings.agents.revoke': 'Cofnij',
+  'settings.agents.revoke.action': 'Cofnij: {name}',
+  'settings.agents.revoke.title': 'Cofnąć dostęp: {name}?',
+  'settings.agents.revoke.body':
+    'Następne wywołanie narzędzia z tym uprawnieniem się nie uda. Wiersze, które już zapisało, zostają.',
+  'settings.agents.revoke.confirm': 'Cofnij dostęp',
+  'settings.agents.revoked': 'Dostęp dla {name} został cofnięty.',
+  'settings.agents.edit': 'Edytuj ustawienia',
+  'settings.agents.edit.action': 'Edytuj ustawienia: {name}',
+  'settings.agents.edit.title': 'Ustawienia: {name}',
+  'settings.agents.edit.saved': 'Dostęp dla {name} został zaktualizowany.',
+  'settings.agents.edit.scopesRequired':
+    'Wybierz co najmniej jedno uprawnienie.',
+  'settings.agents.locked':
+    'Dostęp agentów jest w planach Plus i Household. Plan bezpłatny go nie obejmuje.',
+  'settings.agents.locked.cta': 'Zobacz plany',
+  'settings.agents.membersOnly':
+    'Tylko właściciel albo administrator może podłączyć agenta.',
+  'settings.agents.error.title': 'Nie udało się wczytać połączonych agentów',
+  'settings.agents.column.name': 'Nazwa',
+  'settings.agents.column.kind': 'Rodzaj',
+  'settings.agents.column.scopes': 'Dostęp',
+  'settings.agents.column.lastUsed': 'Ostatnio użyty',
+  'settings.agents.column.actions': 'Działania',
+  'settings.agents.neverUsed': 'Nigdy',
+  'settings.agents.list.label': 'Uprawnienia z dostępem do tej przestrzeni',
+  'settings.agents.scope.accounts.read': 'Odczyt kont',
+  'settings.agents.scope.accounts.write': 'Tworzenie i zmiana kont',
+  'settings.agents.scope.accounts.delete': 'Usuwanie kont',
+  'settings.agents.scope.transactions.read': 'Odczyt wpisów',
+  'settings.agents.scope.transactions.write': 'Tworzenie i zmiana wpisów',
+  'settings.agents.scope.transactions.delete': 'Usuwanie wpisów',
+  'settings.agents.scope.categories.read': 'Odczyt kategorii',
+  'settings.agents.scope.categories.write': 'Tworzenie i zmiana kategorii',
+  'settings.agents.scope.categories.delete': 'Usuwanie kategorii',
+  'settings.agents.scope.payees.read': 'Odczyt odbiorców',
+  'settings.agents.scope.payees.write': 'Tworzenie i zmiana odbiorców',
+  'settings.agents.scope.payees.delete': 'Usuwanie odbiorców',
+  'settings.agents.scope.recurring.read': 'Odczyt cykli',
+  'settings.agents.scope.recurring.write': 'Tworzenie i zmiana cykli',
+  'settings.agents.scope.recurring.delete': 'Usuwanie cykli',
+  'settings.agents.scope.budgets.read': 'Odczyt budżetów',
+  'settings.agents.scope.budgets.write': 'Tworzenie i zmiana budżetów',
+  'settings.agents.scope.budgets.delete': 'Usuwanie budżetów',
+  'oauth.consent.title': 'Zezwolić aplikacji {clientName}?',
+  'oauth.consent.body':
+    'Ta aplikacja prosi o dostęp do domu {workspaceName}. Nie zobaczy żadnej innej przestrzeni.',
+  'oauth.consent.requested': 'Wybierz dostęp',
+  'oauth.consent.scopeHint':
+    'Odczyt jest włączony. Tworzenie, zmiana i usuwanie zostają wyłączone, dopóki ich nie włączysz.',
+  'oauth.consent.revokeHint':
+    'Możesz to później cofnąć w Ustawieniach → Połączone agenty.',
+  'oauth.consent.allow': 'Zezwól',
+  'oauth.consent.deny': 'Odrzuć',
+  'oauth.consent.error.title': 'Ta prośba o zgodę się nie dokończyła',
+  'oauth.consent.missingClient':
+    'W tym linku zgody brakuje aplikacji, której dotyczy. Wróć i połącz ponownie.',
 
   /* -- Plans and billing -------------------------------------------------- */
   'plans.free.name': 'Bezpłatny',
@@ -1686,6 +1801,11 @@ const messages = {
   'plans.feature.household.roles':
     'Właściciele i administratorzy decydują, kto co zmienia',
   'plans.feature.household.storage': 'Pięć gigabajtów na paragony',
+  'plans.feature.mcp': 'Podłącz agenty przez MCP',
+  'mcp.preview.delete.transaction': 'Usunąć wpis {id}?',
+  'mcp.preview.delete.category': 'Usunąć kategorię {id}?',
+  'mcp.preview.delete.payee': 'Usunąć odbiorcę {id}?',
+  'mcp.preview.delete.recurring': 'Usunąć cykl {id}?',
   'plans.interval.monthly': 'Miesięcznie',
   'plans.interval.yearly': 'Rocznie',
   'plans.price.monthly': '{amount} miesięcznie',
@@ -1804,6 +1924,11 @@ const messages = {
   'members.error.seatsFull':
     'W tym planie nie ma wolnego miejsca. Zmień plan albo najpierw wycofaj jedno zaproszenie.',
   'members.error.generic': 'Nie udało się. Nic nie zostało zmienione.',
+  'members.toast.roleFailed': 'Nie udało się zmienić roli osoby {name}',
+  'members.toast.resendFailed':
+    'Nie udało się ponownie wysłać zaproszenia na adres {email}',
+  'members.toast.revokeFailed':
+    'Nie udało się wycofać zaproszenia na adres {email}',
 
   /* -- Accepting an invitation -------------------------------------------- */
   'invite.title': 'Dołącz do domu {workspace}',
@@ -1893,12 +2018,19 @@ const messages = {
   'recurring.filter.label': 'Pokaż',
   'recurring.filter.active': 'Aktywne',
   'recurring.filter.all': 'Wszystkie, łącznie z wstrzymanymi',
+  'recurring.filter.results': {
+    one: '{count} seria',
+    few: '{count} serie',
+    many: '{count} serii',
+    other: '{count} serii',
+  },
 
-  'book.filter.label': 'Wymiar',
+  'book.filter.label': 'Księga',
   'book.filter.all': 'Wszystko',
   'book.business': 'Firma',
   'book.personal': 'Prywatne',
-  'book.field.label': 'Wymiar',
+  'book.value': 'Księga: {book}',
+  'book.field.label': 'Księga',
   'book.field.description':
     'Czy ta seria należy do firmy, czy do finansów prywatnych.',
 
@@ -2557,7 +2689,7 @@ const messages = {
   'loans.schedule.caption':
     'Każdy wiersz to jedna oczekiwana płatność. Zapłacone oznacza wskazanie zapisanej transakcji.',
   'loans.schedule.missing':
-    'To zobowiązanie nie ma harmonogramu. Tak nie powinno być; spróbuj ponownie albo je usuń.',
+    'To zobowiązanie nie ma harmonogramu. Spróbuj ponownie albo wróć do wszystkich zobowiązań.',
   'loans.schedule.title': 'Harmonogram rat',
   'loans.schedule.sequence': 'Lp.',
   'loans.schedule.due': 'Termin',
@@ -2881,6 +3013,7 @@ const messages = {
     'Plik {name} zostanie usunięty na stałe. Sam wpis pozostanie bez zmian.',
   'attachments.confirm.action': 'Usuń',
   'attachments.toast.deleted': 'Paragon usunięty',
+  'attachments.toast.deleteFailed': 'Nie usunięto pliku {name}',
   /* -- Why an import refused a row (19-S2) ---------------------------------- */
   'import.error.date_empty': 'Kolumna daty jest pusta w tym wierszu.',
   'import.error.date_unparseable':

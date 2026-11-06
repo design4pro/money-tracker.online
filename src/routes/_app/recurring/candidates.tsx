@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 
 import {
   CandidateCard,
   CandidateListSkeleton,
+  useRecurringAction,
 } from '#/components/app/recurring'
 import { ErrorPanel } from '#/components/app/shell'
 import { Button, Card, EmptyState, toast } from '#/components/ui'
@@ -86,8 +87,8 @@ function CandidateListError({ reset }: { readonly reset: () => void }) {
 function CandidateListRoute() {
   const t = useTranslate()
   const { candidates, accounts, categories, payees } = Route.useLoaderData()
-  const router = useRouter()
   const refreshCaches = useDataRefresh()
+  const runAction = useRecurringAction(refreshCaches)
 
   const [isDetecting, setIsDetecting] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -96,8 +97,6 @@ function CandidateListRoute() {
   const [reasons, setReasons] = useState<
     ReadonlyMap<string, WeakestSignal> | undefined
   >(undefined)
-
-  const refresh = () => void Promise.all([router.invalidate(), refreshCaches()])
 
   const accountRefs = accounts.accounts.map((account) => ({
     id: account.id,
@@ -123,7 +122,7 @@ function CandidateListRoute() {
         ),
       )
       toast.success(t('recurring.candidates.found', { count: report.found }))
-      refresh()
+      refreshCaches()
     } catch (error) {
       toast.error(t('recurring.toast.failed'), {
         description: t(failureOf(error).message.key),
@@ -199,14 +198,13 @@ function CandidateListRoute() {
                 onAccept={() => setAccepting(row)}
                 onDismiss={() => {
                   setBusyId(row.candidate.id)
-                  void dismissCandidate({
-                    data: { candidateId: row.candidate.id },
-                  })
-                    .then(() => {
-                      toast.success(t('recurring.candidate.toast.dismissed'))
-                      refresh()
-                    })
-                    .finally(() => setBusyId(null))
+                  void runAction(
+                    () =>
+                      dismissCandidate({
+                        data: { candidateId: row.candidate.id },
+                      }),
+                    t('recurring.candidate.toast.dismissed'),
+                  ).finally(() => setBusyId(null))
                 }}
               />
             )
@@ -225,7 +223,7 @@ function CandidateListRoute() {
           onAccepted={() => {
             toast.success(t('recurring.candidate.toast.accepted'))
             setAccepting(null)
-            refresh()
+            refreshCaches()
           }}
         />
       )}

@@ -18,6 +18,17 @@ children unless overridden.
 
 ## Stage 08-S1 — Categories
 
+Delivered: 2026-11-02 - the owned paths listed below exist as built, merged in #740 (tenant
+isolation, money case, handler pins), #741 (write gate), #744 (named refusal), #795 (standard-set
+seed), #796 (empty state), #798 (browser spec) and #800 (this plan amendment); `pnpm vitest run` on
+`src/server/repos/__tests__/categories.test.ts`,
+`src/server/repos/__tests__/tenant-isolation.test.ts`,
+`src/server/repos/__tests__/money-invariants.test.ts`,
+`src/server/fns/__tests__/categories.test.ts`, `src/components/app/categories`,
+`src/components/app/tree` and `src/routes/_app/categories` passes 491 tests in 12 files (113, 155,
+90, 53, 21, 22 and 37), 26 of them the categories section of `tenant-isolation.test.ts` and 1 of
+them money case 22; `e2e/categories.visual.spec.ts` is run by CI, not by the gate.
+
 ### Stage id
 
 `08-S1` · Wave 2 · effort **L**.
@@ -30,61 +41,94 @@ children unless overridden.
 
 ### Owned paths
 
-- `src/server/repos/categories.ts` — new
-- `src/server/fns/categories.ts` — new
-- `src/routes/_app/settings/categories.tsx` — new
-- `src/routes/_app/settings/-ui/category-tree.tsx` — new
-- `src/routes/_app/settings/-ui/category-form.tsx` — new
-- `src/server/repos/__tests__/categories.test.ts` — new
-- `e2e/categories.visual.spec.ts` — new
+- `src/server/repos/categories.ts` — edit (nine writes, the seed, the depth cap, colour cascade)
+- `src/server/fns/categories.ts` — edit (one handler per repository export, including the seed)
+- `src/server/categories/standard-set.ts` — new (typed 36-row table, no SQL)
+- `src/routes/_app/categories/index.tsx` — edit
+- `src/routes/_app/categories/-lib/refusal.ts` — new
+- `src/routes/_app/categories/-ui/category-form-dialog.tsx` — edit
+- `src/routes/_app/categories/-ui/refusal-panel.tsx` — new
+- `src/components/app/categories/` — edit (tree, empty state, swatch, colour field, icons)
+- `src/components/app/tree/` — edit (`dropMove` no-op; shared with `06-S3`)
+- `src/server/repos/__tests__/categories.test.ts` — edit
+- `src/server/repos/__tests__/tenant-isolation.test.ts` — edit (categories section)
+- `src/server/repos/__tests__/money-invariants.test.ts` — edit (case 22)
+- `src/server/fns/__tests__/categories.test.ts` — new
+- `e2e/categories.visual.spec.ts` — new (refused drag, axe at rest and on refusal, keyboard menu, empty state)
+
+The plan once named `src/routes/_app/settings/categories.tsx`,
+`src/routes/_app/settings/-ui/category-tree.tsx`, `src/routes/_app/settings/-ui/category-form.tsx`
+and a `reorder-menu` component from `00-S8`. None of those files exists and none is owed: the screen
+is `/categories`, the tree and form live under `src/components/app/categories/` and
+`src/routes/_app/categories/-ui/`, and the row menu is inline in `category-tree.tsx` with the
+arithmetic in `src/components/app/tree/`.
 
 ### Data and migration
 
 `categories` exists from `00-S5`: `name`, `slug`, `icon text(50)`, `color text(7) NOT NULL`, `kind`
 (`expense|income|both`), `parent_id`, `is_system boolean`, `position`, `archived_at`. No schema
-change.
+change and no migration.
 
-A **seed set** of system categories is created with the workspace (`04-S1` provisioning calls into
-this repository once it exists; until then a workspace starts empty and `26-S1`'s onboarding offers
-the set). `is_system` categories may be renamed and re-coloured but not deleted, because the import
-mappers and the rule engine reference them by slug.
+The **standard set** is 36 ordinary rows (twelve top-level, twenty-four children) in
+`src/server/categories/standard-set.ts`. Every row is `is_system = false`, so a person who does not
+want the set can delete it. It is applied by the empty state's **Add the standard set** action
+(`seedStandardCategories`), not at workspace provisioning: `04-S1` is delivered and does not write
+categories. `26-S1`'s presets build on that table and never redefine it. `is_system` stays reserved
+for a row the product itself must find by slug; none exists today. Import mappers and the rule
+engine address categories by free text and by id, not by these slugs.
 
 ### Server (repo, server function, Zod)
 
-- **Repository.** `categories.ts`: `listCategories({ includeArchived })`, `getCategory`,
-  `createCategory`, `updateCategory`, `archiveCategory`, `restoreCategory`, `deleteCategory`,
-  `reorderCategories`, `moveCategory({ id, parentId, position })`.
-- **Depth cap.** `createCategory` and `moveCategory` refuse a `parent_id` whose own `parent_id` is
-  not null, with a message naming the two categories. Asserted in the repository, on every write —
-  including the import path, which is the one that would otherwise create depth 3.
+- **Repository.** `src/server/repos/categories.ts`: `listCategories({ includeArchived })`,
+  `getCategory`, `createCategory`, `updateCategory`, `archiveCategory`, `restoreCategory`,
+  `deleteCategory`, `reorderCategories`, `moveCategory({ id, parentId, position })`,
+  `seedStandardCategories({ locale })`, plus `spendingByCategory` and `assertCategoryUsable`.
+- **Depth cap.** `createCategory` and `moveCategory` go through `assertMayParent`. A parent that is
+  itself a child cannot take children (`canTakeChildren`); `CategoryDepthError` and
+  `CategoryHasChildrenError` name both categories in their server messages, without a hand-rolled
+  plural. No importer writes a category today (`19-S3` owns that). Any later writer calls
+  `createCategory` or `moveCategory`; there is no second door, because SQL outside
+  `src/server/repos` is forbidden.
 - **`deleteCategory` refuses when the category has transactions or splits**, naming the count, and
   offers archive instead. `archiveCategory` cascades to descendants; restoring restores only the
   category asked for, not the subtree, because a subtree that archived together did not necessarily
   become relevant together.
-- **Colour inheritance** is resolved in the repository on read: a child with a null override returns
-  its parent's colour. Resolving it in the UI means two components disagree.
-- **Server function.** One per repository export.
-- **Zod.** `color` is `z.string().regex(/^#[0-9a-f]{6}$/i)`; `icon` is a member of the icon-name
+- **Colour inheritance** is maintained on write, not resolved on read: `categories.color` is
+  `NOT NULL`, a child created without a colour stores its parent's, `updateCategory` repaints
+  children that still carry the parent's old value (`cascadeColor`), and `moveCategory` adopts the
+  new parent's colour for a child that was inheriting. A child that carries its own colour is not
+  touched.
+- **Server function.** One per repository export, including `seedStandardCategories` (POST).
+- **Zod.** `color` is a case-folded `#rrggbb` (`colorSchema`); `icon` is a member of the icon-name
   tuple, not free text, so a rename in `lucide-react` is a type error rather than a blank square.
-- **Authorisation.** `requireOrg()`; writes require `owner | admin` in a multi-member workspace.
+- **Authorisation.** `requireOrg()`; every write — create, edit, archive, restore, delete, reorder,
+  move and the seed — calls `assertMayAdminister` after the Zod parse and before any read or write.
+  Reads and `assertCategoryUsable` stay ungated.
 - **Ledger batching.** None: categories carry no amount and no balance. Archiving a category does not
   touch a transaction row.
 
 ### UI (route, components)
 
-- **Route.** `/settings/categories`, SSR default.
+- **Route.** `/categories` (`src/routes/_app/categories/index.tsx`), SSR default. The settings hub
+  links here; there is no `/settings/categories`.
 - **Components.** Reuses `GridList`, `Dialog`, `ColorSwatch`, `Select`, `TextField`, `Menu`,
-  `reorder-menu` (`00-S8`), `Badge`. New: `category-tree.tsx`, `category-form.tsx`.
-- **States.** Empty: _"No categories yet"_ with **Add the standard set** as the primary action and
-  Add category as secondary — the standard set is what almost everyone wants, so it is the default
-  path rather than a hidden option. Skeleton: eight tree rows. Error: `ErrorPanel` retryable.
+  `Badge`. The tree is `src/components/app/categories/category-tree.tsx`; the form is
+  `src/routes/_app/categories/-ui/category-form-dialog.tsx`; move arithmetic is
+  `src/components/app/tree/` (`dropMove`, `stepMove`, `reparentMove`). The depth-cap refusal is
+  composed from the catalogue in `src/routes/_app/categories/-lib/refusal.ts` and rendered by
+  `refusal-panel.tsx`. No `reorder-menu` component exists.
+- **States.** Empty (`status=active` and no rows): **Add the standard set** is the primary action and
+  **Add a category** the secondary. Skeleton: eight tree rows. Error: `ErrorPanel` retryable. A
+  refused move, restore or seed lands in one `role="alert"` region; the body names the two
+  categories from the loaded tree for a nest conflict, or the catalogue's forbidden / generic
+  sentence, and never the server's English message.
 - **Tokens.** None new. The category colour is rendered as a swatch **beside** the name, never as the
   row's background — a coloured row background cannot hold 7:1 text contrast across an arbitrary
   user-chosen hue.
-- **Accessibility.** Reordering and re-parenting are available from `reorder-menu`'s _Move up / down /
-  to top / to bottom / Move to…_ **and** by drag. Each colour swatch has an accessible name that
-  includes the colour's contrast-safe label, because a swatch alone tells a colour-blind reader
-  nothing. The depth-cap refusal is announced in a live region, not only shown as a toast.
+- **Accessibility.** Reordering and re-parenting are available from the per-row menu (_Move up /
+  down / to top / to bottom / Move to…_) **and** by drag. Each colour swatch has an accessible name
+  that includes the colour's contrast-safe label, because a swatch alone tells a colour-blind reader
+  nothing. The depth-cap refusal is announced in a live region, not as a toast.
 
 ### Quota
 
@@ -93,31 +137,37 @@ and rationing them would make the free tier actively worse at its one job. State
 
 ### Tenant isolation test
 
-Added to `tenant-isolation.test.ts`: A, in A's scope, attempts `getCategory`, `updateCategory`,
-`archiveCategory`, `deleteCategory`, `reorderCategories` on B's ids, and `createCategory` /
-`moveCategory` with B's `parent_id`. Every one is a `NotFoundError`; B's tree is unchanged. Functions
-covered: all nine exports.
+`describe('categories cannot be reached or be aimed across a workspace boundary')` in
+`src/server/repos/__tests__/tenant-isolation.test.ts`: A, in A's scope, attempts `getCategory`,
+`updateCategory`, `archiveCategory`, `restoreCategory`, `deleteCategory`, `reorderCategories` (one
+A id and one B id in the same call), `moveCategory` and `createCategory` with a B `parentId`, and
+`seedStandardCategories`. Every foreign id is a `NotFoundError`; `listCategories` returns none of
+B's; `spendingByCategory` counts none of B's spending; B's tree is byte-identical afterwards. B
+holding a `food` slug does not make A skip it. Functions covered: the nine writes, the seed, the
+two reads.
 
 ### Money invariant
 
 This stage writes no amount, and that is the answer — but it is not the whole answer. Categories are
 the **grouping key** for every category-based report, so the invariant it must not break is that
-re-parenting or archiving a category **never changes a stored `ref_amount_minor`**. Case in
-`money-invariants.test.ts`: _category writes do not touch `transactions`_ — asserted by a query spy
-across all nine exports, because a well-meaning "re-categorise descendants" implementation is exactly
-how a category edit would start rewriting the ledger.
+re-parenting or archiving a category **never changes a stored `ref_amount_minor`**. Case 22 in
+`money-invariants.test.ts`: _a category write never touches an amount_ — asserted by a statement log
+across the nine exports and `seedStandardCategories`, because a well-meaning "re-categorise
+descendants" implementation is exactly how a category edit would start rewriting the ledger.
 
 ### Verification
 
 - Command gate.
-- `categories.test.ts`: the depth cap on create, move and the import path; delete refuses with
-  history; colour inheritance resolves on read; archive cascades and restore does not; the money case.
-- Browser evidence: `/settings/categories` with a two-level tree of twelve categories, both themes, at
-  **360 / 1280 / 2560 px**, plus the **empty state**, the **Move to… menu open**, and the **depth-cap
-  refusal message** — the refusal is the point of `CLS-01` and a resting tree is not evidence about
-  it.
-- `e2e/categories.visual.spec.ts` runs axe on `/settings/categories`: zero `serious`, zero `critical`.
-- Console silent through reorder and re-parent.
+- `src/server/repos/__tests__/categories.test.ts`: the depth cap on create and move, naming both
+  rows; delete refuses with history; colour inheritance maintained on write; archive cascades and
+  restore does not; the write gate; the standard-set seed.
+- `src/server/fns/__tests__/categories.test.ts`: every handler calls `requireOrg()`, none opens a
+  ledger batch, the strict schemas refuse unknown fields.
+- Browser evidence: `/categories` in `e2e/categories.visual.spec.ts` (#744 the refused drag, #798
+  axe at rest and on the refusal, the keyboard _Move to…_ menu, the empty-state pair). Frames are
+  360 / 1280 / 2560 px, both themes. The refusal is the point of `CLS-01` and a resting tree is not
+  evidence about it.
+- Console silent through a refused re-parent.
 
 ### Definition of done
 

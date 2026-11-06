@@ -19,6 +19,11 @@ import { UnsupportedImportSourceError } from '#/server/import/registry'
 import { RateTimelineUnavailableError } from '#/server/ledger/rates'
 import { AliasTakenError, PayeeMergeError } from '#/server/repos/payees'
 import {
+  OverRefundError,
+  RefundCurrencyError,
+  RefundDirectionError,
+} from '#/server/repos/refunds'
+import {
   ConflictError,
   FeatureLockedError,
   ForbiddenError,
@@ -163,6 +168,27 @@ describe('classifyFailure: one case per thrown class', () => {
     [
       'InvitationClosedError',
       new InvitationClosedError('expired'),
+      'conflict',
+      409,
+      false,
+    ],
+    [
+      'RefundDirectionError',
+      new RefundDirectionError('inflow', 'inflow'),
+      'conflict',
+      409,
+      false,
+    ],
+    [
+      'RefundCurrencyError',
+      new RefundCurrencyError('PLN', 'EUR'),
+      'conflict',
+      409,
+      false,
+    ],
+    [
+      'OverRefundError',
+      new OverRefundError('txn_1', 1000, 400, 700),
       'conflict',
       409,
       false,
@@ -482,6 +508,51 @@ describe('validation', () => {
       v: 1,
       kind: 'validation',
       message: { key: 'failure.validation' },
+    })
+  })
+})
+
+describe('refund conflict reasons', () => {
+  it.each([
+    [
+      'RefundDirectionError',
+      new RefundDirectionError('inflow', 'inflow'),
+      'refund_direction',
+    ],
+    [
+      'RefundCurrencyError',
+      new RefundCurrencyError('PLN', 'EUR'),
+      'refund_currency',
+    ],
+    [
+      'OverRefundError',
+      new OverRefundError('txn_1', 10_000, 4_000, 7_000),
+      'over_refund',
+    ],
+  ] as const)(
+    '%s carries %s and no amount or code from the throw',
+    (_label, thrown, reason) => {
+      const envelope = envelopeOf(thrown)
+      expect(envelope).toEqual({
+        v: 1,
+        kind: 'conflict',
+        message: { key: 'failure.conflict' },
+        reason,
+      })
+      const bytes = JSON.stringify(envelope)
+      expect(bytes).not.toContain('PLN')
+      expect(bytes).not.toContain('EUR')
+      expect(bytes).not.toContain('inflow')
+      expect(bytes).not.toContain('txn_1')
+      expect(bytes.replace('"v":1', '')).not.toMatch(/\d/)
+    },
+  )
+
+  it('an ordinary conflict has no reason', () => {
+    expect(envelopeOf(new ConflictError('collides'))).toEqual({
+      v: 1,
+      kind: 'conflict',
+      message: { key: 'failure.conflict' },
     })
   })
 })

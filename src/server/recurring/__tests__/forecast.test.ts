@@ -176,6 +176,29 @@ describe('forecastSeries', () => {
     expect(forecast.next12MonthsMinor).toBe(asMinor(500_00))
   })
 
+  it('does not reopen a year whose annual period is already paid after the month moves', () => {
+    const forecast = forecastSeries({
+      direction: 'expense',
+      schedule: {
+        frequency: 'annual',
+        anchorDay: 10,
+        anchorMonth: 12,
+        startDate: '2025-03-15',
+      },
+      expectedAmountMinor: 500_00,
+      expectedCurrencyCode: 'PLN',
+      isActive: true,
+      today: TODAY,
+      links: [],
+      periods: [paid('2026-11-01')],
+    })
+
+    // The paid November 2026 row is history of this year. Walking December 2026 from the new
+    // schedule must not count another expected payment for the same year.
+    expect(forecast.restOfYearMinor).toBe(asMinor(0))
+    expect(forecast.next12MonthsMinor).toBe(asMinor(0))
+  })
+
   it('forecasts nothing for an income series, which is not money going out', () => {
     const forecast = forecastSeries({
       direction: 'income',

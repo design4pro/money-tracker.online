@@ -7,27 +7,42 @@ import {
   trailingMonths,
 } from '#/components/app/dashboard'
 import { createTranslator, loadCatalogue } from '#/lib/i18n'
-import { asCurrencyCode, asMinor, subtractMinor, sumMinor } from '#/lib/money'
+import {
+  ZERO_MINOR,
+  addMinor,
+  asCurrencyCode,
+  asMinor,
+  subtractMinor,
+  sumMinor,
+} from '#/lib/money'
 import { serverToday } from '#/server/clock'
 import { isLiabilityCategory } from '#/server/catalog/account-types'
 import { negotiateLocaleFrom } from '#/server/fns/locale'
 import { listAccounts } from '#/server/repos/accounts'
 import { spendingByCategory } from '#/server/repos/categories'
 import { listPayees } from '#/server/repos/payees'
+import { sumPlannedPeriodsByMonth } from '#/server/repos/recurring'
 import {
   DEFAULT_TRANSACTION_SORT,
+  exclusiveAfter,
   pageTransactions,
+  sumPlannedTransactionsByMonth,
   sumTransactions,
 } from '#/server/repos/transaction-queries'
+import { resolveRate } from '#/server/repos/workspace-currencies'
+import { convertExpectedAmount } from '#/server/transactions/display-expected'
 
 import type {
   CashFlowBucket,
   CategorySpend,
   DashboardData,
   DashboardPeriod,
+  NativePlanLine,
 } from '#/components/app/dashboard'
+import type { CurrencyCode, Minor } from '#/lib/money'
 import type { TenantScope } from '#/server/repos/base'
 import type { SpendingByCategory } from '#/server/repos/categories'
+import type { PlannedPeriodSum } from '#/server/repos/recurring'
 import type { TransactionPolicies } from '#/server/repos/transactions'
 
 /**
@@ -279,24 +294,198 @@ async function cashFlowBuckets(
   const drawn =
     months.length === 1 ? trailingMonths(months[0], CONTEXT_MONTHS) : months
 
-  return Promise.all(
-    drawn.map(async (firstDay): Promise<CashFlowBucket> => {
-      const month = monthRange(firstDay)
-      const totals = await sumTransactions({
-        scope,
-        policies: FLOW_POLICIES,
-        filters: { from: month.from, to: month.to },
-        historyFloor: null,
-        baseCurrencyCode,
-      })
+  const from = drawn[0] ?? range.from
+  const last = drawn.at(-1) ?? from
+  const to = exclusiveAfter(monthRange(last).to)
 
-      return {
-        key: firstDay,
-        incomeMinor: totals.incomeMinor,
-        expenseMinor: totals.expenseMinor,
-        netMinor: totals.netMinor,
-        inPeriod: selected.has(firstDay),
-      }
-    }),
+  const [actuals, oneOff, periods] = await Promise.all([
+    Promise.all(
+      drawn.map(async (firstDay) => {
+        const month = monthRange(firstDay)
+        const totals = await sumTransactions({
+          scope,
+          policies: FLOW_POLICIES,
+          filters: { from: month.from, to: month.to },
+          historyFloor: null,
+          baseCurrencyCode,
+        })
+        return { firstDay, totals }
+      }),
+    ),
+    sumPlannedTransactionsByMonth({ scope, from, to }),
+    sumPlannedPeriodsByMonth(scope, { from, to }),
+  ])
+
+  const plan = await composePlanBuckets(
+    scope,
+    drawn,
+    baseCurrencyCode,
+    oneOff,
+    periods,
   )
+
+  return actuals.map(({ firstDay, totals }): CashFlowBucket => {
+    const planned = plan.get(firstDay) ?? emptyPlan()
+    return {
+      key: firstDay,
+      incomeMinor: totals.incomeMinor,
+      expenseMinor: totals.expenseMinor,
+      netMinor: totals.netMinor,
+      inPeriod: selected.has(firstDay),
+      plannedIncomeMinor: planned.plannedIncomeMinor,
+      plannedExpenseMinor: planned.plannedExpenseMinor,
+      plannedRateMissing: planned.plannedRateMissing,
+      nativePlan: planned.nativePlan,
+    }
+  })
+}
+
+interface MonthPlan {
+  readonly plannedIncomeMinor: Minor | null
+  readonly plannedExpenseMinor: Minor | null
+  readonly plannedRateMissing: boolean
+  readonly nativePlan: ReadonlyArray<NativePlanLine>
+}
+
+function emptyPlan(): MonthPlan {
+  return {
+    plannedIncomeMinor: ZERO_MINOR,
+    plannedExpenseMinor: ZERO_MINOR,
+    plannedRateMissing: false,
+    nativePlan: [],
+  }
+}
+
+async function composePlanBuckets(
+  scope: TenantScope,
+  months: ReadonlyArray<string>,
+  baseCurrencyCode: CurrencyCode,
+  oneOff: ReadonlyArray<{
+    readonly monthKey: string
+    readonly direction: 'income' | 'expense'
+    readonly amountMinor: Minor
+  }>,
+  periods: ReadonlyArray<PlannedPeriodSum>,
+): Promise<Map<string, MonthPlan>> {
+  const acc = new Map<string, MutableMonthPlan>()
+  for (const key of months) {
+    acc.set(key, newMutablePlan())
+  }
+
+  for (const row of oneOff) {
+    const month = acc.get(row.monthKey)
+    if (month === undefined) continue
+    if (row.direction === 'income') {
+      month.income = addMinor(month.income, row.amountMinor)
+      month.sawIncome = true
+      month.incomeConverted = true
+    } else {
+      month.expense = addMinor(month.expense, row.amountMinor)
+      month.sawExpense = true
+      month.expenseConverted = true
+    }
+  }
+
+  for (const row of periods) {
+    const month = acc.get(row.monthKey)
+    if (month === undefined) continue
+    if (row.currencyCode !== baseCurrencyCode) {
+      addNative(month, row)
+    }
+    const converted = await convertExpectedAmount(
+      {
+        amountMinor: row.amountMinor,
+        currencyCode: row.currencyCode,
+        dueOn: row.dueOn,
+        baseCurrencyCode,
+      },
+      (query) => resolveRate(scope, query),
+    )
+    if (row.direction === 'income') {
+      month.sawIncome = true
+      if (converted === null) {
+        month.incomeGap = true
+      } else {
+        month.income = addMinor(month.income, converted)
+        month.incomeConverted = true
+      }
+    } else {
+      month.sawExpense = true
+      if (converted === null) {
+        month.expenseGap = true
+      } else {
+        month.expense = addMinor(month.expense, converted)
+        month.expenseConverted = true
+      }
+    }
+  }
+
+  return new Map(
+    [...acc.entries()].map(([key, month]) => [key, freezePlan(month)]),
+  )
+}
+
+interface MutableMonthPlan {
+  income: Minor
+  expense: Minor
+  sawIncome: boolean
+  sawExpense: boolean
+  incomeConverted: boolean
+  expenseConverted: boolean
+  incomeGap: boolean
+  expenseGap: boolean
+  native: Map<CurrencyCode, { income: Minor; expense: Minor }>
+}
+
+function newMutablePlan(): MutableMonthPlan {
+  return {
+    income: ZERO_MINOR,
+    expense: ZERO_MINOR,
+    sawIncome: false,
+    sawExpense: false,
+    incomeConverted: false,
+    expenseConverted: false,
+    incomeGap: false,
+    expenseGap: false,
+    native: new Map(),
+  }
+}
+
+function addNative(month: MutableMonthPlan, row: PlannedPeriodSum): void {
+  const current = month.native.get(row.currencyCode) ?? {
+    income: ZERO_MINOR,
+    expense: ZERO_MINOR,
+  }
+  if (row.direction === 'income') {
+    month.native.set(row.currencyCode, {
+      ...current,
+      income: addMinor(current.income, row.amountMinor),
+    })
+  } else {
+    month.native.set(row.currencyCode, {
+      ...current,
+      expense: addMinor(current.expense, row.amountMinor),
+    })
+  }
+}
+
+function freezePlan(month: MutableMonthPlan): MonthPlan {
+  return {
+    plannedIncomeMinor: month.sawIncome
+      ? month.incomeConverted
+        ? month.income
+        : null
+      : ZERO_MINOR,
+    plannedExpenseMinor: month.sawExpense
+      ? month.expenseConverted
+        ? month.expense
+        : null
+      : ZERO_MINOR,
+    plannedRateMissing: month.incomeGap || month.expenseGap,
+    nativePlan: [...month.native.entries()].map(([currencyCode, amounts]) => ({
+      currencyCode,
+      incomeMinor: amounts.income,
+      expenseMinor: amounts.expense,
+    })),
+  }
 }

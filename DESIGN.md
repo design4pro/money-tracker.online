@@ -478,10 +478,10 @@ few characters but never by a pixel of height. `h1`-`h3` take the display face a
 ### Named Rules
 
 **The Typed Line Rule.** A line of the passbook is a 2.5rem box - one rule of the form - and its
-baseline sits 3px above the printed rule, placed by a translate (`translate-y-[calc(1rem-0.22em)]`
-for the typewriter at label size) so paint moves and layout does not. A cell has no vertical
-padding, and the rule under it is drawn as an inset one-pixel shadow rather than a border so it
-adds no height and the table never walks off the pitch.
+type sits vertically centred in that box. A cell has no vertical padding, and the rule under it
+is drawn as an inset one-pixel shadow rather than a border so it adds no height and the table
+never walks off the pitch. (Owner decision, 2026-11-03: centre the type rather than set its
+baseline 3px above the printed rule.)
 
 **The Hand-On-Rules Rule.** A handwritten heading on ruled paper is placed on the rules the same
 way: the hero by `translate-y-[calc(2.5rem-0.33em)]`, a title by `leading-10` plus
@@ -531,8 +531,9 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
   `border-panel` rule that is the foot of the form - the same rule that sits under the column
   headings. When the last entry is planned, the balance carried forward is written in pencil
   like the line that produced it, and the page is not marked.
-- **The summary strip**: three typed lines in a `dl`, label at the start, figure at the end, a
-  `border-t` rule under each - never three tiles.
+- **The summary strip**: a `dl` of three items, each a small label over its figure, one pattern
+  for every item, the strip's items vertically centred - never three tiles. (Owner decision,
+  2026-11-03.)
 - **Three width bands, and nothing improvised between them**. A block states which band it belongs
   to; a screen that names none inherits the shell column and spans it, which is how a row carrying
   four short facts comes to draw a rule across 1150px of nothing.
@@ -687,6 +688,30 @@ Stamps. Square-cornered, typed, pressed one pixel into the page.
 **The Pending-Not-Disabled Rule.** A submit in flight uses `isPending`: focusable, `aria-disabled`,
 label kept in the DOM under the spinner so the button holds its width.
 
+### Button links
+
+A router `<a>` wearing the stamp. Navigation is an href, so this is never `Button` with an
+`onPress` that routes: a screen reader’s link list, a status-bar preview and “open in a new tab”
+all require a real anchor. `buttonVariants` still paints React Aria’s `data-[hovered]` and
+`data-[pressed]`, which a TanStack `Link` never receives, so `ButtonLink`
+(`src/components/app/shell/button-link.tsx`) restates those states as `:hover` / `:active` and
+keeps `target-min`. The caller states the variant and size (and `block` when the stamp is full
+width).
+
+- **Shape and sizes:** the same stamps as Buttons — `sm` 32px / `md` 40px / `lg` 48px, `md`
+  radius (2px), bold. No extra variants or colours.
+- **Tones:** the same meanings as Buttons. A filled stamp (`primary`, `secondary`, and the unused
+  `ghost` / `subtle` / `brand` / `danger` maps) drops the underline. The `link` tone keeps the
+  `brand` underline at 40% opacity, reaching full on hover.
+- **States:** hover and press via CSS pseudo-classes; focus via the shared ring. There is no
+  disabled or pending form: a way out that cannot be taken is omitted, not greyed.
+- **When colour is gone:** the filled stamp still has a border or a fill step; the `link` tone
+  still has an underline.
+- **What it is not:** `Button` (an in-place `onPress`, including the budget empty-state tiles);
+  `Link` in `components/ui` (a text link, which needs React Aria’s router). Do not import
+  `ButtonLink` from `__root.tsx` or `router.tsx` — `not-found` and `default-error` load it lazily
+  so the marketing entry chunk stays free of the button primitive.
+
 ### Fields
 
 - **Style:** `surface` ground, `border-strong` rule, `md` radius (2px), 40px at the default size,
@@ -705,6 +730,29 @@ label kept in the DOM under the spinner so the button holds its width.
   is not an error (a limit reached, a hint) is not an `errorMessage`; where one already is, pass
   `isInvalid={false}`. A new field component takes the same `errorMessage` and `isInvalid` pair and
   hands its container `isInvalid={resolveInvalid(isInvalid, errorMessage)}`.
+
+### Agent scope picker
+
+The eighteen `resource:verb` checkboxes one grant can hold. Consent, the personal-token
+dialog, and the connected-app editor all render this group (`AgentScopePicker`). A second
+screen is what made it shared.
+
+- **The shape.** A vertical `CheckboxGroup`: visible label at label size, weight bold, then one
+  checkbox per closed scope. Each row is at least 44px. The box is the shared checkbox (2px
+  radius, `border-strong` rule). There is no second size and no horizontal orientation.
+- **What a box means.** One scope, labelled with `settings.agents.scope.{resource}.{verb}`.
+  Read, write, and delete are separate. Checking write does not check delete, and checking
+  delete does not check read. The group label says what the set is for: "Access" when minting
+  or editing, "Choose access" on consent. The caller passes that label. An empty group is
+  invalid: the error sentence sits under the group, and Save or Allow does not proceed.
+- **States.** Checked, unchecked, focus (the shared ring), disabled (the plan gate hides the
+  whole editor instead of greying the boxes), invalid (the group error). Hover darkens the
+  box rule the way other checkboxes do. There is no indeterminate state.
+- **When colour is gone.** The check mark and the label text remain. The invalid state is the
+  sentence, not a red box alone.
+- **What it is not.** A summary list of scopes already stored (the agents list renders those
+  as text). It is not a consent decision by itself: Deny and Allow, and Save, stay on the
+  screen that owns the decision.
 
 ### Select and ComboBox popover
 
@@ -842,12 +890,37 @@ a sentence that says what to do, not a blank.
 - **Needs more?** A surface that wants to offer more than two actions - a choice of kind, say -
   does it in a sibling section under its own sub-heading, never inside the card. `/accounts` (three
   kind shortcuts) and `/budgets` (two) are the examples: a labelled `<section>` below the empty
-  state.
+  state, whose tiles are `KindTile` (Kind tile, below).
 - **It is not** a `brand` card (an invitation or an upsell on a page that has content) and not
   `ErrorPanel` (something went wrong). An empty list with a filter on is the same state with the
   filter's own copy.
 - `src/components/ui/__tests__/empty-state-ownership.test.ts` fails when `variant="dashed"`
   appears outside `src/components/ui`.
+
+### Kind tile
+
+The pick-a-kind shortcut on an empty list. `/accounts` draws three, `/budgets` two; `KindTile` is
+the one owner of the tile.
+
+- **The shape:** the secondary `lg` button's paint - hairline `border-strong` on `surface`,
+  `--shadow-card`, `md` radius, `lg` type step and side padding - stretched to fill its grid cell.
+  `h-auto` so the cell, not the copy, sets the height (the `lg` 48px box would pin it). Content is
+  a column, start-aligned, 6px gap: a 20px glyph in `ink-2`, then a `label` semibold title, then
+  optional `caption` `ink-2` help. `whitespace-normal` so the help wraps. The grid is the
+  caller's (`auto-rows-fr`, a flex `<li>`); the tile fills it. Hit area is 44px (`target-min`) and
+  the focus ring is the product's (Focus, above).
+- **The tones:** one, `secondary`. It is not the empty state's primary action; it is a shortcut
+  that opens a form with a kind already chosen and creates nothing.
+- **The states:** hover, press, focus and disabled from the button paint. No selected state
+  (choosing a tile leaves the screen). No pending state (a tile writes no row).
+- **What carries the meaning when the colour does not:** the title, and the help when the caller
+  gives one. The glyph is `aria-hidden`. The accessible name is the title alone, or the title plus
+  the help. Under forced colours the tile is a bordered button with text; the glyph can vanish.
+- **It is not** the shared `Button` (that primitive wraps children in an inner row, so a column
+  layout never reaches them) and not `EmptyState` (the dashed card with at most two actions). The
+  tile lives in the sibling section Empty state already describes; it never goes inside the card.
+- **Verified by:** `src/components/ui/__tests__/kind-tile.test.tsx` (name, press, no inner row) and
+  `e2e/empty-kind-tiles.spec.ts` (equal height and stacking at 360 and 1280, EN and PL).
 
 ### Error panel
 
@@ -877,8 +950,10 @@ failure kind calls for, so a screen never invents its own way out. Both live in
   sentence, Retry when the caller has one, a way back to the dashboard where the reader is known to
   be signed in, and a reference). `not_found` and `forbidden` share the `internal` recovery on
   purpose, so the screen never offers a different way out (the sentence still differs) for a missing row and a foreign one
-  (`RECOVERY_OF`). The sentence is the envelope's own catalogue key, so two failures of one kind
-  read the same, and no recovery shows a plan name or an amount.
+  (`RECOVERY_OF`). The body is the envelope's own catalogue key, so two failures of one kind
+  read the same, and no recovery shows a plan name or an amount. The heading is the call site's
+  `title` when it passes one (`retryable`, and also `internal`, `quota` and `feature_locked`), so a
+  screen reader hears the action that failed rather than only the generic kind.
 - **The states.** It has two placements, `after-action` and `in-place` (the alert-versus-region
   rule below), and Retry has a pending state (the Pending-Not-Disabled Rule). It does not have
   hover, press, selected, disabled or invalid: a panel is not interactive, only its buttons and
@@ -1005,7 +1080,8 @@ because what a row can do differs (a category archives, a group deletes).
   matching menu item must produce the same move; a component test holds that.
 - **Names say where a row is.** A child row's accessible name carries its parent ("Trips, inside
   Joint") because the indent says nothing aloud; the drag handle and the menu trigger are named
-  after their row, and their parent for a child.
+  after their row, and their parent for a child. Below `sm` the group tree stacks the account-count
+  badge under the name so a long name wraps at word boundaries instead of against the badge.
 - **Account membership is menu-only.** An account row in the group tree offers _Move to…_ and
   _Remove from this group_, acting only on that row's membership. Destinations include their parent
   and the current group stays disabled. Focus follows the account into the target group, or the
@@ -1059,10 +1135,10 @@ the same three rolled up per currency on `/recurring`. The second call site is t
   and _Due soon_, not here.
 - **The states:** resting only. There is no empty colour wash; an empty rollup is a sentence
   (`recurring.forecast.empty`).
-- **What carries the meaning when the colour does not:** the three labels, and a visually-hidden
-  table of the same three cells so a screen reader gets tabular data rather than three adjacent
-  paragraphs. The clip (`sr-only`) sits on a wrapper `div`, never on the `<table>`: a table lays
-  out by its content and ignores `width: 1px`, so it widens the page at 360px. Amounts are formatted by `formatMoney`; they never become a float in the panel.
+- **What carries the meaning when the colour does not:** the three labelled amounts in the `dl`.
+  A definition list is already structured for a screen reader; a second, visually-hidden table of
+  the same cells would announce each total twice. Amounts are formatted by `formatMoney`; they
+  never become a float in the panel.
 - **It is not** a chart (no SVG, no second encoding) and not _Due soon_ (that list is periods you
   act on). This panel is a year view of integer sums.
 
@@ -1128,19 +1204,43 @@ the series detail grid and _Due soon_ on `/recurring`.
 - **The one thing it is not:** a row menu. The actions are visible buttons on purpose; burying
   _Mark paid_ behind a menu adds a click to the only thing the table is for.
 
+### Segmented filter
+
+The "Show" / "Book" control of a list: two or three views of one list, side by side on a rule.
+`SegmentedFilter` is the shared component (`src/components/app/nav/segmented-filter.tsx`). Call
+sites include `/recurring` and the transactions mode switch.
+
+- **The shape:** a radio group on a `border-subtle` rule, 44px segments (`h-11`), the current one
+  marked by a one-pixel `brand` rule along its top edge and `brand` text at the heavier weight.
+- **The tones:** one. There is no emphasis between the options; the current one is marked by
+  position and weight, not by a fill.
+- **The states:** hover washes the text to `ink`; focus is the product ring; there is no disabled
+  state, because every option is always reachable.
+- **What carries the meaning when the colour does not:** `aria-checked`, the weight and the rule.
+  The group is one tab stop and the arrow keys move and select.
+- **The caption:** `hidden` (the default) names the group with `aria-label` only, which is enough
+  for a lone Show bar. `visible` prints the name above the bar — the second filter on a screen
+  that already has a Show control, so the two groups are not two unnamed rows of segments. When
+  the caption is hidden the radiogroup **is** the component's root: `/accounts` measures the
+  filter band as that node's parent (control at the start, count at the end, hairline on the
+  row). Wrapping a caption-less group would shrink the band to the three words.
+- **Where focus goes when the route pending-swaps (2.4.3):** choosing a segment often unmounts the
+  group (the loader replaces the page with the skeleton). Focus would fall to `<body>`. The
+  component remembers the named group that was chosen and, on the next mount, focuses the current
+  radio. Every call site gets this; a screen must not re-implement it.
+- **Filter results (4.1.3):** `FilterLiveStatus` is a `div` `role="status"`, never a `p`, so a
+  band that finds its counterweight as `p` still finds that caption. It mounts empty and then
+  announces the row count or the filtered-empty copy. The caller translates; the component holds
+  no message key. This is the AA live-region pattern, not a wider conformance claim.
+- **The one thing it is not:** a navigation entry or a tab bar. There is no panel under it to
+  switch, only a list whose address changes with the filters.
+
 ### Mode switch
 
 The control that moves between two addresses of one screen: _Recorded_ and _Planned_ on the
-transactions screen. It is the `SegmentedFilter`, so it takes that component's shape: a radio group
-on a `border-subtle` rule, 44px segments, the current one marked by a one-pixel `brand` rule along
-its top edge and `brand` text at the heavier weight.
+transactions screen. It is the `SegmentedFilter`, so it takes that component's shape, tones,
+states, non-colour encoding and pending-remount focus restore.
 
-- **The tones:** one. There is no emphasis between the two modes; the current one is marked by
-  position and weight, not by a fill.
-- **The states:** hover washes the text to `ink`; focus is the product ring; there is no disabled
-  state, because both modes are always reachable.
-- **What carries the meaning when the colour does not:** `aria-checked`, the weight and the rule.
-  The group is one tab stop and the arrow keys move and select.
 - **The one thing it is not:** a navigation entry or a tab bar. A mode is not an area, so it adds
   nothing to the navigation table; and there is no panel under it to switch, only a list whose
   address changes with the filters carried across.
@@ -1246,8 +1346,8 @@ opacity only.
 ### Signature: the typed line
 
 The unit the whole world is built from (`TYPED_LINE` in `src/routes/-ui/ledger-preview.tsx`). A
-2.5rem line box in the typewriter at label size, baseline 3px above the printed rule by a translate,
-no vertical padding, the rule drawn as an inset one-pixel shadow on the cell's last pixel row. On
+2.5rem line box in the typewriter at label size, type vertically centred in the box, no vertical
+padding, the rule drawn as an inset one-pixel shadow on the cell's last pixel row. On
 the wide page every entry is one such line: date in caption `ink-2`, description in `ink` with its
 category after a middle dot in `ink-2`, amount end-aligned in its tone, and the balance-after column
 behind the 2px `border-panel` spine. The opening balance is a line with no amount, and it wears
@@ -1285,8 +1385,8 @@ still fire.
 
 - **Do** set every heading, margin note and section title in Caveat, and every figure, label,
   control and paragraph in Courier Prime.
-- **Do** put a line of the passbook in a 2.5rem box with its baseline 3px above the rule by a
-  translate, and draw the rule under a cell as an inset one-pixel shadow.
+- **Do** put a line of the passbook in a 2.5rem box with its type vertically centred in the
+  rule, and draw the rule under a cell as an inset one-pixel shadow.
 - **Do** build a section, a list or a summary as headings over bodies on `border-t` rules; reach
   for a card only when the content needs its own ground.
 - **Do** spend violet on actions and on what is settled - the primary button, links, the current
@@ -1311,10 +1411,12 @@ still fire.
 ### Don't:
 
 - **Don't** place an eyebrow, kicker or uppercase label above a heading. Micro uppercase is for a
-  column heading or a `dt` on the same line as its figure, never a line above a title.
+  column heading or a `dt` beside or above its figure, never a line above a title.
 - **Don't** use cards as the scaffold of a page, or a grid of equal icon cards as a section.
-- **Don't** build a hero-metric tile - a big number over a small label. A figure is a typed line
-  with its label at the start and the figure at the end.
+- **Don't** build a hero-metric tile - a card or tile of a big number over a small label. A
+  figure elsewhere is a typed line with its label at the start and the figure at the end. The
+  totals strip is the documented exception (owner decision, 2026-11-03): there the label sits
+  over the figure, still as items of a `dl`, never as cards.
 - **Don't** set a figure in the hand or a heading in the typewriter.
 - **Don't** use gradient text, glass, blur, a translucent bar, or a hard offset shadow anywhere.
 - **Don't** put a coloured border wider than 1px on a card, list item, callout or alert, or mark

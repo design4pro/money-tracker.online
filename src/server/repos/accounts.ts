@@ -5,7 +5,7 @@
  * property of an account at all: {@link adjustAccountBalance}, which records a **transaction**.
  *
  * ---------------------------------------------------------------------------
- * THE FOUR RULES THIS MODULE EXISTS TO KEEP
+ * THE FIVE RULES THIS MODULE EXISTS TO KEEP
  * ---------------------------------------------------------------------------
  *
  * 1. **A correction is a transaction, never an overwrite.** Nothing here writes
@@ -28,12 +28,18 @@
  *    on read.** An account already in the base currency has `ref_x === x` for every balance column,
  *    which is the cheapest detector there is for a conversion applied where none was needed.
  *
+ * 5. **An account's currency is locked once it has transactions.** Changing it under history would
+ *    mix currencies on booked rows, or rewrite `amount_minor` / `currency_code` / `ref_amount_minor`
+ *    — which `docs/MONEY.md` §3.1 forbids. Empty accounts may still change currency; that re-derives
+ *    only the account row's own opening `ref_` columns.
+ *
  * ---------------------------------------------------------------------------
  * WHAT THIS MODULE BORROWS RATHER THAN OWNS
  * ---------------------------------------------------------------------------
- * - The **conversion** is `./transactions`' `computeRefAmount` and its {@link ConversionContext},
- *   passed in by the caller. Rate resolution order belongs to the workspace-currency repository,
- *   and a second opinion about it here would eventually become a different opinion.
+ * - The **conversion** is `#/server/transactions/ref-amount`'s `computeRefAmount` and its
+ *   {@link ConversionContext}, passed in by the caller. Rate resolution order belongs to the
+ *   workspace-currency repository, and a second opinion about it here would eventually become a
+ *   different opinion.
  * - The **balance adjustment** is written through `./transactions`' `createTransaction`, not
  *   through an insert of its own, so a correction is subject to exactly the invariants every other
  *   transaction is. A parallel write path is how "a real transaction" quietly becomes "nearly a
@@ -55,7 +61,6 @@ import {
 import { isLiabilityCategory } from '#/server/catalog/account-types'
 import { latestCalendarDayOnEarth } from '#/server/calendar-day'
 import { serverToday } from '#/server/clock'
-import { member } from '#/server/db/auth-schema'
 import { newId } from '#/server/db/ids'
 import {
   pauseRulesReferencing,
@@ -70,6 +75,7 @@ import {
   transactions,
 } from '#/server/db/schema'
 
+import { assertMayAdminister } from './administer'
 import {
   assertScopedWrite,
   assertWithinLimit,
@@ -79,22 +85,20 @@ import {
   tenantFilter,
   touchLedgerAccount,
 } from './base'
-import { ConflictError, ForbiddenError, NotFoundError } from './errors'
+import { ConflictError, NotFoundError } from './errors'
 // The base currency is read in one place in this codebase. This module and `./workspace-currencies`
 // were written in parallel against the same `is_base` row, and two readers of it is two chances to
 // answer a different currency after a base change.
 import { baseCurrencyOf } from './workspace-currencies'
-import {
-  applyPolicies,
-  computeRefAmount,
-  createTransaction,
-} from './transactions'
+import { applyPolicies, createTransaction } from './transactions'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
 
 import type { CurrencyCode, Minor } from '#/lib/money'
 import type { AccountGroupRow } from '#/server/db/schema'
 import type { Account } from '#/server/db/types'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 import type { TenantPatch, TenantScope } from './base'
-import type { ConversionContext, TransactionPolicies } from './transactions'
+import type { TransactionPolicies } from './transactions'
 
 /* -------------------------------------------------------------------------- */
 /* Errors                                                                     */
@@ -113,6 +117,26 @@ export class AccountHasTransactionsError extends ConflictError {
   constructor(accountId: string, transactionCount: number) {
     super(
       `Account ${accountId} still has ${transactionCount} transaction(s); archive it instead of deleting it.`,
+    )
+    this.accountId = accountId
+    this.transactionCount = transactionCount
+  }
+}
+
+/**
+ * Thrown by {@link updateAccount} when the patch would change `currency_code` and the account
+ * already has transactions.
+ *
+ * Booked rows keep the currency they were written in (`docs/MONEY.md` §3.1). An empty account may
+ * still change currency; that path re-derives only the account row's opening `ref_` columns.
+ */
+export class AccountCurrencyLockedError extends ConflictError {
+  readonly accountId: string
+  readonly transactionCount: number
+
+  constructor(accountId: string, transactionCount: number) {
+    super(
+      `Account ${accountId} already has ${transactionCount} transaction(s); its currency cannot change.`,
     )
     this.accountId = accountId
     this.transactionCount = transactionCount
@@ -329,6 +353,18 @@ export const reorderAccountGroupsSchema = z.strictObject({
   ids: z.array(idSchema).min(1).max(200),
 })
 
+export const moveAccountGroupSchema = z
+  .strictObject({
+    id: idSchema,
+    parentId: idSchema.nullable(),
+    orderedIds: z.array(idSchema).min(1).max(200),
+  })
+  .refine((value) => value.orderedIds.includes(value.id), {
+    path: ['orderedIds'],
+    message: 'orderedIds must contain id',
+  })
+export type MoveAccountGroupInput = z.input<typeof moveAccountGroupSchema>
+
 /* -------------------------------------------------------------------------- */
 /* Returned shapes                                                            */
 /* -------------------------------------------------------------------------- */
@@ -424,36 +460,6 @@ function openingDayOf(row: typeof accounts.$inferSelect): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Authorisation                                                              */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The destructive writes need `owner | admin` — **but only in a shared workspace**.
- *
- * A solo workspace has one member and that member is its owner, so a role gate there can only ever
- * produce a bug report. The member count is read live rather than taken from the session, for the
- * same reason `requireOrg()` re-reads the role: a claim minted before somebody was invited is a
- * claim about a workspace that no longer exists.
- */
-async function assertMayAdminister(
-  scope: TenantScope,
-  action: string,
-): Promise<void> {
-  if (scope.ctx.role === 'owner' || scope.ctx.role === 'admin') {
-    return
-  }
-  // `member` is an auth table rather than a finance one, but it carries the same discriminator and
-  // the same rule applies to it: the predicate is composed by the base, not spelled out here.
-  const rows = await scope.db
-    .select({ value: count() })
-    .from(member)
-    .where(tenantFilter(scope, member))
-  if ((rows.at(0)?.value ?? 0) > 1) {
-    throw new ForbiddenError(action, ['owner', 'admin'])
-  }
-}
-
-/* -------------------------------------------------------------------------- */
 /* Currency                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -484,6 +490,20 @@ async function requireHeldCurrency(
     throw new CurrencyNotHeldError(code)
   }
   return code
+}
+
+/** Transactions this workspace booked on this account. The tenant predicate is the whole point. */
+async function countTransactionsFor(
+  scope: TenantScope,
+  accountId: string,
+): Promise<number> {
+  const rows = await scope.db
+    .select({ value: count() })
+    .from(transactions)
+    .where(
+      tenantFilter(scope, transactions, eq(transactions.accountId, accountId)),
+    )
+  return rows.at(0)?.value ?? 0
 }
 
 /* -------------------------------------------------------------------------- */
@@ -621,10 +641,11 @@ export async function createAccount(
 /**
  * Edits an account.
  *
- * **Changing the currency changes every `ref_` value in the account's history**, which is why this
- * is one of the two writes here that asks for a rebuild. The `ref_` columns on the row itself are
- * re-derived at `openedOn`'s rate; the transactions' own `ref_amount_minor` values are the
- * ledger's to rebuild and are not touched from here.
+ * **Changing the currency is refused once the account has transactions** (`docs/MONEY.md` §3.1):
+ * booked rows keep `amount_minor`, `currency_code` and `ref_amount_minor`. An empty account may
+ * still change currency; then the account row's own `ref_` columns are re-derived at `openedOn`'s
+ * rate and a rebuild is requested. Transaction `ref_amount_minor` is never rewritten from here —
+ * not even on the empty path, because there are no such rows.
  *
  * The conversion runs only when something it depends on actually moved, so renaming an account
  * cannot fail because the catalogue is missing a rate for a currency nobody changed.
@@ -640,6 +661,16 @@ export async function updateAccount(
   await assertMayAdminister(scope, 'edit an account')
 
   const current = await accountRepo.requireById(scope, id)
+
+  if (
+    parsed.currencyCode !== undefined &&
+    parsed.currencyCode !== current.currencyCode
+  ) {
+    const transactionCount = await countTransactionsFor(scope, id)
+    if (transactionCount > 0) {
+      throw new AccountCurrencyLockedError(id, transactionCount)
+    }
+  }
 
   const currencyCode =
     parsed.currencyCode === undefined
@@ -757,11 +788,7 @@ export async function deleteAccount(
   await assertMayAdminister(scope, 'delete an account')
   const row = await accountRepo.requireById(scope, id)
 
-  const rows = await scope.db
-    .select({ value: count() })
-    .from(transactions)
-    .where(tenantFilter(scope, transactions, eq(transactions.accountId, id)))
-  const transactionCount = rows.at(0)?.value ?? 0
+  const transactionCount = await countTransactionsFor(scope, id)
   if (transactionCount > 0) {
     throw new AccountHasTransactionsError(id, transactionCount)
   }
@@ -851,7 +878,6 @@ export async function adjustAccountBalance(
       accountId: account.id,
       direction,
       amountMinor,
-      currencyCode: account.currencyCode,
       bookedOn: parsed.bookedOn,
       bookedAt: Date.parse(`${parsed.bookedOn}T23:59:59.999Z`),
       note: parsed.note ?? null,
@@ -999,18 +1025,8 @@ export async function updateAccountGroup(
   await assertMayAdminister(scope, 'edit an account group')
   await groupRepo.requireById(scope, id)
 
-  if (parsed.parentId !== undefined && parsed.parentId !== null) {
-    if (parsed.parentId === id) {
-      throw new GroupDepthError(id)
-    }
-    await assertParentIsTopLevel(scope, parsed.parentId)
-    const children = await groupRepo.count(
-      scope,
-      eq(accountGroups.parentId, id),
-    )
-    if (children > 0) {
-      throw new GroupDepthError(id)
-    }
+  if (parsed.parentId !== undefined) {
+    await assertMayNest(scope, id, parsed.parentId)
   }
 
   const changes: TenantPatch<typeof accountGroups> = { updatedAt: new Date() }
@@ -1186,6 +1202,55 @@ export async function moveAccountToGroup(
     throw new NotFoundError('account group membership', accountId)
 }
 
+/**
+ * Moves a group to a parent and a position in one tenant batch.
+ *
+ * Re-parenting without rewriting the run it lands in is how two groups share a position and the
+ * list starts reordering itself on reload. The route used to sequence {@link updateAccountGroup}
+ * then {@link reorderAccountGroups}; a failure of the second left the group under its new parent
+ * at a stale index. This function is that pair as one `runTenantBatch`: the parent on the moved
+ * row and the position of every id in the new order, or nothing. {@link TenantPatch} types
+ * `position` as a number, so each id is its own statement rather than a `CASE` expression.
+ *
+ * A move inside one run still goes through {@link reorderAccountGroups}; that path does not
+ * change a parent.
+ */
+export async function moveAccountGroup(
+  scope: TenantScope,
+  input: MoveAccountGroupInput,
+): Promise<void> {
+  const parsed = moveAccountGroupSchema.parse(input)
+  await assertMayAdminister(scope, 'move an account group')
+  await groupRepo.requireById(scope, parsed.id)
+  await assertMayNest(scope, parsed.id, parsed.parentId)
+  await requireAllOwned(
+    scope,
+    accountGroups,
+    parsed.orderedIds,
+    'account group',
+  )
+
+  const now = new Date()
+  const [first, ...rest] = parsed.orderedIds.map((rowId, index) => {
+    const patch: TenantPatch<typeof accountGroups> = {
+      position: index,
+      updatedAt: now,
+    }
+    if (rowId === parsed.id) {
+      patch.parentId = parsed.parentId
+    }
+    return groupRepo.updateWhereStatement(
+      scope,
+      eq(accountGroups.id, rowId),
+      patch,
+    )
+  })
+  if (first === undefined) {
+    throw new ConflictError('A batch needs at least one statement.')
+  }
+  await runTenantBatch(scope, [first, ...rest])
+}
+
 /** The group order, in one statement, for the same reasons as {@link reorderAccounts}. */
 export async function reorderAccountGroups(
   scope: TenantScope,
@@ -1213,9 +1278,9 @@ export async function reorderAccountGroups(
 /**
  * One amount in the workspace base currency, at `on`'s rate.
  *
- * A thin call onto `./transactions`' `computeRefAmount`, deliberately: the identity short-circuit,
- * the rate direction and the refusal to invent a missing rate are all decided there, once, for
- * every amount in the product.
+ * A thin call onto `#/server/transactions/ref-amount`'s `computeRefAmount`, deliberately: the
+ * identity short-circuit, the rate direction and the refusal to invent a missing rate are all
+ * decided there, once, for every amount in the product.
  */
 async function toBase(
   amountMinor: Minor,
@@ -1313,5 +1378,32 @@ async function assertParentIsTopLevel(
   const parent = await groupRepo.requireById(scope, parentId)
   if (parent.parentId !== null) {
     throw new GroupDepthError(parentId)
+  }
+}
+
+/**
+ * The one-level rule from both directions: a parent must be top-level, and a group that already
+ * has children may not itself become a child. {@link updateAccountGroup} and
+ * {@link moveAccountGroup} both ask here; {@link createAccountGroup} keeps
+ * {@link assertParentIsTopLevel} because a new group has no children yet.
+ */
+async function assertMayNest(
+  scope: TenantScope,
+  groupId: string,
+  parentId: string | null,
+): Promise<void> {
+  if (parentId === null) {
+    return
+  }
+  if (parentId === groupId) {
+    throw new GroupDepthError(groupId)
+  }
+  await assertParentIsTopLevel(scope, parentId)
+  const children = await groupRepo.count(
+    scope,
+    eq(accountGroups.parentId, groupId),
+  )
+  if (children > 0) {
+    throw new GroupDepthError(groupId)
   }
 }

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
@@ -7,11 +8,14 @@ import en from '#/lib/i18n/messages/en'
 import { AccountEmptyState } from '../account-empty-state'
 
 import type { Catalogue } from '#/lib/i18n'
+import type { AccountCategory } from '#/server/db/schema'
 
-const renderState = () =>
+const renderState = (
+  onCreate: (category?: AccountCategory) => void = () => {},
+) =>
   render(
     <I18nProvider locale="en" messages={en as Catalogue}>
-      <AccountEmptyState onCreate={() => {}} />
+      <AccountEmptyState onCreate={onCreate} />
     </I18nProvider>,
   )
 
@@ -35,5 +39,35 @@ describe('AccountEmptyState', () => {
     expect(screen.getByRole('heading', { level: 3 }).closest('section')).toBe(
       section,
     )
+  })
+
+  it('hands the chosen category to onCreate, and none from the primary action', async () => {
+    const onCreate = vi.fn()
+    const user = userEvent.setup()
+    renderState(onCreate)
+
+    await user.click(
+      screen.getByRole('button', {
+        name: en['accounts.category.current'],
+      }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith('current')
+
+    await user.click(
+      screen.getByRole('button', { name: en['accounts.category.cash'] }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith('cash')
+
+    await user.click(
+      screen.getByRole('button', {
+        name: en['accounts.category.creditCard'],
+      }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith('credit_card')
+
+    await user.click(
+      screen.getByRole('button', { name: en['accounts.empty.action'] }),
+    )
+    expect(onCreate).toHaveBeenLastCalledWith()
   })
 })

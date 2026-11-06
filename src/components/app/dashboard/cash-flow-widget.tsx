@@ -1,4 +1,4 @@
-import { BarChart } from '#/components/charts'
+import { BarChart, chartAmount } from '#/components/charts'
 import { EmptyState } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { isZeroMinor } from '#/lib/money'
@@ -6,7 +6,7 @@ import { isZeroMinor } from '#/lib/money'
 import { cashFlowCopy } from './chart-copy'
 import { monthLabel } from './month-label'
 
-import type { ChartSeries } from '#/components/charts'
+import type { ChartSeries, ChartTableRow } from '#/components/charts'
 import type { CurrencyCode } from '#/lib/money'
 import type { CashFlowBucket } from './types'
 
@@ -53,10 +53,7 @@ export function CashFlowWidget({
   const locale = useLocale()
   const copy = cashFlowCopy(t)
 
-  const hasMovement = buckets.some(
-    (bucket) =>
-      !isZeroMinor(bucket.incomeMinor) || !isZeroMinor(bucket.expenseMinor),
-  )
+  const hasMovement = buckets.some(bucketHasMovement)
 
   if (!hasMovement) {
     return (
@@ -87,11 +84,57 @@ export function CashFlowWidget({
         amountMinor: bucket.expenseMinor,
       })),
     },
+    {
+      id: 'planned-income',
+      name: t('dashboard.plannedIncome'),
+      points: buckets.map((bucket) => ({
+        key: `planned-income-${bucket.key}`,
+        label: monthLabel(locale, bucket.key),
+        amountMinor: bucket.plannedIncomeMinor,
+      })),
+    },
+    {
+      id: 'planned-expense',
+      name: t('dashboard.plannedExpenses'),
+      points: buckets.map((bucket) => ({
+        key: `planned-expense-${bucket.key}`,
+        label: monthLabel(locale, bucket.key),
+        amountMinor: bucket.plannedExpenseMinor,
+      })),
+    },
   ]
 
   const emphasis = buckets.map((bucket) => bucket.inPeriod)
   const context = buckets.filter((bucket) => !bucket.inPeriod).length > 0
   const selected = buckets.find((bucket) => bucket.inPeriod)
+  const hasPlan = buckets.some(bucketHasPlan)
+  const converted = buckets.some((bucket) => bucket.nativePlan.length > 0)
+  const rateMissing = buckets.some((bucket) => bucket.plannedRateMissing)
+
+  const notes = [
+    context && selected !== undefined
+      ? t('dashboard.cashFlow.context', {
+          month: monthLabel(locale, selected.key),
+        })
+      : undefined,
+    hasPlan ? t('dashboard.cashFlow.plannedNote') : undefined,
+    converted ? t('dashboard.cashFlow.convertedNote') : undefined,
+    rateMissing ? t('dashboard.cashFlow.rateMissingNote') : undefined,
+  ].filter((note): note is string => note !== undefined)
+
+  const extraTableRows: ReadonlyArray<ChartTableRow> = buckets.flatMap(
+    (bucket) =>
+      bucket.nativePlan.map((line) => ({
+        key: `${bucket.key}-${line.currencyCode}`,
+        header: `${monthLabel(locale, bucket.key)} · ${line.currencyCode}`,
+        cells: [
+          copy.noData,
+          copy.noData,
+          chartAmount(locale, line.currencyCode, line.incomeMinor),
+          chartAmount(locale, line.currencyCode, line.expenseMinor),
+        ],
+      })),
+  )
 
   return (
     <BarChart
@@ -102,13 +145,34 @@ export function CashFlowWidget({
       layout="grouped"
       height={220}
       emphasis={emphasis}
+      extraTableRows={extraTableRows}
       footnote={
-        context && selected !== undefined
-          ? t('dashboard.cashFlow.context', {
-              month: monthLabel(locale, selected.key),
-            })
-          : undefined
+        notes.length === 0 ? undefined : (
+          <div className="flex flex-col gap-1">
+            {notes.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </div>
+        )
       }
     />
+  )
+}
+
+function bucketHasPlan(bucket: CashFlowBucket): boolean {
+  return (
+    bucket.plannedIncomeMinor === null ||
+    bucket.plannedExpenseMinor === null ||
+    !isZeroMinor(bucket.plannedIncomeMinor) ||
+    !isZeroMinor(bucket.plannedExpenseMinor) ||
+    bucket.nativePlan.length > 0
+  )
+}
+
+function bucketHasMovement(bucket: CashFlowBucket): boolean {
+  return (
+    !isZeroMinor(bucket.incomeMinor) ||
+    !isZeroMinor(bucket.expenseMinor) ||
+    bucketHasPlan(bucket)
   )
 }

@@ -49,6 +49,17 @@ describe('readFailure', () => {
     expect(readFailure(wireError(validation))).toEqual(validation)
   })
 
+  it('keeps a closed conflict reason', () => {
+    const conflict: FailureEnvelope = {
+      v: 1,
+      kind: 'conflict',
+      message: { key: 'failure.conflict' },
+      reason: 'over_refund',
+    }
+
+    expect(readFailure(wireError(conflict))).toEqual(conflict)
+  })
+
   it('returns null for a plain error', () => {
     expect(readFailure(new Error('x'))).toBeNull()
   })

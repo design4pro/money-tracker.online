@@ -85,6 +85,11 @@ export interface CategoryTreeProps {
   readonly onDelete: (id: string) => void
   /** Applied by the route, which owns the server calls a move costs. */
   readonly onMove: (move: CategoryMove) => void
+  /**
+   * Passed to the `GridList` on mount. React Aria reads `autoFocus` once; turning it on after
+   * the tree has already mounted does nothing.
+   */
+  readonly autoFocus?: 'first'
 }
 
 export function CategoryTree({
@@ -95,6 +100,7 @@ export function CategoryTree({
   onRestore,
   onDelete,
   onMove,
+  autoFocus,
 }: CategoryTreeProps) {
   const t = useTranslate()
 
@@ -131,6 +137,7 @@ export function CategoryTree({
       items={categories}
       dragAndDropHooks={dragAndDropHooks}
       dependencies={[categories]}
+      autoFocus={autoFocus}
     >
       {(row) => (
         <GridListItem
@@ -171,7 +178,9 @@ export function CategoryTree({
               className="size-4 shrink-0 text-ink-2"
             />
             <CategorySwatch color={row.color} />
-            <span className="truncate text-label text-ink">{row.name}</span>
+            <span className="min-w-0 break-words text-label text-ink">
+              {row.name}
+            </span>
             {/*
               The kind yields to the name on a phone. A `Badge` is `shrink-0` and a text span is
               not, so on a 328px row the seven fixed-width elements keep their size and the one

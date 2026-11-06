@@ -1,0 +1,337 @@
+<!doctype html>
+<!--
+  Illustrative static mockup for
+  .ai/specs/2026-11-03-dashboard-cash-flow-planned-vs-actual.md
+  No app code, no build step, no external requests. Synthetic placeholder data only.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dashboard cash-flow — actual beside whole-month plan</title>
+    <style>
+      :root {
+        --canvas: #f5f4ee;
+        --surface: #fbfaf6;
+        --ink: #262420;
+        --ink-2: #4b4941;
+        --border: #c3d1c4;
+        --income: #2f6f4e;
+        --expense: #8a3a32;
+        --planned-in: #4a2a82;
+        --planned-out: #8a5a12;
+      }
+      .dark {
+        --canvas: #16171a;
+        --surface: #262930;
+        --ink: #ebe8df;
+        --ink-2: #b9b5aa;
+        --border: #42454c;
+        --income: #7dcea0;
+        --expense: #e07a72;
+        --planned-in: #c5aef2;
+        --planned-out: #e2c17a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          16px/1.45 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: var(--canvas);
+        color: var(--ink);
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 650;
+      }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 20px;
+        font-size: 0.875rem;
+        color: var(--ink-2);
+        margin-bottom: 12px;
+      }
+      .swatch {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+      .solid-in {
+        background: var(--income);
+      }
+      .solid-out {
+        background: var(--expense);
+      }
+      .outline-in {
+        box-shadow: inset 0 0 0 2px var(--planned-in);
+        background: repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 2px,
+          var(--planned-in) 2px,
+          var(--planned-in) 3px
+        );
+      }
+      .outline-out {
+        box-shadow: inset 0 0 0 2px var(--planned-out);
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 2px,
+          var(--planned-out) 2px,
+          var(--planned-out) 3px
+        );
+      }
+      .chart {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        align-items: end;
+        height: 180px;
+        border-bottom: 2px solid var(--border);
+        padding: 0 8px;
+      }
+      .month {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 3px;
+        align-items: end;
+        height: 100%;
+      }
+      .bar {
+        width: 100%;
+        min-height: 2px;
+      }
+      .in {
+        background: var(--income);
+      }
+      .out {
+        background: var(--expense);
+      }
+      .pin {
+        box-shadow: inset 0 0 0 2px var(--planned-in);
+        background: repeating-linear-gradient(
+          -45deg,
+          transparent,
+          transparent 3px,
+          color-mix(in srgb, var(--planned-in) 55%, transparent) 3px,
+          color-mix(in srgb, var(--planned-in) 55%, transparent) 4px
+        );
+      }
+      .pout {
+        box-shadow: inset 0 0 0 2px var(--planned-out);
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 3px,
+          color-mix(in srgb, var(--planned-out) 55%, transparent) 3px,
+          color-mix(in srgb, var(--planned-out) 55%, transparent) 4px
+        );
+      }
+      .labels {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: var(--ink-2);
+        text-align: center;
+      }
+      .emphasis {
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .note {
+        margin-top: 12px;
+        font-size: 0.8125rem;
+        color: var(--ink-2);
+      }
+      table {
+        caption-side: bottom;
+        margin-top: 20px;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+      }
+      caption {
+        text-align: left;
+        padding-bottom: 8px;
+        color: var(--ink-2);
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 6px 8px;
+        text-align: end;
+      }
+      th:first-child,
+      td:first-child {
+        text-align: start;
+      }
+      .header-row {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 16px;
+        font-size: 0.875rem;
+      }
+      .header-row strong {
+        display: block;
+        font-size: 1.05rem;
+      }
+      .themes {
+        display: grid;
+        gap: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Cash flow — actual beside the whole month’s plan</h1>
+      <p>
+        Synthetic household, base PLN. March rent expected 2&nbsp;500,00 zł,
+        paid 2&nbsp;500,00 zł. April still unpaid. Header totals stay actual
+        only.
+      </p>
+      <div class="themes">
+        <section class="panel" aria-label="Light theme mockup">
+          <div class="header-row">
+            <div>Money in <strong>8 200,00 zł</strong></div>
+            <div>Money out <strong>5 400,00 zł</strong></div>
+            <div>Planned in <strong>8 200,00 zł</strong></div>
+            <div>Planned out <strong>6 100,00 zł</strong></div>
+          </div>
+          <div class="legend">
+            <span><i class="swatch solid-in"></i>Money in</span>
+            <span><i class="swatch solid-out"></i>Money out</span>
+            <span><i class="swatch outline-in"></i>Planned in</span>
+            <span><i class="swatch outline-out"></i>Planned out</span>
+          </div>
+          <div class="chart" role="img" aria-label="Grouped bars, four series">
+            <div class="month">
+              <div class="bar in" style="height: 70%"></div>
+              <div class="bar out" style="height: 45%"></div>
+              <div class="bar pin" style="height: 70%"></div>
+              <div class="bar pout" style="height: 55%"></div>
+            </div>
+            <div class="month">
+              <div class="bar in" style="height: 80%"></div>
+              <div class="bar out" style="height: 50%"></div>
+              <div class="bar pin" style="height: 80%"></div>
+              <div class="bar pout" style="height: 60%"></div>
+            </div>
+            <div class="month">
+              <div class="bar in" style="height: 75%"></div>
+              <div class="bar out" style="height: 52%"></div>
+              <div class="bar pin" style="height: 75%"></div>
+              <div class="bar pout" style="height: 58%"></div>
+            </div>
+            <div class="month">
+              <div class="bar in" style="height: 20%"></div>
+              <div class="bar out" style="height: 10%"></div>
+              <div class="bar pin" style="height: 75%"></div>
+              <div class="bar pout" style="height: 58%"></div>
+            </div>
+          </div>
+          <div class="labels">
+            <span>January</span>
+            <span>February</span>
+            <span class="emphasis">March</span>
+            <span>April</span>
+          </div>
+          <p class="note">
+            Planned amounts are the whole month’s plan, not only what is still
+            unpaid. Showing March.
+          </p>
+          <table>
+            <caption>
+              Text equivalent of the chart (synthetic)
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Month</th>
+                <th scope="col">Money in</th>
+                <th scope="col">Money out</th>
+                <th scope="col">Planned in</th>
+                <th scope="col">Planned out</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">January</th>
+                <td>7 400,00 zł</td>
+                <td>4 800,00 zł</td>
+                <td>7 400,00 zł</td>
+                <td>5 600,00 zł</td>
+              </tr>
+              <tr>
+                <th scope="row">February</th>
+                <td>8 100,00 zł</td>
+                <td>5 200,00 zł</td>
+                <td>8 100,00 zł</td>
+                <td>6 000,00 zł</td>
+              </tr>
+              <tr>
+                <th scope="row">March</th>
+                <td>8 200,00 zł</td>
+                <td>5 400,00 zł</td>
+                <td>8 200,00 zł</td>
+                <td>6 100,00 zł</td>
+              </tr>
+              <tr>
+                <th scope="row">April</th>
+                <td>1 200,00 zł</td>
+                <td>400,00 zł</td>
+                <td>8 200,00 zł</td>
+                <td>6 100,00 zł</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+        <section class="panel dark" aria-label="Dark theme mockup">
+          <p class="note">Dark theme uses the same series encoding.</p>
+          <div class="legend">
+            <span><i class="swatch solid-in"></i>Money in</span>
+            <span><i class="swatch solid-out"></i>Money out</span>
+            <span><i class="swatch outline-in"></i>Planned in</span>
+            <span><i class="swatch outline-out"></i>Planned out</span>
+          </div>
+          <div class="chart">
+            <div class="month">
+              <div class="bar in" style="height: 75%"></div>
+              <div class="bar out" style="height: 52%"></div>
+              <div class="bar pin" style="height: 75%"></div>
+              <div class="bar pout" style="height: 58%"></div>
+            </div>
+            <div class="month">
+              <div class="bar in" style="height: 20%"></div>
+              <div class="bar out" style="height: 10%"></div>
+              <div class="bar pin" style="height: 75%"></div>
+              <div class="bar pout" style="height: 58%"></div>
+            </div>
+          </div>
+          <div class="labels">
+            <span class="emphasis">March</span>
+            <span>April</span>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

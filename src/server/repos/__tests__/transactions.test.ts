@@ -17,7 +17,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { asCurrencyCode, asMinor, asRateE10 } from '#/lib/money'
+import { asCurrencyCode, asRateE10 } from '#/lib/money'
 import { organization, user } from '#/server/db/auth-schema'
 import {
   accounts,
@@ -31,10 +31,10 @@ import { buildEnvelope } from '#/server/errors/envelope'
 
 import { touchLedgerAccount } from '../base'
 import { ConflictError, NotFoundError, RateUnavailableError } from '../errors'
+import { sqliteBatchCallback } from './db-harness'
 import { createScope } from '../scope'
 import {
   applyPolicies,
-  computeRefAmount,
   createTransaction,
   deleteTransaction,
   findTransaction,
@@ -43,10 +43,10 @@ import {
 } from '../transactions'
 
 import type { RateE10 } from '#/lib/money'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 import type * as BaseModule from '../base'
 import type { TenantScope } from '../scope'
 import type {
-  ConversionContext,
   CreateTransactionArgs,
   TransactionPolicies,
 } from '../transactions'
@@ -83,18 +83,23 @@ function openTestDb() {
       }
     }
   }
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      executed.push(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, (query) => {
+      executed.push(query)
+    }),
+  )
 }
 
 const EVERYTHING: TransactionPolicies = {
@@ -247,7 +252,6 @@ const BASE_INPUT = {
   accountId: 'acc-a',
   direction: 'expense',
   amountMinor: 12_345,
-  currencyCode: 'PLN',
   bookedOn: '2026-03-15',
 } as const
 
@@ -484,7 +488,6 @@ describe('ref_amount', () => {
       input: {
         ...BASE_INPUT,
         accountId: 'acc-a-eur',
-        currencyCode: 'EUR',
         amountMinor: 12_345,
       },
     })
@@ -503,7 +506,6 @@ describe('ref_amount', () => {
         input: {
           ...BASE_INPUT,
           accountId: 'acc-a-eur',
-          currencyCode: 'EUR',
           bookedOn: '2026-03-14',
         },
       }),
@@ -538,7 +540,7 @@ describe('ref_amount', () => {
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...BASE_INPUT, accountId: 'acc-a-eur', currencyCode: 'EUR' },
+      input: { ...BASE_INPUT, accountId: 'acc-a-eur' },
     })
 
     // The rate for that day changes. A read must not notice.
@@ -580,7 +582,7 @@ describe('updating', () => {
       scope,
       policies: EVERYTHING,
       conversion,
-      input: { ...BASE_INPUT, accountId: 'acc-a-eur', currencyCode: 'EUR' },
+      input: { ...BASE_INPUT, accountId: 'acc-a-eur' },
     })
     const resolveRate = vi.fn(async () => APRIL_RATE)
 
@@ -606,7 +608,6 @@ describe('updating', () => {
       input: {
         ...BASE_INPUT,
         accountId: 'acc-a-eur',
-        currencyCode: 'EUR',
         amountMinor: 12_345,
       },
     })
@@ -738,34 +739,6 @@ describe('the ledger batch', () => {
   })
 })
 
-describe('computeRefAmount', () => {
-  it('rounds half to even at the single final step', async () => {
-    const quarter = conversionOf(
-      new Map([['PLN:EUR:2026-03-15', asRateE10(2_500_000_000)]]),
-      'EUR',
-    )
-    const half = await computeRefAmount(
-      {
-        amountMinor: asMinor(2),
-        currencyCode: asCurrencyCode('PLN'),
-        bookedOn: '2026-03-15',
-      },
-      quarter,
-    )
-    const oneAndAHalf = await computeRefAmount(
-      {
-        amountMinor: asMinor(6),
-        currencyCode: asCurrencyCode('PLN'),
-        bookedOn: '2026-03-15',
-      },
-      quarter,
-    )
-
-    expect(half.refAmountMinor).toBe(0)
-    expect(oneAndAHalf.refAmountMinor).toBe(2)
-  })
-})
-
 /* -------------------------------------------------------------------------- */
 /* The booking date                                                            */
 /* -------------------------------------------------------------------------- */
@@ -827,7 +800,6 @@ describe('the booking date', () => {
         input: {
           ...BASE_INPUT,
           accountId: 'acc-a-eur',
-          currencyCode: 'EUR',
           bookedOn,
         },
       }).catch((error: unknown) => error)

@@ -8,10 +8,10 @@
  *
  * **Every value in an envelope comes from a closed set.** A kind from {@link FAILURE_KINDS}, a
  * message key from {@link FAILURE_MESSAGE_KEYS}, a metric from `QUOTA_METRICS`, a field key from
- * {@link FAILURE_FIELD_KEYS}, a field path of identifier characters. Nothing the thrown value
- * *says* (its message, its name, an entity, an id) is a member of any of them, which is what makes
- * two failures of one kind byte-identical and a cross-workspace read indistinguishable from a
- * missing row.
+ * {@link FAILURE_FIELD_KEYS}, a reason from {@link FAILURE_REASONS}, a field path of identifier
+ * characters. Nothing the thrown value *says* (its message, its name, an entity, an id) is a
+ * member of any of them. Two failures of one kind are byte-identical unless they carry different
+ * closed reasons; a cross-workspace read is indistinguishable from a missing row.
  *
  * **No key is built at runtime.** {@link FAILURE_MESSAGE_KEYS} is a total record from the kind to a
  * literal catalogue key, so a kind added without a key does not compile and the i18n parity and
@@ -62,6 +62,20 @@ export const FAILURE_MESSAGE_KEYS = {
 export type FailureMessageKey = (typeof FAILURE_MESSAGE_KEYS)[FailureKind]
 
 /**
+ * Why a `conflict` (today) was refused, when the kind sentence is not enough to act on.
+ *
+ * Refund links that point the same way, mix currencies, or would give back more than was paid all
+ * classify as `conflict`. The dialog already owns the sentence; this code lets it say which of
+ * those three to change without reading the thrown value. Other conflicts omit the field.
+ */
+export const FAILURE_REASONS = [
+  'refund_direction',
+  'refund_currency',
+  'over_refund',
+] as const
+export type FailureReason = (typeof FAILURE_REASONS)[number]
+
+/**
  * What a validation failure says about one field. Chosen from the Zod issue *code* alone, so the
  * issue's message and the rejected value never take part.
  */
@@ -88,6 +102,11 @@ export type FailureEnvelope = {
   v: 1
   kind: FailureKind
   message: { key: FailureMessageKey; params?: { metric?: QuotaMetric } }
+  /**
+   * A closed per-refusal code for kinds that share a sentence. Optional and additive: a client
+   * that does not read it still has `kind`. Never an id, amount, currency or developer sentence.
+   */
+  reason?: FailureReason
   /** Validation only. A path of `''` is the form as a whole. */
   fields?: Array<{ path: string; key: FailureFieldKey }>
   /** Seconds, an integer from 1 to 3600. Reserved: no source produces it yet. */
@@ -106,6 +125,7 @@ export const failureEnvelopeSchema = z.object({
     key: z.enum(messageKeys),
     params: z.object({ metric: z.enum(QUOTA_METRICS).optional() }).optional(),
   }),
+  reason: z.enum(FAILURE_REASONS).optional(),
   fields: z
     .array(
       z.object({

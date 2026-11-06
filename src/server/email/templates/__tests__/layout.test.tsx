@@ -125,6 +125,20 @@ describe('what it inherits from the design system', () => {
 
     expect(padding * 2 + line).toBeGreaterThanOrEqual(44)
   })
+
+  it('sizes a digest group heading in px, between body and subtitle', () => {
+    expect(emailStyles.groupHeading.fontSize).toBe('16px')
+    const body = Number.parseInt(String(emailStyles.paragraph.fontSize), 10)
+    const group = Number.parseInt(String(emailStyles.groupHeading.fontSize), 10)
+    const title = Number.parseInt(String(emailStyles.heading.fontSize), 10)
+
+    expect(group).toBeGreaterThan(body)
+    expect(group).toBeLessThan(title)
+  })
+
+  it('paints an in-body link with the stamp colour, so it is not a second paragraph', () => {
+    expect(emailStyles.link.color).toBe(emailStyles.light.accent)
+  })
 })
 
 describe('the document', () => {

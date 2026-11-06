@@ -83,14 +83,19 @@ additions to step 2 and step 11:
   Report it as pending and let the bounded follow-up correct the label.
 - The `develop → main` promotion PR is reviewed like any other; when its diff is only merge
   commits already reviewed on `develop`, say so and approve.
+- Immediately before each push to the PR head in step 11, **get-pr** reads `state` in the same
+  command as the push. Anything other than `OPEN` stops the run without pushing (see
+  **Re-read the PR state before every push**).
 
 ## Re-read the PR state before every push
 
-The claim step stops on a merged or closed PR only at the start. Immediately before each
-`git push` of an autofix commit to the PR head, run **get-pr** and read `state`, in the same
-command as the push. Anything other than `OPEN` stops the run: do not push, release the claim,
-post one comment saying why the run stopped, and report the commits that were not pushed. A push
-to a merged PR's head recreates the branch GitHub deleted on merge (#447, 2026-09-24).
+The claim step stops on a merged or closed PR only at the start. A standalone `--autofix` run
+(`.ai/cezar/workflows/pr-review.yml`, `implement-ticket.yml`) still pushes in step 11 after that.
+Immediately before each `git push` to the PR head (autofix commits, conflict-resolution merges),
+run **get-pr** and read `state`, in the same command as the push. Anything other than `OPEN` stops
+the run: do not push, release the claim, post one comment saying why the run stopped, and report
+the commits that were not pushed. A push to a merged PR's head recreates the branch GitHub deleted
+on merge (#447, 2026-09-24).
 
 ## Unattended-run limits
 

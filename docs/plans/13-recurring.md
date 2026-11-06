@@ -120,6 +120,12 @@ _An expected amount is a plan, not a fact, and the two are never conflated._ Cas
 
 - _`expected_amount_minor` is never summed into a report_ — reports sum transactions, and an expected
   amount has no `ref_amount_minor` because it has no rate and no booking date until it settles.
+  **Exception (dashboard cash-flow only; owner 2026-11-03, issue #840,
+  `.ai/specs/2026-11-03-dashboard-cash-flow-planned-vs-actual.md`):** the dashboard **may** sum
+  `expected_amount_minor` of recurring periods due in a month into a **separate planned series** on
+  the cash-flow chart. That series is labelled as a plan, is converted at read time (never stored as
+  `ref_amount_minor` on the period), and is never folded into actual money-in / money-out. Every
+  other report still sums transactions only.
 - _`markPaid` does not copy the expected amount onto the transaction_: the transaction keeps the
   amount actually paid, and the period records both, so a variable bill shows its variance.
 - _the variance is computed at read as `settled - expected` in the series' currency_, integer, and is

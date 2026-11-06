@@ -282,12 +282,14 @@ function GroupRow({
           />
         ) : null}
         <Folder aria-hidden="true" className="size-4 shrink-0 text-ink-2" />
-        <span className="min-w-0 break-words text-label text-ink">
-          {group.name}
-        </span>
-        <Badge tone="neutral" size="sm">
-          {t('accounts.count', { count: group.accounts.length })}
-        </Badge>
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2.5">
+          <span className="min-w-0 break-words text-label text-ink">
+            {group.name}
+          </span>
+          <Badge tone="neutral" size="sm">
+            {t('accounts.count', { count: group.accounts.length })}
+          </Badge>
+        </div>
       </div>
     </GridListItem>
   )
@@ -426,10 +428,11 @@ const TOP_LEVEL = '__top_level__'
 
 /**
  * Below this width the "Move to..." submenu opens under the menu instead of beside it: beside it, at
- * 360px, it ran off the right edge of the screen. The server has no viewport, so it reports the wide
- * layout and a phone corrects it in the first effect (the menu is closed until then).
+ * 360–768px, it ran off the left or right edge of the screen on a sub-group row. The server has no
+ * viewport, so it reports the wide layout and a phone corrects it in the first effect (the menu is
+ * closed until then).
  */
-const NARROW_QUERY = '(max-width: 40rem)'
+const NARROW_QUERY = '(max-width: 48rem)'
 
 function subscribeNarrow(onChange: () => void): () => void {
   const list = window.matchMedia(NARROW_QUERY)

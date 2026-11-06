@@ -139,7 +139,8 @@ need later is worse, so the alarm — not the shard — is the v1 deliverable.
 **substitute: our own primitives.** `recharts`, `chart.js`, `visx` and `nivo` all lose on the same
 axis: none of them gives a per-series text alternative, a keyboard-reachable data point and a
 non-colour encoding without being fought. Plan `16` writes line/area, stacked bar, donut and
-sparkline on `d3-scale` / `d3-shape` / `d3-time`. Reasoning: `docs/adr/0007-hand-rolled-accessible-charts-over-a-chart-library.md`.
+sparkline on `d3-scale` / `d3-shape`. Reasoning: `docs/adr/0007-hand-rolled-accessible-charts-over-a-chart-library.md`
+(ADR 0036 dropped the unused `d3-time` declaration).
 
 ### BND-21 — A Radix-based shadcn registry
 

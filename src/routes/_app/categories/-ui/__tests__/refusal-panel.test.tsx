@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
@@ -102,15 +106,24 @@ describe('RefusalPanel', () => {
     ['move', 'categories.move.refused'],
     ['reorder', 'categories.move.refused'],
     ['restore', 'categories.restore.refused'],
+    ['seed', 'categories.seed.failed'],
   ] as const)('titles a %s failure from its source', (call, key) => {
     renderPanel({ kind: 'generic', call })
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(en[key])
   })
 
-  it('is a labelled region, so the route’s wrapper stays the one live region', () => {
+  it('is a labelled region and not an alert', () => {
     renderPanel(NEST)
     expect(screen.getByRole('region')).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('the categories index does not wrap the panel in an extra alert', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../index.tsx'),
+      'utf8',
+    )
+    expect(source).not.toMatch(/<div[^>]*role=["']alert["']/)
   })
 
   it('shows no server text and no disclosure', () => {
@@ -132,7 +145,7 @@ describe('RefusalPanel', () => {
     view.rerender(withPanel(true))
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
     expect(document.activeElement).toBe(elsewhere)
   })
 

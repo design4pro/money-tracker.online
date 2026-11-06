@@ -32,7 +32,7 @@ import {
   listGoals,
   suggestContributions,
 } from '#/server/repos/goals'
-import { computeRefAmount } from '#/server/repos/transactions'
+import { computeRefAmount } from '#/server/transactions/ref-amount'
 
 import type { Minor } from '#/lib/money'
 import type { SavingsGoal } from '#/server/db/types'
@@ -41,7 +41,7 @@ import type {
   ContributionSuggestion,
   GoalContributionTotals,
 } from '#/server/repos/goals'
-import type { ConversionContext } from '#/server/repos/transactions'
+import type { ConversionContext } from '#/server/transactions/ref-amount'
 
 /** The secondary line: the same goal in the workspace's own money. `null` when no rate exists. */
 export interface GoalInBase {

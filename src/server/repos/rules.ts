@@ -164,6 +164,7 @@ export interface Rule {
 export interface RuleSubject extends RuleTarget {
   readonly transactionId: string
   readonly payeeLocked: boolean
+  readonly isPlanned: boolean
 }
 
 /**
@@ -502,6 +503,7 @@ export async function loadRuleSubjects(
       currencyCode: transactions.currencyCode,
       direction: transactions.direction,
       bookedOn: transactions.bookedOn,
+      isPlanned: transactions.isPlanned,
     })
     .from(transactions)
     .leftJoin(payees, eq(payees.id, transactions.payeeId))
@@ -555,6 +557,7 @@ export async function loadRuleSubjects(
     direction: row.direction as RuleSubject['direction'],
     bookedOn: row.bookedOn,
     payeeLocked: row.payeeLocked,
+    isPlanned: row.isPlanned,
   }))
 }
 
@@ -819,7 +822,12 @@ export async function applyOutcome(
       : { paymentMethod: outcome.paymentMethod }),
     ...(outcome.isPlanned === undefined || !mayWritePlanned(subject, outcome)
       ? {}
-      : { isPlanned: outcome.isPlanned }),
+      : {
+          isPlanned: outcome.isPlanned,
+          ...(outcome.isPlanned || subject.isPlanned
+            ? { wasPlanned: true }
+            : {}),
+        }),
     ...(outcome.excludeFromStats === undefined
       ? {}
       : { excludeFromStats: outcome.excludeFromStats }),

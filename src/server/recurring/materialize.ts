@@ -5,20 +5,30 @@
  * *"was the March bill paid"* must have an auditable answer that does not change when somebody
  * edits the series in April. The schedule is the plan; these rows are the record.
  *
- * **Idempotent per `(series_id, period_start)`.** That is the table's own primary key, and this
- * module respects it rather than the other way round: it reads what exists, writes only what does
- * not, and never rewrites a row it finds. A period that has already been paid keeps the
- * `expected_amount_minor` it was created with — what was expected in March is part of March's
- * record, and an edit in April does not get to rewrite it.
+ * **Idempotent per `(series_id, period_start)` on the ordinary path.** That is the table's own
+ * primary key, and this module respects it rather than the other way round: it reads what exists,
+ * writes only what does not, and never rewrites a row it finds. A period that has already been
+ * paid keeps the `expected_amount_minor` it was created with — what was expected in March is part
+ * of March's record, and an edit in April does not get to rewrite it.
  *
- * Runs on series create, on series edit, and from the the hourly `RECURRING_CRON` cron branch. All three call the
- * same function with the same arguments, so there is one answer to "which periods exist".
+ * **An anchor edit is the exception.** `realignOpen` rebuilds unpaid open periods (`upcoming` /
+ * `overdue`) against the new schedule so the grid and the forecast name the same dates. Paid and
+ * skipped rows stay put; they occupy their occurrence slot so a settled year is not opened twice.
+ *
+ * Runs from `writeSeries` after a series change and from `catchUpSeries` on a read or the hourly
+ * `RECURRING_CRON` branch. Both call the same function with the same arguments, so there is one
+ * answer to "which periods exist".
  */
 
 import { parseDate } from '@internationalized/date'
 import { z } from 'zod'
 
-import { getSeries, insertMissingPeriods } from '#/server/repos/recurring'
+import {
+  getSeries,
+  insertMissingPeriods,
+  listPeriodRows,
+  removeUnpaidOpenPeriods,
+} from '#/server/repos/recurring'
 
 import { occurrences } from './schedule'
 
@@ -38,6 +48,11 @@ export const materializeSchema = z.strictObject({
    * has to exist first.
    */
   ahead: z.number().int().min(0).max(24).default(3),
+  /**
+   * When true, unpaid open periods are rebuilt against this schedule. Paid and
+   * skipped history is left unchanged. Ordinary materialisation leaves this off.
+   */
+  realignOpen: z.boolean().default(false),
 })
 export type MaterializeInput = z.input<typeof materializeSchema>
 
@@ -103,8 +118,63 @@ export async function materializeSeries(
       expectedCurrencyCode: series.expectedCurrencyCode,
     }))
 
-  const created = await insertMissingPeriods(scope, series.id, wanted)
+  const existing = parsed.realignOpen
+    ? await listPeriodRows(scope, series.id)
+    : []
+  const occupied = parsed.realignOpen
+    ? wantedStartsOccupiedBySettled(existing, wanted)
+    : new Set<string>()
+  if (parsed.realignOpen) {
+    await removeUnpaidOpenPeriods(scope, series.id)
+  }
+
+  const created = await insertMissingPeriods(
+    scope,
+    series.id,
+    wanted.filter((row) => !occupied.has(row.periodStart)),
+  )
   return { seriesId: series.id, created }
+}
+
+function isSettledStatus(status: string): boolean {
+  return status === 'paid' || status === 'skipped'
+}
+
+/**
+ * Occurrence slots already taken by paid or skipped history, keyed by the new
+ * schedule's `period_start`. Index pairing is by due date: the nth stored row
+ * is the nth occurrence, even when the anchor moved the calendar day.
+ */
+function wantedStartsOccupiedBySettled(
+  existing: ReadonlyArray<{
+    readonly periodStart: string
+    readonly dueOn: string
+    readonly status: string
+  }>,
+  wanted: ReadonlyArray<{ readonly periodStart: string }>,
+): Set<string> {
+  const ordered = [...existing].sort((left, right) => {
+    if (left.dueOn !== right.dueOn) return left.dueOn < right.dueOn ? -1 : 1
+    return left.periodStart < right.periodStart
+      ? -1
+      : left.periodStart > right.periodStart
+        ? 1
+        : 0
+  })
+  const occupied = new Set<string>()
+  for (
+    let index = 0;
+    index < ordered.length && index < wanted.length;
+    index += 1
+  ) {
+    const row = ordered.at(index)
+    const occurrence = wanted.at(index)
+    if (row === undefined || occurrence === undefined) break
+    if (isSettledStatus(row.status)) {
+      occupied.add(occurrence.periodStart)
+    }
+  }
+  return occupied
 }
 
 /** The day after `day`, on the calendar. Never `Date` arithmetic — see `./schedule`. */
