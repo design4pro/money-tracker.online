@@ -55,6 +55,7 @@ import {
 } from '../refunds'
 import { createScope } from '../scope'
 import { deleteTransaction } from '../transactions'
+import { sqliteBatchCallback } from './db-harness'
 
 import type { Database, TenantScope } from '../base'
 import type { TransactionPolicies } from '../transactions'
@@ -93,7 +94,7 @@ function openTestDb(): Database {
       .all(...(params as Array<never>))
       .map((row) => Object.values(row as Record<string, unknown>))
     return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  }, sqliteBatchCallback(sqlite))
 }
 
 const EVERYTHING: TransactionPolicies = {
