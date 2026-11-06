@@ -92,7 +92,7 @@ const groupIdSchema = z.strictObject({
  * page with a number missing from the top of it.
  */
 export const listAccounts = createServerFn({ method: 'GET' })
-  .inputValidator(listAccountsSchema)
+  .validator(listAccountsSchema)
   .handler(async ({ data }): Promise<AccountListResult> => {
     const scope = await requireOrg()
     return listAccountsRow(scope, data)
@@ -100,7 +100,7 @@ export const listAccounts = createServerFn({ method: 'GET' })
 
 /** One account. An id belonging to another workspace is a `NotFoundError`, never a `403`. */
 export const getAccount = createServerFn({ method: 'GET' })
-  .inputValidator(accountIdSchema)
+  .validator(accountIdSchema)
   .handler(async ({ data }): Promise<Account> => {
     const scope = await requireOrg()
     return getAccountRow(scope, data.accountId)
@@ -120,7 +120,7 @@ export const listAccountGroups = createServerFn({ method: 'GET' }).handler(
 
 /** Creates an account. Batched, because a non-zero opening balance starts a balance history. */
 export const createAccount = createServerFn({ method: 'POST' })
-  .inputValidator(createAccountSchema)
+  .validator(createAccountSchema)
   .handler(async ({ data }): Promise<Account> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -139,7 +139,7 @@ const updateAccountInputSchema = z.strictObject({
  * is refused in the repository (`docs/MONEY.md` §3.1).
  */
 export const updateAccount = createServerFn({ method: 'POST' })
-  .inputValidator(updateAccountInputSchema)
+  .validator(updateAccountInputSchema)
   .handler(async ({ data }): Promise<Account> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -154,7 +154,7 @@ export const updateAccount = createServerFn({ method: 'POST' })
 
 /** Archives an account: reversible, keeps every row, and is what the UI offers before delete. */
 export const archiveAccount = createServerFn({ method: 'POST' })
-  .inputValidator(accountIdSchema)
+  .validator(accountIdSchema)
   .handler(async ({ data }): Promise<Account> => {
     const scope = await requireOrg()
     return archiveAccountRow(scope, data.accountId)
@@ -162,7 +162,7 @@ export const archiveAccount = createServerFn({ method: 'POST' })
 
 /** Restores an archived account. Batched: it counts towards the totals again. */
 export const restoreAccount = createServerFn({ method: 'POST' })
-  .inputValidator(accountIdSchema)
+  .validator(accountIdSchema)
   .handler(async ({ data }): Promise<Account> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -172,7 +172,7 @@ export const restoreAccount = createServerFn({ method: 'POST' })
 
 /** Deletes an account that has no history. The repository refuses — with the count — if it has. */
 export const deleteAccount = createServerFn({ method: 'POST' })
-  .inputValidator(accountIdSchema)
+  .validator(accountIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteAccountRow(scope, data.accountId)
@@ -180,7 +180,7 @@ export const deleteAccount = createServerFn({ method: 'POST' })
 
 /** Rewrites the display order. One statement, and no balance moves, so no batch. */
 export const reorderAccounts = createServerFn({ method: 'POST' })
-  .inputValidator(reorderAccountsSchema)
+  .validator(reorderAccountsSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await reorderAccountsRow(scope, data.ids)
@@ -196,7 +196,7 @@ export const reorderAccounts = createServerFn({ method: 'POST' })
  * lookup is the authoriser, and the schema only checks shape.
  */
 export const getAccountBalanceOn = createServerFn({ method: 'GET' })
-  .inputValidator(getAccountBalanceOnSchema)
+  .validator(getAccountBalanceOnSchema)
   .handler(async ({ data }): Promise<AccountBalanceOn> => {
     const scope = await requireOrg()
     return getAccountBalanceOnRow(scope, data)
@@ -211,7 +211,7 @@ export const getAccountBalanceOn = createServerFn({ method: 'GET' })
  * whether the correction was applied once or twice.
  */
 export const adjustAccountBalance = createServerFn({ method: 'POST' })
-  .inputValidator(adjustBalanceSchema)
+  .validator(adjustBalanceSchema)
   .handler(async ({ data }): Promise<BalanceAdjustment> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -229,7 +229,7 @@ export const adjustAccountBalance = createServerFn({ method: 'POST' })
 
 /** Creates a group. No balance moves and no metric is consumed: a group is organisation. */
 export const createAccountGroup = createServerFn({ method: 'POST' })
-  .inputValidator(createAccountGroupSchema)
+  .validator(createAccountGroupSchema)
   .handler(async ({ data }): Promise<AccountGroupRow> => {
     const scope = await requireOrg()
     return createAccountGroupRow(scope, data)
@@ -242,7 +242,7 @@ const updateAccountGroupInputSchema = z.strictObject({
 
 /** Edits a group, including its parent. The one-level rule is enforced in the repository. */
 export const updateAccountGroup = createServerFn({ method: 'POST' })
-  .inputValidator(updateAccountGroupInputSchema)
+  .validator(updateAccountGroupInputSchema)
   .handler(async ({ data }): Promise<AccountGroupRow> => {
     const scope = await requireOrg()
     return updateAccountGroupRow(scope, data.groupId, data.patch)
@@ -250,7 +250,7 @@ export const updateAccountGroup = createServerFn({ method: 'POST' })
 
 /** Deletes a group. Its accounts become ungrouped; none of them is touched otherwise. */
 export const deleteAccountGroup = createServerFn({ method: 'POST' })
-  .inputValidator(groupIdSchema)
+  .validator(groupIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteAccountGroupRow(scope, data.groupId)
@@ -258,7 +258,7 @@ export const deleteAccountGroup = createServerFn({ method: 'POST' })
 
 /** Replaces a group's membership wholesale, in the order given. */
 export const setAccountGroupMembers = createServerFn({ method: 'POST' })
-  .inputValidator(setGroupMembersSchema)
+  .validator(setGroupMembersSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await setAccountGroupMembersRow(scope, data.groupId, data.accountIds)
@@ -266,7 +266,7 @@ export const setAccountGroupMembers = createServerFn({ method: 'POST' })
 
 /** Changes membership only; no ledger batch or quota applies. */
 export const moveAccountToGroup = createServerFn({ method: 'POST' })
-  .inputValidator(moveAccountToGroupSchema)
+  .validator(moveAccountToGroupSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await moveAccountToGroupRow(scope, data)
@@ -274,7 +274,7 @@ export const moveAccountToGroup = createServerFn({ method: 'POST' })
 
 /** Re-parents a group and rewrites the run it lands in, as one repository write. */
 export const moveAccountGroup = createServerFn({ method: 'POST' })
-  .inputValidator(moveAccountGroupSchema)
+  .validator(moveAccountGroupSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await moveAccountGroupRow(scope, data)
@@ -282,7 +282,7 @@ export const moveAccountGroup = createServerFn({ method: 'POST' })
 
 /** Rewrites the group order. */
 export const reorderAccountGroups = createServerFn({ method: 'POST' })
-  .inputValidator(reorderAccountGroupsSchema)
+  .validator(reorderAccountGroupsSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await reorderAccountGroupsRow(scope, data.ids)

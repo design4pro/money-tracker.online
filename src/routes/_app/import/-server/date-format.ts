@@ -31,7 +31,7 @@ export const suggestDateFormatSchema = z.strictObject({
 })
 
 export const suggestImportDateFormat = createServerFn({ method: 'POST' })
-  .inputValidator(suggestDateFormatSchema)
+  .validator(suggestDateFormatSchema)
   .handler(async ({ data }): Promise<DateFormatSuggestion> => {
     await requireOrg()
     return suggestDateFormat(data.samples)

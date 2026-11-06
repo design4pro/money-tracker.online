@@ -51,7 +51,7 @@ export interface LoanDetail {
 }
 
 export const loadLoans = createServerFn({ method: 'GET' })
-  .inputValidator(listInputSchema)
+  .validator(listInputSchema)
   .handler(async ({ data }): Promise<LoansOverview> => {
     const scope = await requireOrg()
     const book =
@@ -63,7 +63,7 @@ export const loadLoans = createServerFn({ method: 'GET' })
   })
 
 export const loadObligationCalendar = createServerFn({ method: 'GET' })
-  .inputValidator(
+  .validator(
     z.strictObject({
       book: z.enum(['business', 'personal', 'all']).optional(),
     }),
@@ -76,7 +76,7 @@ export const loadObligationCalendar = createServerFn({ method: 'GET' })
   })
 
 export const loadLoanDetail = createServerFn({ method: 'GET' })
-  .inputValidator(loanIdSchema)
+  .validator(loanIdSchema)
   .handler(async ({ data }): Promise<LoanDetail> => {
     const scope = await requireOrg()
     const loan = await getLoanRow(scope, data.loanId).catch(rethrowAsNotFound)
@@ -91,7 +91,7 @@ export const loadLoanDetail = createServerFn({ method: 'GET' })
   })
 
 export const markLoanInstalmentPaid = createServerFn({ method: 'POST' })
-  .inputValidator(markInstalmentPaidSchema)
+  .validator(markInstalmentPaidSchema)
   .handler(async ({ data }): Promise<InstalmentView> => {
     const scope = await requireOrg()
     await getLoanRow(scope, data.loanId).catch(rethrowAsNotFound)
@@ -119,7 +119,7 @@ export interface InstalmentCandidates {
  * automatically.
  */
 export const loadInstalmentCandidates = createServerFn({ method: 'GET' })
-  .inputValidator(candidatesSchema)
+  .validator(candidatesSchema)
   .handler(async ({ data }): Promise<InstalmentCandidates> => {
     const scope = await requireOrg()
     const loan = await getLoanRow(scope, data.loanId).catch(rethrowAsNotFound)

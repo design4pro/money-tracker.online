@@ -47,7 +47,7 @@ async function filesBucket(): Promise<R2Bucket> {
 
 /** A transaction's receipts in upload order, empty when it has none. */
 export const listAttachments = createServerFn({ method: 'GET' })
-  .inputValidator(transactionIdSchema)
+  .validator(transactionIdSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<AttachmentDto>> => {
     const scope = await requireOrg()
     return listAttachmentRows(scope, data)
@@ -61,7 +61,7 @@ export const listAttachments = createServerFn({ method: 'GET' })
  * status code. The dropzone posts as many times as somebody dropped files.
  */
 export const uploadAttachment = createServerFn({ method: 'POST' })
-  .inputValidator((data: FormData) => data)
+  .validator((data: FormData) => data)
   .handler(async ({ data }): Promise<AttachmentDto> => {
     const scope = await requireOrg()
     const upload = await readAttachmentUpload(data)
@@ -77,7 +77,7 @@ export const uploadAttachment = createServerFn({ method: 'POST' })
 
 /** Removes one receipt: the row, then the object. Returns the row that went, without its R2 key. */
 export const deleteAttachment = createServerFn({ method: 'POST' })
-  .inputValidator(attachmentIdSchema)
+  .validator(attachmentIdSchema)
   .handler(async ({ data }): Promise<AttachmentDto> => {
     const scope = await requireOrg()
     return toAttachmentDto(

@@ -3,7 +3,6 @@ import { expect, test } from './support/console'
 // The axe-core meter defect is corrected in `support/axe-defects.ts` rather than here, because
 // `.github/a11y/axe-scan.mjs` scans the same pages and has to forgive the same node. Two copies of
 // a three-condition correction with a 2027 re-check date would drift on the first edit.
-import { RAC_METER_FALLBACK_ROLE } from './support/axe-defects'
 // The scan itself — the tag list, the correction and the failure formatting — is shared with
 // `states.spec.ts`, which holds the same bar over the empty screens.
 import { expectNoWcagViolations } from './support/axe-scan'
@@ -125,20 +124,14 @@ test.describe('accessibility', () => {
   })
 
   /**
-   * The positive half of the correction in `isMeterFallbackRoleArtefact`.
+   * The credit meter on `/accounts` is a `role="meter"` with a sentence as its name.
    *
-   * Dropping an axe node earns nothing unless the behaviour it was pointing at is asserted
-   * somewhere. So this holds the three facts the correction rests on, and holds them harder than
-   * the rule it replaces: the fallback list is present, it resolves to **`meter`** rather than
-   * decaying to `progressbar` or to nothing, and the value attributes it carries produce the
-   * whole sentence as the accessible name — "zł 1,692.11 of zł 10,000.00 used, 17%", not "17%".
+   * `react-aria-components` 1.22.1 emits a single `meter` token. The axe-core 4.13 fallback-list
+   * defect in `isMeterFallbackRoleArtefact` therefore matches nothing on this page; this case
+   * still asserts the reader-facing facts that correction used to stand in for.
    *
-   * On Chromium it goes further and reads the browser's *own* accessibility tree over CDP, which
-   * is what a screen reader consumes; on WebKit, where no such protocol is reachable from here,
-   * Playwright's ARIA resolver is the available answer and it agrees.
-   *
-   * If React Aria ever stops emitting the list, or a browser stops resolving it, this fails —
-   * which is the signal to delete the correction rather than to widen it.
+   * On Chromium it reads the browser's *own* accessibility tree over CDP; on WebKit, Playwright's
+   * ARIA resolver is the available answer and it agrees.
    */
   test('the credit meter on accounts announces as a meter, with its whole sentence as the name', async ({
     browser,
@@ -153,38 +146,35 @@ test.describe('accessibility', () => {
     )
 
     try {
-      const fallbackNodes = page.locator(`[role="${RAC_METER_FALLBACK_ROLE}"]`)
-      const fallbackCount = await fallbackNodes.count()
+      const meters = page.getByRole('meter')
+      const meterCount = await meters.count()
       expect(
-        fallbackCount,
+        meterCount,
         'the seeded demo workspace has at least one credit account with a limit',
       ).toBeGreaterThan(0)
 
-      // Every one of them resolves to `meter`, and none of them to `progressbar`: the second
-      // token is the fallback for an agent that lacks the first, and no browser we ship to needs
-      // it any more. `toHaveCount` on both is what makes that a claim rather than an assumption.
-      await expect(page.getByRole('meter')).toHaveCount(fallbackCount)
       await expect(page.getByRole('progressbar')).toHaveCount(0)
 
-      const meter = page.getByRole('meter').first()
+      const meter = meters.first()
       await expect(meter).toHaveAccessibleName(/ of .* used, \d+%$/)
       await expect(meter).toHaveAttribute('aria-valuenow', /^[\d.]+$/)
       await expect(meter).toHaveAttribute('aria-valuemin', '0')
       await expect(meter).toHaveAttribute('aria-valuemax', '1')
+      await expect(meter).toHaveAttribute('role', 'meter')
 
       if (testInfo.project.name === 'chromium') {
         const cdp = await context.newCDPSession(page)
         try {
           await cdp.send('Accessibility.enable')
           const { nodes } = await cdp.send('Accessibility.getFullAXTree')
-          const meters = nodes.filter(
+          const axMeters = nodes.filter(
             (axNode) => axNode.role?.value === 'meter',
           )
           expect(
-            meters.length,
-            "Chrome's own accessibility tree computes the fallback list as role=meter",
-          ).toBe(fallbackCount)
-          expect(meters[0]?.name?.value).toMatch(/ of .* used, \d+%$/)
+            axMeters.length,
+            "Chrome's own accessibility tree computes the node as role=meter",
+          ).toBe(meterCount)
+          expect(axMeters[0]?.name?.value).toMatch(/ of .* used, \d+%$/)
         } finally {
           await cdp.detach()
         }

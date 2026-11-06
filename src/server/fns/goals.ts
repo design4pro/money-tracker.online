@@ -85,7 +85,7 @@ const listInputSchema = z.strictObject({
  * meters is a second chance to paint a page with the numbers missing.
  */
 export const loadGoals = createServerFn({ method: 'GET' })
-  .inputValidator(listInputSchema)
+  .validator(listInputSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<GoalSummary>> => {
     const scope = await requireOrg()
     return summariseGoals({
@@ -119,7 +119,7 @@ export interface GoalDetail {
  * loaded for the table beneath it, so computing it is cheaper than reading a cache of it would be.
  */
 export const loadGoalDetail = createServerFn({ method: 'GET' })
-  .inputValidator(goalIdSchema)
+  .validator(goalIdSchema)
   .handler(async ({ data }): Promise<GoalDetail> => {
     const scope = await requireOrg()
     const today = serverToday()
@@ -164,7 +164,7 @@ export const loadGoalDetail = createServerFn({ method: 'GET' })
  * query nobody asked for. The dialog fetches it when it mounts.
  */
 export const loadContributionCandidates = createServerFn({ method: 'GET' })
-  .inputValidator(goalIdSchema)
+  .validator(goalIdSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<Transaction>> => {
     const scope = await requireOrg()
     return listContributionCandidatesRow(scope, data.goalId)
@@ -176,7 +176,7 @@ export const loadContributionCandidates = createServerFn({ method: 'GET' })
 
 /** Creates a goal. The quota is enforced inside the repository, before the insert. */
 export const createGoal = createServerFn({ method: 'POST' })
-  .inputValidator(createGoalSchema)
+  .validator(createGoalSchema)
   .handler(async ({ data }): Promise<{ readonly goalId: string }> => {
     const scope = await requireOrg()
     const goal = await createGoalRow(scope, data)
@@ -190,7 +190,7 @@ const updateInputSchema = z.strictObject({
 
 /** Edits a goal. The repository re-derives the status, because a lowered target can reach one. */
 export const updateGoal = createServerFn({ method: 'POST' })
-  .inputValidator(updateInputSchema)
+  .validator(updateInputSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await updateGoalRow(scope, data.goalId, data.patch)
@@ -198,7 +198,7 @@ export const updateGoal = createServerFn({ method: 'POST' })
 
 /** Takes a goal out of the list. Every contribution link it holds stays exactly as it was. */
 export const archiveGoal = createServerFn({ method: 'POST' })
-  .inputValidator(goalIdSchema)
+  .validator(goalIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await archiveGoalRow(scope, data.goalId)
@@ -206,7 +206,7 @@ export const archiveGoal = createServerFn({ method: 'POST' })
 
 /** Puts an archived goal back, at whatever status its links say it is now. */
 export const restoreGoal = createServerFn({ method: 'POST' })
-  .inputValidator(goalIdSchema)
+  .validator(goalIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await restoreGoalRow(scope, data.goalId)
@@ -214,7 +214,7 @@ export const restoreGoal = createServerFn({ method: 'POST' })
 
 /** Deletes a goal and its links. The transactions they pointed at are untouched. */
 export const deleteGoal = createServerFn({ method: 'POST' })
-  .inputValidator(goalIdSchema)
+  .validator(goalIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteGoalRow(scope, data.goalId)
@@ -238,7 +238,7 @@ export interface ContributionResult {
  * module docblock. Until `21-S1` installs a dispatcher it goes to a documented no-op.
  */
 export const addGoalContribution = createServerFn({ method: 'POST' })
-  .inputValidator(contributionSchema)
+  .validator(contributionSchema)
   .handler(async ({ data }): Promise<ContributionResult> => {
     const scope = await requireOrg()
     const totals = await addContributionRow(scope, data)
@@ -260,7 +260,7 @@ export const addGoalContribution = createServerFn({ method: 'POST' })
 
 /** Takes a transaction back out of a goal. The transaction itself survives. */
 export const removeGoalContribution = createServerFn({ method: 'POST' })
-  .inputValidator(contributionSchema)
+  .validator(contributionSchema)
   .handler(async ({ data }): Promise<ContributionResult> => {
     const scope = await requireOrg()
     return { ...(await removeContributionRow(scope, data)) }
@@ -273,7 +273,7 @@ export const removeGoalContribution = createServerFn({ method: 'POST' })
  * adjusting it, so pressing it twice says the same thing as pressing it once.
  */
 export const recomputeGoalProgress = createServerFn({ method: 'POST' })
-  .inputValidator(goalIdSchema)
+  .validator(goalIdSchema)
   .handler(async ({ data }): Promise<ContributionResult> => {
     const scope = await requireOrg()
     return { ...(await recomputeContributedRow(scope, data.goalId)) }

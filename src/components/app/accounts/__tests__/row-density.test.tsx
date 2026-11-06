@@ -124,7 +124,7 @@ describe('an account row', () => {
       </ul>,
     )
 
-    const meter = container.querySelector('[role="meter progressbar"]')
+    const meter = container.querySelector('[role="meter"]')
     // A track capped at an arbitrary measure lands its 100% on no edge a reader can point at.
     expect(meter?.getAttribute('class') ?? '').not.toContain('max-w')
     expect(meter?.parentElement?.getAttribute('class') ?? '').not.toContain(

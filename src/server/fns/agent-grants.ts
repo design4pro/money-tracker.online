@@ -97,7 +97,7 @@ export const loadConsentPage = createServerFn({ method: 'GET' }).handler(
 )
 
 export const recordOauthGrant = createServerFn({ method: 'POST' })
-  .inputValidator(createOauthGrantSchema)
+  .validator(createOauthGrantSchema)
   .handler(async ({ data }): Promise<AgentGrantView> => {
     const scope = await requireOrg()
     const effective = await resolveLimits(scope)
@@ -108,7 +108,7 @@ export const recordOauthGrant = createServerFn({ method: 'POST' })
   })
 
 export const mintAgentPat = createServerFn({ method: 'POST' })
-  .inputValidator(mintSchema)
+  .validator(mintSchema)
   .handler(async ({ data }): Promise<MintedPat> => {
     const scope = await requireOrg()
     const effective = await resolveLimits(scope)
@@ -127,13 +127,13 @@ export const mintAgentPat = createServerFn({ method: 'POST' })
   })
 
 export const revokeAgentGrant = createServerFn({ method: 'POST' })
-  .inputValidator(revokeGrantSchema)
+  .validator(revokeGrantSchema)
   .handler(async ({ data }): Promise<AgentGrantView> => {
     return revokeGrant(await requireOrg(), data, new Date())
   })
 
 export const updateAgentGrant = createServerFn({ method: 'POST' })
-  .inputValidator(updateAgentGrantSchema)
+  .validator(updateAgentGrantSchema)
   .handler(async ({ data }): Promise<AgentGrantView> => {
     const scope = await requireOrg()
     const effective = await resolveLimits(scope)

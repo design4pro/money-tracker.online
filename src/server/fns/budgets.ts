@@ -91,7 +91,7 @@ const listInputSchema = z.strictObject({
  * meters is a second chance to paint a page with the numbers missing.
  */
 export const loadBudgets = createServerFn({ method: 'GET' })
-  .inputValidator(listInputSchema)
+  .validator(listInputSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<BudgetSummary>> => {
     const scope = await requireOrg()
     return summariseBudgets({
@@ -118,7 +118,7 @@ export interface BudgetDetail {
  * which is right for a screen somebody opened on purpose and wrong for a grid of cards.
  */
 export const loadBudgetDetail = createServerFn({ method: 'GET' })
-  .inputValidator(budgetIdSchema)
+  .validator(budgetIdSchema)
   .handler(async ({ data }): Promise<BudgetDetail> => {
     const scope = await requireOrg()
     const today = serverToday()
@@ -175,7 +175,7 @@ export const loadBudgetDetail = createServerFn({ method: 'GET' })
  * person sees after creating a budget an empty screen.
  */
 export const createBudget = createServerFn({ method: 'POST' })
-  .inputValidator(createBudgetSchema)
+  .validator(createBudgetSchema)
   .handler(async ({ data }): Promise<{ readonly budgetId: string }> => {
     const scope = await requireOrg()
     const budget = await createBudgetRow(scope, data)
@@ -199,7 +199,7 @@ const updateInputSchema = z.strictObject({
  * than something `updateBudget` does to every row it can reach.
  */
 export const updateBudget = createServerFn({ method: 'POST' })
-  .inputValidator(updateInputSchema)
+  .validator(updateInputSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await updateBudgetRow(scope, data.budgetId, data.patch)
@@ -210,7 +210,7 @@ export const updateBudget = createServerFn({ method: 'POST' })
 
 /** Takes a budget out of the list. Every period it closed stays exactly as it was. */
 export const archiveBudget = createServerFn({ method: 'POST' })
-  .inputValidator(budgetIdSchema)
+  .validator(budgetIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await archiveBudgetRow(scope, data.budgetId)
@@ -218,7 +218,7 @@ export const archiveBudget = createServerFn({ method: 'POST' })
 
 /** Puts an archived budget back. */
 export const restoreBudget = createServerFn({ method: 'POST' })
-  .inputValidator(budgetIdSchema)
+  .validator(budgetIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await restoreBudgetRow(scope, data.budgetId)
@@ -226,7 +226,7 @@ export const restoreBudget = createServerFn({ method: 'POST' })
 
 /** Deletes a budget that never closed a period. The repository refuses — with the count — if it did. */
 export const deleteBudget = createServerFn({ method: 'POST' })
-  .inputValidator(budgetIdSchema)
+  .validator(budgetIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteBudgetRow(scope, data.budgetId)
@@ -234,7 +234,7 @@ export const deleteBudget = createServerFn({ method: 'POST' })
 
 /** Replaces a `category` budget's category set, then recomputes what the open period counted. */
 export const setBudgetCategories = createServerFn({ method: 'POST' })
-  .inputValidator(setBudgetCategoriesSchema)
+  .validator(setBudgetCategoriesSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await setBudgetCategoriesRow(scope, data)
@@ -243,7 +243,7 @@ export const setBudgetCategories = createServerFn({ method: 'POST' })
 
 /** Puts transactions into a `manual` budget. A `category` budget is refused. */
 export const addBudgetTransactions = createServerFn({ method: 'POST' })
-  .inputValidator(budgetTransactionsSchema)
+  .validator(budgetTransactionsSchema)
   .handler(async ({ data }): Promise<{ readonly added: number }> => {
     const scope = await requireOrg()
     const added = await addBudgetTransactionsRow(scope, data)
@@ -253,7 +253,7 @@ export const addBudgetTransactions = createServerFn({ method: 'POST' })
 
 /** Takes transactions back out of a `manual` budget. */
 export const removeBudgetTransactions = createServerFn({ method: 'POST' })
-  .inputValidator(budgetTransactionsSchema)
+  .validator(budgetTransactionsSchema)
   .handler(async ({ data }): Promise<{ readonly removed: number }> => {
     const scope = await requireOrg()
     const removed = await removeBudgetTransactionsRow(scope, data)
@@ -263,7 +263,7 @@ export const removeBudgetTransactions = createServerFn({ method: 'POST' })
 
 /** Freezes a period's figures. `owner | admin` in a shared workspace — the repository decides. */
 export const closeBudgetPeriod = createServerFn({ method: 'POST' })
-  .inputValidator(periodKeySchema)
+  .validator(periodKeySchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await closePeriodRow(scope, data)
@@ -271,7 +271,7 @@ export const closeBudgetPeriod = createServerFn({ method: 'POST' })
 
 /** Unfreezes one, so a mistake can be corrected at source. Same gate, same reasoning. */
 export const reopenBudgetPeriod = createServerFn({ method: 'POST' })
-  .inputValidator(periodKeySchema)
+  .validator(periodKeySchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await reopenPeriodRow(scope, data)
@@ -279,7 +279,7 @@ export const reopenBudgetPeriod = createServerFn({ method: 'POST' })
 
 /** Brings the open period's stored spend up to date. Idempotent; touches no closed row. */
 export const refreshBudgetPeriods = createServerFn({ method: 'POST' })
-  .inputValidator(budgetIdSchema)
+  .validator(budgetIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     const today = serverToday()

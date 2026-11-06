@@ -60,7 +60,7 @@ const categoryIdSchema = z.strictObject({
 
 /** The whole tree in reading order: each parent followed by its own children. */
 export const listCategories = createServerFn({ method: 'GET' })
-  .inputValidator(listCategoriesSchema)
+  .validator(listCategoriesSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<Category>> => {
     const scope = await requireOrg()
     return listCategoriesRow(scope, data)
@@ -68,7 +68,7 @@ export const listCategories = createServerFn({ method: 'GET' })
 
 /** One category. An id belonging to another workspace is a `NotFoundError`, never a `403`. */
 export const getCategory = createServerFn({ method: 'GET' })
-  .inputValidator(categoryIdSchema)
+  .validator(categoryIdSchema)
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return getCategoryRow(scope, data.categoryId)
@@ -80,7 +80,7 @@ export const getCategory = createServerFn({ method: 'GET' })
 
 /** Creates a category. The depth cap and the colour inheritance are the repository's. */
 export const createCategory = createServerFn({ method: 'POST' })
-  .inputValidator(createCategorySchema)
+  .validator(createCategorySchema)
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return createCategoryRow(scope, data)
@@ -93,7 +93,7 @@ const updateCategoryInputSchema = z.strictObject({
 
 /** Edits a category. Re-parenting is {@link moveCategory}, not a patch field. */
 export const updateCategory = createServerFn({ method: 'POST' })
-  .inputValidator(updateCategoryInputSchema)
+  .validator(updateCategoryInputSchema)
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return updateCategoryRow(scope, data.categoryId, data.patch)
@@ -101,7 +101,7 @@ export const updateCategory = createServerFn({ method: 'POST' })
 
 /** Archives a category and everything filed inside it. Reversible, and keeps every row. */
 export const archiveCategory = createServerFn({ method: 'POST' })
-  .inputValidator(categoryIdSchema)
+  .validator(categoryIdSchema)
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return archiveCategoryRow(scope, data.categoryId)
@@ -109,7 +109,7 @@ export const archiveCategory = createServerFn({ method: 'POST' })
 
 /** Restores one category — never its subtree. See the repository for why. */
 export const restoreCategory = createServerFn({ method: 'POST' })
-  .inputValidator(categoryIdSchema)
+  .validator(categoryIdSchema)
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return restoreCategoryRow(scope, data.categoryId)
@@ -117,7 +117,7 @@ export const restoreCategory = createServerFn({ method: 'POST' })
 
 /** Deletes a category that was never used. The repository refuses — with the count — if it was. */
 export const deleteCategory = createServerFn({ method: 'POST' })
-  .inputValidator(categoryIdSchema)
+  .validator(categoryIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteCategoryRow(scope, data.categoryId)
@@ -125,7 +125,7 @@ export const deleteCategory = createServerFn({ method: 'POST' })
 
 /** Rewrites the display order of one sibling run. One statement, no amount moves. */
 export const reorderCategories = createServerFn({ method: 'POST' })
-  .inputValidator(reorderCategoriesSchema)
+  .validator(reorderCategoriesSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await reorderCategoriesRow(scope, data.ids)
@@ -133,7 +133,7 @@ export const reorderCategories = createServerFn({ method: 'POST' })
 
 /** Re-parents a category. The refusal that names both rows comes from the repository. */
 export const moveCategory = createServerFn({ method: 'POST' })
-  .inputValidator(moveCategorySchema)
+  .validator(moveCategorySchema)
   .handler(async ({ data }): Promise<Category> => {
     const scope = await requireOrg()
     return moveCategoryRow(scope, data)
@@ -141,7 +141,7 @@ export const moveCategory = createServerFn({ method: 'POST' })
 
 /** Applies the standard set. Idempotent by slug; ordinary rows, not system rows. */
 export const seedStandardCategories = createServerFn({ method: 'POST' })
-  .inputValidator(seedStandardCategoriesSchema)
+  .validator(seedStandardCategoriesSchema)
   .handler(async ({ data }): Promise<StandardSetResult> => {
     const scope = await requireOrg()
     return seedStandardCategoriesRow(scope, data)
