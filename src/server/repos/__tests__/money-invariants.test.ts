@@ -86,8 +86,13 @@ import { createLogger, createMemorySink } from '#/server/observability/logger'
 import {
   AccountCurrencyLockedError,
   adjustAccountBalance,
+  getAccount,
   updateAccount,
 } from '../accounts'
+import { rebuildAccountBalance } from '../account-balances'
+import { createPatGrant } from '../agent-grants'
+import { invokeMcpTool } from '#/server/mcp/tools'
+import { MemoryMcpKv } from '#/server/mcp/kv'
 import { touchLedgerAccount } from '../base'
 import { budgetSpend, getBudget } from '../budgets'
 import {
@@ -149,6 +154,7 @@ import { convertExpectedAmount } from '#/server/transactions/display-expected'
 import { computeRefAmount } from '#/server/transactions/ref-amount'
 import {
   createTransaction,
+  deleteTransaction,
   findAccountCurrencyMismatches,
   getTransaction,
   updateTransaction,
@@ -1158,6 +1164,87 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
     expect(
       after.find((row) => row.periodStart === second.periodStart)?.status,
     ).not.toBe('paid')
+  })
+
+  it('deletes a settled receipt without recomputing ref_amount_minor or the expected amount', async () => {
+    // docs/MONEY.md §3.1: ref_amount_minor moves only when that row’s amount, currency or
+    // booked_on is written, or on a whole-workspace re-denomination. Deleting a different
+    // receipt is neither. expected_amount_minor is the plan and is not a conversion.
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 250_000,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      accountId: 'acc-a',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-03-15',
+      ahead: 0,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-03-15',
+    )
+    const settled = periods.at(0)
+    const otherPeriod = periods.at(1)
+    if (settled === undefined || otherPeriod === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-receipt',
+      refAmountMinor: 4_999,
+      bookedOn: settled.dueOn,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-untouched',
+      refAmountMinor: 8_888,
+      bookedOn: '2026-03-02',
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+      transactionId: 'txn-receipt',
+    })
+    const [untouchedBefore] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, 'txn-untouched'))
+
+    budgetExecuted.length = 0
+    await deleteTransaction({
+      scope: world.scope,
+      policies: EVERYTHING,
+      id: 'txn-receipt',
+    })
+
+    const [untouchedAfter] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, 'txn-untouched'))
+    expect(untouchedAfter).toEqual(untouchedBefore)
+    expect(untouchedAfter?.refAmountMinor).toBe(8_888)
+    expect(untouchedAfter?.rateE10).toBe(10_000_000_000)
+    const after = await listSeriesPeriods(world.scope, series.id, '2026-03-15')
+    expect(
+      after.find((row) => row.periodStart === settled.periodStart),
+    ).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+      expectedAmountMinor: 250_000,
+    })
+    expect(
+      after.find((row) => row.periodStart === otherPeriod.periodStart),
+    ).toEqual(otherPeriod)
+    expect(
+      budgetExecuted.some((query) => query.includes('exchange_rates')),
+    ).toBe(false)
+    expect(
+      budgetExecuted.some((query) => /update "transactions"/i.test(query)),
+    ).toBe(false)
   })
 })
 
@@ -3219,5 +3306,49 @@ describe('16 — dashboard whole-month plan never joins actuals', () => {
         amountMinor: planned.refAmountMinor,
       },
     ])
+  })
+})
+
+describe('MCP write tools keep balances equal to the rebuilt ledger', () => {
+  it('N synthetic create_transaction calls match rebuildAccountBalance', async () => {
+    await scope.db.insert(organizationCurrencies).values({
+      organizationId: 'org-a',
+      currencyCode: 'PLN',
+      isBase: true,
+      addedAt: new Date('2026-03-15T10:00:00.000Z'),
+    })
+    const minted = await createPatGrant(
+      scope,
+      {
+        name: 'mcp writer',
+        scopes: ['transactions:write', 'transactions:read'],
+        environment: 'stg',
+      },
+      new Date('2026-03-15T10:00:00.000Z'),
+    )
+    const ctx = {
+      scopes: ['transactions:write', 'transactions:read'] as const,
+      scope,
+      grantId: minted.grant.id,
+      userId: scope.ctx.userId,
+      kv: new MemoryMcpKv(),
+    }
+    const amounts = [11_00, 22_00, 33_00] as const
+    for (const amountMinor of amounts) {
+      const result = await invokeMcpTool(ctx, 'create_transaction', {
+        accountId: 'acc-a',
+        direction: 'expense',
+        amountMinor,
+        bookedOn: BOOKED_ON,
+        policies: EVERYTHING,
+      })
+      expect(result.ok).toBe(true)
+    }
+    await rebuildAccountBalance(scope.db, 'acc-a')
+    const account = await getAccount(scope, 'acc-a')
+    const expected =
+      (account.initialBalanceMinor as number) -
+      amounts.reduce((sum, amount) => sum + amount, 0)
+    expect(account.currentBalanceMinor).toBe(expected)
   })
 })

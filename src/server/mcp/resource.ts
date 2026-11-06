@@ -5,6 +5,7 @@
  * and `WWW-Authenticate` challenges name the same value.
  */
 
+import { AUTH_BASE_PATH } from '#/server/auth/config'
 import { appUrl } from '#/server/auth/env'
 
 /** Streamable HTTP mount. The `agents` package defaults to `/mcp`; this product does not. */
@@ -19,5 +20,16 @@ export function mcpResourceMetadataUrl(): string {
 }
 
 export function jwksUrl(): string {
-  return `${appUrl()}/api/auth/jwks`
+  return `${mcpAccessTokenIssuer()}/jwks`
+}
+
+/**
+ * Issuer written on oauth-provider access tokens.
+ *
+ * Better Auth's context base URL is `appUrl()` plus `AUTH_BASE_PATH`. The
+ * provider copies that string into `iss`, and authorization-server metadata
+ * publishes the same value. The origin alone does not verify.
+ */
+export function mcpAccessTokenIssuer(): string {
+  return `${appUrl()}${AUTH_BASE_PATH}`
 }

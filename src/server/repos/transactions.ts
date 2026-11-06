@@ -34,6 +34,7 @@
  */
 
 import {
+  and,
   count,
   eq,
   isNotNull,
@@ -58,12 +59,15 @@ import {
   categories,
   loanInstalments,
   payees,
+  recurringLinks,
+  recurringPeriods,
   transactions,
 } from '#/server/db/schema'
 
 import {
   assertScopedWrite,
   createTenantTableAccess,
+  runTenantBatch,
   tenantFilter,
   touchLedgerAccount,
 } from './base'
@@ -87,6 +91,14 @@ import type { KeyedTenantTable, TenantScope } from './base'
  * future column addition has to remember.
  */
 const transactionAccess = createTenantTableAccess(transactions, 'transaction')
+const recurringPeriodAccess = createTenantTableAccess(
+  recurringPeriods,
+  'recurring period',
+)
+const recurringLinkAccess = createTenantTableAccess(
+  recurringLinks,
+  'recurring link',
+)
 
 /* -------------------------------------------------------------------------- */
 /* Policies                                                                    */
@@ -743,6 +755,11 @@ export interface DeleteTransactionArgs extends TransactionScopeArgs {
  * plan `10`'s. Both refuse with a {@link ConflictError} naming what to do first, rather than
  * cascading a deletion the person did not ask for.
  * A paid loan instalment must likewise be reverted before its settling transaction is deleted.
+ * A paid recurring period is the opposite: the delete releases it. `settled_transaction_id` is
+ * `ON DELETE SET NULL`, and `recurring_periods_paid_requires_transaction_check` rejects that while
+ * `status` is still `paid`, so the period is returned to `upcoming` in the same batch as the
+ * delete. The loan `CHECK` is the same shape and is not released — the existing `notExists` stays
+ * on every statement, and a match is still {@link ConflictError}.
  */
 export async function deleteTransaction(
   args: DeleteTransactionArgs,
@@ -781,13 +798,34 @@ export async function deleteTransaction(
     notExists(paidInstalments),
   ]
   assertScopedWrite(predicates)
+  // Repeated on the period and link writes so a paid instalment matches nothing there either.
+  // A batch that deleted zero rows must not have released a period on the way past the refusal.
+  const loanStillBlocks = notExists(paidInstalments)
+  const now = new Date()
 
-  const rows = await scope.db
-    .delete(transactions)
-    .where(tenantFilter(scope, transactions, ...predicates))
-    .returning({ accountId: transactions.accountId })
+  const [, , deletedRows] = await runTenantBatch(scope, [
+    recurringPeriodAccess.updateWhereStatement(
+      scope,
+      and(
+        eq(recurringPeriods.settledTransactionId, id),
+        eq(recurringPeriods.status, 'paid'),
+        loanStillBlocks,
+      ) as SQL,
+      {
+        status: 'upcoming',
+        settledTransactionId: null,
+        updatedAt: now,
+      },
+    ),
+    recurringLinkAccess.updateWhereStatement(
+      scope,
+      and(eq(recurringLinks.transactionId, id), loanStillBlocks) as SQL,
+      { status: 'unlinked', updatedAt: now },
+    ),
+    transactionAccess.removeWhereStatement(scope, and(...predicates) as SQL),
+  ])
 
-  const deleted = rows.at(0)
+  const deleted = deletedRows.at(0)
   if (deleted === undefined) {
     const [bound] = await paidInstalments.limit(1)
     if (bound !== undefined) {

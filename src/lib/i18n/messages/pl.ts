@@ -1702,6 +1702,78 @@ const messages = {
     'Dwupoziomowe drzewo, do którego trafia każdy wpis.',
   'settings.payees.description':
     'Komu trafiły pieniądze oraz nazwy, które import ma z nimi scalać.',
+  'settings.agents.title': 'Połączone agenty',
+  'settings.agents.subtitle':
+    'Tokeny i aplikacje, które mogą czytać albo zmieniać dane tej przestrzeni.',
+  'settings.agents.empty':
+    'Żaden agent nie ma jeszcze dostępu do tej przestrzeni.',
+  'settings.agents.mcpUrl': 'Adres MCP',
+  'settings.agents.createToken': 'Utwórz token osobisty',
+  'settings.agents.createTitle': 'Utwórz token osobisty',
+  'settings.agents.createSubmit': 'Utwórz token',
+  'settings.agents.tokenName': 'Nazwa',
+  'settings.agents.scopesLabel': 'Dostęp',
+  'settings.agents.tokenOnce':
+    'Skopiuj ten token teraz. Nie pokażemy go drugi raz. Traktuj go jak hasło.',
+  'settings.agents.kind.pat': 'Token osobisty',
+  'settings.agents.kind.oauth': 'Aplikacja OAuth',
+  'settings.agents.revoke': 'Cofnij',
+  'settings.agents.revoke.action': 'Cofnij: {name}',
+  'settings.agents.revoke.title': 'Cofnąć dostęp: {name}?',
+  'settings.agents.revoke.body':
+    'Następne wywołanie narzędzia z tym uprawnieniem się nie uda. Wiersze, które już zapisało, zostają.',
+  'settings.agents.revoke.confirm': 'Cofnij dostęp',
+  'settings.agents.revoked': 'Dostęp dla {name} został cofnięty.',
+  'settings.agents.edit': 'Edytuj ustawienia',
+  'settings.agents.edit.action': 'Edytuj ustawienia: {name}',
+  'settings.agents.edit.title': 'Ustawienia: {name}',
+  'settings.agents.edit.saved': 'Dostęp dla {name} został zaktualizowany.',
+  'settings.agents.edit.scopesRequired':
+    'Wybierz co najmniej jedno uprawnienie.',
+  'settings.agents.locked':
+    'Dostęp agentów jest w planach Plus i Household. Plan bezpłatny go nie obejmuje.',
+  'settings.agents.locked.cta': 'Zobacz plany',
+  'settings.agents.membersOnly':
+    'Tylko właściciel albo administrator może podłączyć agenta.',
+  'settings.agents.error.title': 'Nie udało się wczytać połączonych agentów',
+  'settings.agents.column.name': 'Nazwa',
+  'settings.agents.column.kind': 'Rodzaj',
+  'settings.agents.column.scopes': 'Dostęp',
+  'settings.agents.column.lastUsed': 'Ostatnio użyty',
+  'settings.agents.column.actions': 'Działania',
+  'settings.agents.neverUsed': 'Nigdy',
+  'settings.agents.list.label': 'Uprawnienia z dostępem do tej przestrzeni',
+  'settings.agents.scope.accounts.read': 'Odczyt kont',
+  'settings.agents.scope.accounts.write': 'Tworzenie i zmiana kont',
+  'settings.agents.scope.accounts.delete': 'Usuwanie kont',
+  'settings.agents.scope.transactions.read': 'Odczyt wpisów',
+  'settings.agents.scope.transactions.write': 'Tworzenie i zmiana wpisów',
+  'settings.agents.scope.transactions.delete': 'Usuwanie wpisów',
+  'settings.agents.scope.categories.read': 'Odczyt kategorii',
+  'settings.agents.scope.categories.write': 'Tworzenie i zmiana kategorii',
+  'settings.agents.scope.categories.delete': 'Usuwanie kategorii',
+  'settings.agents.scope.payees.read': 'Odczyt odbiorców',
+  'settings.agents.scope.payees.write': 'Tworzenie i zmiana odbiorców',
+  'settings.agents.scope.payees.delete': 'Usuwanie odbiorców',
+  'settings.agents.scope.recurring.read': 'Odczyt cykli',
+  'settings.agents.scope.recurring.write': 'Tworzenie i zmiana cykli',
+  'settings.agents.scope.recurring.delete': 'Usuwanie cykli',
+  'settings.agents.scope.budgets.read': 'Odczyt budżetów',
+  'settings.agents.scope.budgets.write': 'Tworzenie i zmiana budżetów',
+  'settings.agents.scope.budgets.delete': 'Usuwanie budżetów',
+  'oauth.consent.title': 'Zezwolić aplikacji {clientName}?',
+  'oauth.consent.body':
+    'Ta aplikacja prosi o dostęp do domu {workspaceName}. Nie zobaczy żadnej innej przestrzeni.',
+  'oauth.consent.requested': 'Wybierz dostęp',
+  'oauth.consent.scopeHint':
+    'Odczyt jest włączony. Tworzenie, zmiana i usuwanie zostają wyłączone, dopóki ich nie włączysz.',
+  'oauth.consent.revokeHint':
+    'Możesz to później cofnąć w Ustawieniach → Połączone agenty.',
+  'oauth.consent.allow': 'Zezwól',
+  'oauth.consent.deny': 'Odrzuć',
+  'oauth.consent.error.title': 'Ta prośba o zgodę się nie dokończyła',
+  'oauth.consent.missingClient':
+    'W tym linku zgody brakuje aplikacji, której dotyczy. Wróć i połącz ponownie.',
 
   /* -- Plans and billing -------------------------------------------------- */
   'plans.free.name': 'Bezpłatny',
@@ -1729,8 +1801,11 @@ const messages = {
   'plans.feature.household.roles':
     'Właściciele i administratorzy decydują, kto co zmienia',
   'plans.feature.household.storage': 'Pięć gigabajtów na paragony',
-  'plans.feature.mcp':
-    'Agenci mogą czytać i zmieniać dane tej przestrzeni przez MCP',
+  'plans.feature.mcp': 'Podłącz agenty przez MCP',
+  'mcp.preview.delete.transaction': 'Usunąć wpis {id}?',
+  'mcp.preview.delete.category': 'Usunąć kategorię {id}?',
+  'mcp.preview.delete.payee': 'Usunąć odbiorcę {id}?',
+  'mcp.preview.delete.recurring': 'Usunąć cykl {id}?',
   'plans.interval.monthly': 'Miesięcznie',
   'plans.interval.yearly': 'Rocznie',
   'plans.price.monthly': '{amount} miesięcznie',

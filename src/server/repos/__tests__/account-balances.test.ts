@@ -37,6 +37,7 @@ import { runWithLedgerBatch, setLedgerBatchPorts } from '#/server/ledger/batch'
 
 import { adjustAccountBalance } from '../accounts'
 import { rebuildAccountBalance } from '../account-balances'
+import { sqliteBatchCallback } from './db-harness'
 import { createScope } from '../scope'
 import {
   createTransaction,
@@ -86,8 +87,9 @@ function openTestDb(): Database {
     return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
   }
 
-  return drizzle((query, params, method) =>
-    Promise.resolve(one(query, params, method)),
+  return drizzle(
+    (query, params, method) => Promise.resolve(one(query, params, method)),
+    sqliteBatchCallback(sqlite),
   )
 }
 

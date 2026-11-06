@@ -19,6 +19,7 @@ import { nanoid } from 'nanoid'
 
 import { authSchema } from '#/server/db/auth-schema'
 import { negotiateEmailLocale } from '#/server/fns/locale'
+import { MCP_ORGANIZATION_CLAIM } from '#/server/mcp/organization-claim'
 import { loggerFromEnv } from '#/server/observability/logger'
 import { getDb } from './db'
 import { createAuthEmailer } from './email'
@@ -40,6 +41,7 @@ import {
   DISABLED_ORGANIZATION_PATHS,
   adminOptions,
 } from './permissions'
+import { rejectKvOnlyOauthSession } from './oauth-session-guard'
 import { createKvSecondaryStorage } from './secondary-storage'
 
 import type { Locale } from '#/lib/i18n'
@@ -47,6 +49,23 @@ import type { BetterAuthOptions, betterAuth } from 'better-auth'
 
 /** Where the auth routes are mounted. The browser client in `src/lib/auth-client.ts` matches it. */
 export const AUTH_BASE_PATH = '/api/auth'
+
+/**
+ * Workspace pinned on the session. Empty and missing are the same: no
+ * reference id, so a token is not bound to a workspace the query named.
+ *
+ * The OAuth callback's session type does not list `activeOrganizationId`.
+ * The organization plugin still sets it on the object, which is what the
+ * issued token's `org_id` claim is read from.
+ */
+function organizationIdFromAuthSession(session: unknown): string | undefined {
+  if (typeof session !== 'object' || session === null) return undefined
+  if (!('activeOrganizationId' in session)) return undefined
+  const value = session.activeOrganizationId
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
 
 /**
  * Which language to write an auth email in.
@@ -161,6 +180,8 @@ export function authOptions(): BetterAuthOptions {
        * Dual-write to D1 as well as KV. `@better-auth/mcp` (OAuth Provider) refuses to
        * start when `secondaryStorage` is set and this is unset: authorization codes bind
        * to a session row. KV remains the hot read (ADR 0011); this copy is for OAuth.
+       * A session written before this flag has no row. `rejectKvOnlyOauthSession` signs
+       * that session out at the OAuth door instead of copying the KV JSON into D1.
        */
       storeSessionInDatabase: true,
       /**
@@ -257,6 +278,27 @@ export function authOptions(): BetterAuthOptions {
         resource: `${appUrl()}/api/mcp`,
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        // The library default is `web`, which rejects loopback http. `infer`
+        // records `native` when a redirect is http on exact localhost,
+        // 127.0.0.1, or [::1], or uses a private-use scheme. Every other
+        // omitted registration stays `web`, and a sent application_type is kept.
+        clientRegistrationDefaultApplicationType: 'infer',
+        // Product scopes stay off this provider. Clients send the OIDC set;
+        // the person chooses `resource:verb` on `/consent`. The reference id
+        // is the workspace that consent belongs to, read from the session.
+        // `shouldRedirect` stays false: the active workspace is already on
+        // the session, so authorize must not detour through another page.
+        // `page` is required by the option and is never requested.
+        postLogin: {
+          page: '/consent',
+          consentReferenceId: ({ session }) =>
+            organizationIdFromAuthSession(session),
+          shouldRedirect: () => false,
+        },
+        customAccessTokenClaims: ({ referenceId }) => {
+          if (referenceId === undefined || referenceId.length === 0) return {}
+          return { [MCP_ORGANIZATION_CLAIM]: referenceId }
+        },
       }),
     ],
 
@@ -303,8 +345,26 @@ export function authOptions(): BetterAuthOptions {
       },
     },
 
+    /**
+     * KV-only sessions are signed out on the two routes that bind an
+     * authorization code. Every other path still reads KV first.
+     */
+    hooks: {
+      before: rejectKvOnlyOauthSession,
+    },
+
     advanced: {
       cookiePrefix: 'mtr',
+      /**
+       * Cloudflare sets this header and overwrites a client-supplied value.
+       * The default `x-forwarded-for` does not resolve on a Worker, and the
+       * limiter then counts every caller in one shared per-path bucket.
+       * Listing this header replaces the default; `x-forwarded-for` stays
+       * untrusted.
+       */
+      ipAddress: {
+        ipAddressHeaders: ['cf-connecting-ip'],
+      },
       database: {
         /**
          * The same id shape as the rest of the schema: 24 URL-safe characters, generated in the
