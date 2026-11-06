@@ -3437,6 +3437,116 @@ describe('a recurring forecast cannot add another workspace’s linked amounts',
     world = await createBudgetWorld()
   })
 
+  it('releases only the caller’s paid period when that caller deletes the receipt', async () => {
+    const today = '2026-04-15'
+    const policies = {
+      planned: 'include' as const,
+      adjustments: 'include' as const,
+      transfers: 'include' as const,
+      completeness: 'any' as const,
+    }
+    const mine = await createSeries(world.scope, {
+      name: 'Duty A',
+      expectedAmountMinor: 100_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-a',
+    })
+    const theirs = await createSeries(world.otherScope, {
+      name: 'Duty B',
+      expectedAmountMinor: 777_00,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      anchorDay: 20,
+      startDate: '2026-01-20',
+      accountId: 'acc-b',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: mine.id,
+      today,
+      ahead: 0,
+    })
+    await materializeSeries(world.otherScope, {
+      seriesId: theirs.id,
+      today,
+      ahead: 0,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-a-release',
+      refAmountMinor: 100_00,
+      bookedOn: '2026-01-20',
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-b-release',
+      refAmountMinor: 777_00,
+      organizationId: 'org-b',
+      accountId: 'acc-b',
+      bookedOn: '2026-01-20',
+    })
+    const myPeriod = (await listSeriesPeriods(world.scope, mine.id, today)).at(
+      0,
+    )
+    const theirPeriod = (
+      await listSeriesPeriods(world.otherScope, theirs.id, today)
+    ).at(0)
+    if (myPeriod === undefined || theirPeriod === undefined) {
+      throw new Error('no period materialised')
+    }
+    await markPaid(world.scope, {
+      seriesId: mine.id,
+      periodStart: myPeriod.periodStart,
+      transactionId: 'txn-a-release',
+    })
+    await markPaid(world.otherScope, {
+      seriesId: theirs.id,
+      periodStart: theirPeriod.periodStart,
+      transactionId: 'txn-b-release',
+    })
+    const theirPeriodsBefore = await listSeriesPeriods(
+      world.otherScope,
+      theirs.id,
+      today,
+    )
+    const theirLinksBefore = await listSeriesLinkDetails(
+      world.otherScope,
+      theirs.id,
+    )
+
+    await deleteTransaction({
+      scope: world.scope,
+      policies,
+      id: 'txn-a-release',
+    })
+
+    expect(await listSeriesPeriods(world.otherScope, theirs.id, today)).toEqual(
+      theirPeriodsBefore,
+    )
+    expect(await listSeriesLinkDetails(world.otherScope, theirs.id)).toEqual(
+      theirLinksBefore,
+    )
+    expect(
+      (await listSeriesPeriods(world.scope, mine.id, today)).find(
+        (row) => row.periodStart === myPeriod.periodStart,
+      ),
+    ).toMatchObject({ status: 'upcoming', settledTransactionId: null })
+
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies,
+        id: 'txn-b-release',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await listSeriesPeriods(world.otherScope, theirs.id, today)).toEqual(
+      theirPeriodsBefore,
+    )
+    expect(await listSeriesLinkDetails(world.otherScope, theirs.id)).toEqual(
+      theirLinksBefore,
+    )
+  })
+
   it('sums only the caller’s linked transactions for spent this year', async () => {
     const today = '2026-04-15'
     const mine = await createSeries(world.scope, {
