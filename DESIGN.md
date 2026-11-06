@@ -731,6 +731,29 @@ width).
   `isInvalid={false}`. A new field component takes the same `errorMessage` and `isInvalid` pair and
   hands its container `isInvalid={resolveInvalid(isInvalid, errorMessage)}`.
 
+### Agent scope picker
+
+The eighteen `resource:verb` checkboxes one grant can hold. Consent, the personal-token
+dialog, and the connected-app editor all render this group (`AgentScopePicker`). A second
+screen is what made it shared.
+
+- **The shape.** A vertical `CheckboxGroup`: visible label at label size, weight bold, then one
+  checkbox per closed scope. Each row is at least 44px. The box is the shared checkbox (2px
+  radius, `border-strong` rule). There is no second size and no horizontal orientation.
+- **What a box means.** One scope, labelled with `settings.agents.scope.{resource}.{verb}`.
+  Read, write, and delete are separate. Checking write does not check delete, and checking
+  delete does not check read. The group label says what the set is for: "Access" when minting
+  or editing, "Choose access" on consent. The caller passes that label. An empty group is
+  invalid: the error sentence sits under the group, and Save or Allow does not proceed.
+- **States.** Checked, unchecked, focus (the shared ring), disabled (the plan gate hides the
+  whole editor instead of greying the boxes), invalid (the group error). Hover darkens the
+  box rule the way other checkboxes do. There is no indeterminate state.
+- **When colour is gone.** The check mark and the label text remain. The invalid state is the
+  sentence, not a red box alone.
+- **What it is not.** A summary list of scopes already stored (the agents list renders those
+  as text). It is not a consent decision by itself: Deny and Allow, and Save, stay on the
+  screen that owns the decision.
+
 ### Select and ComboBox popover
 
 - **The shape.** The listbox panel is at least as wide as its trigger, grows to its longest option

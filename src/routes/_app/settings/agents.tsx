@@ -8,6 +8,7 @@ import {
   loadAgentsPage,
   mintAgentPat,
   revokeAgentGrant,
+  updateAgentGrant,
 } from '#/server/fns/agent-grants'
 
 import { AgentsPage } from './-ui/agents-page'
@@ -62,6 +63,16 @@ function AgentsRoute() {
       }}
       onRevoke={async (grantId) => {
         await revokeAgentGrant({ data: { grantId } })
+        await router.invalidate()
+      }}
+      onUpdate={async (input) => {
+        await updateAgentGrant({
+          data: {
+            grantId: input.grantId,
+            name: input.name,
+            scopes: [...input.scopes],
+          },
+        })
         await router.invalidate()
       }}
     />

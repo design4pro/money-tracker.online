@@ -69,6 +69,16 @@ export const revokeGrantSchema = z.strictObject({
 })
 export type RevokeGrantInput = z.infer<typeof revokeGrantSchema>
 
+export const updateAgentGrantSchema = z.strictObject({
+  grantId: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(80),
+  scopes: z
+    .array(z.enum(AGENT_SCOPE_TUPLE))
+    .min(1)
+    .max(AGENT_SCOPE_VALUES.length),
+})
+export type UpdateAgentGrantInput = z.infer<typeof updateAgentGrantSchema>
+
 /** Public grant: never `token_hash`. */
 export interface AgentGrantView {
   readonly id: string
@@ -264,6 +274,34 @@ export async function revokeGrant(
   if (existing.revokedAt) return toView(existing)
   const updated = await grantAccess.requireUpdate(scope, parsed.grantId, {
     revokedAt: now,
+  })
+  return toView(updated)
+}
+
+/**
+ * Owner/admin: replace the name and the scope set on one live grant.
+ *
+ * A missing id and a revoked row are not found, and the row is left as it was.
+ * The write does not touch the secret, the client id, the grantor, the
+ * workspace, or `last_used_at`. `now` matches the other grant writes and is
+ * not stored: this update does not stamp a time.
+ */
+export async function updateAgentGrant(
+  scope: TenantScope,
+  input: UpdateAgentGrantInput,
+  now: Date,
+): Promise<AgentGrantView> {
+  void now
+  assertRole(scope, 'update an agent grant', 'admin')
+  const parsed = updateAgentGrantSchema.parse(input)
+  const existing = await grantAccess.findById(scope, parsed.grantId)
+  if (!existing || existing.revokedAt) {
+    throw new NotFoundError('agent grant', parsed.grantId)
+  }
+  const scopes = uniqueSortedScopes(parsed.scopes)
+  const updated = await grantAccess.requireUpdate(scope, parsed.grantId, {
+    name: parsed.name,
+    scopes: JSON.stringify(scopes),
   })
   return toView(updated)
 }

@@ -146,6 +146,7 @@ import {
   listGrants,
   revokeGrant,
   scopesOfGrant,
+  updateAgentGrant,
 } from '../agent-grants'
 import { insertAgentAudit, listAgentAudit } from '../agent-audit'
 import {
@@ -4411,6 +4412,129 @@ describe('agent grants cannot be listed or revoked across a workspace boundary',
     const still = await findPatGrantByTokenHash(world.db, mintedB.secret)
     expect(still?.id).toBe(mintedB.grant.id)
     expect(still?.organizationId).toBe('org-b')
+  })
+
+  it('does not update another workspace’s grant, and a member cannot update', async () => {
+    const world = await createBudgetWorld()
+    await addSecondMember(world.db)
+    const mintedB = await createPatGrant(
+      world.otherScope,
+      { name: 'B inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    const mintedA = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+
+    await expect(
+      updateAgentGrant(
+        world.scope,
+        {
+          grantId: mintedB.grant.id,
+          name: 'Taken',
+          scopes: ['transactions:write'],
+        },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    const stillB = await findPatGrantByTokenHash(world.db, mintedB.secret)
+    expect(stillB?.name).toBe('B inspector')
+    expect(scopesOfGrant(stillB!)).toEqual(['accounts:read'])
+
+    const memberScope = createScope(world.db, {
+      userId: 'user-b',
+      organizationId: 'org-a',
+      role: 'member',
+    })
+    await expect(
+      updateAgentGrant(
+        memberScope,
+        {
+          grantId: mintedA.grant.id,
+          name: 'Taken',
+          scopes: ['transactions:write'],
+        },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError)
+    expect(
+      (await findPatGrantByTokenHash(world.db, mintedA.secret))?.name,
+    ).toBe('A inspector')
+  })
+
+  it('replaces name and scopes on the live row the next tool list reads', async () => {
+    const world = await createBudgetWorld()
+    const minted = await createPatGrant(
+      world.scope,
+      { name: 'A inspector', scopes: [...scopes], environment: 'stg' },
+      budgetWorldNow,
+    )
+    const updated = await updateAgentGrant(
+      world.scope,
+      {
+        grantId: minted.grant.id,
+        name: 'Renamed',
+        scopes: ['transactions:write', 'accounts:read', 'accounts:read'],
+      },
+      budgetWorldNow,
+    )
+    expect(updated.name).toBe('Renamed')
+    expect(updated.scopes).toEqual(['accounts:read', 'transactions:write'])
+    expect(updated.lastUsedAt).toBeNull()
+    expect(updated.tokenPrefix).toBe(minted.grant.tokenPrefix)
+    const row = await findPatGrantByTokenHash(world.db, minted.secret)
+    expect(row?.id).toBe(minted.grant.id)
+    expect(listedMcpToolNames(scopesOfGrant(row!))).toContain(
+      'create_transaction',
+    )
+    expect(listedMcpToolNames(scopesOfGrant(row!))).not.toContain(
+      'confirm_delete',
+    )
+
+    const oauth = await createOauthGrant(
+      world.scope,
+      { name: 'Connector', clientId: 'client-a', scopes: ['accounts:read'] },
+      budgetWorldNow,
+    )
+    const widened = await updateAgentGrant(
+      world.scope,
+      {
+        grantId: oauth.id,
+        name: 'Connector',
+        scopes: ['transactions:delete'],
+      },
+      budgetWorldNow,
+    )
+    expect(widened.clientId).toBe('client-a')
+    expect(widened.scopes).toEqual(['transactions:delete'])
+    const loaded = await findOauthGrantByClient(world.db, {
+      userId: 'user-a',
+      clientId: 'client-a',
+      organizationId: 'org-a',
+    })
+    expect(scopesOfGrant(loaded!)).toEqual(['transactions:delete'])
+    expect(listedMcpToolNames(scopesOfGrant(loaded!))).toContain(
+      'confirm_delete',
+    )
+    expect(listedMcpToolNames(scopesOfGrant(loaded!))).toContain(
+      'delete_transaction',
+    )
+
+    await revokeGrant(world.scope, { grantId: minted.grant.id }, budgetWorldNow)
+    await expect(
+      updateAgentGrant(
+        world.scope,
+        {
+          grantId: minted.grant.id,
+          name: 'Back',
+          scopes: ['accounts:read'],
+        },
+        budgetWorldNow,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(await findPatGrantByTokenHash(world.db, minted.secret)).toBeNull()
   })
 
   it('refuses a member who tries to mint or list, and a revoked secret stops resolving', async () => {

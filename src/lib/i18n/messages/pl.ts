@@ -1724,6 +1724,12 @@ const messages = {
     'Następne wywołanie narzędzia z tym uprawnieniem się nie uda. Wiersze, które już zapisało, zostają.',
   'settings.agents.revoke.confirm': 'Cofnij dostęp',
   'settings.agents.revoked': 'Dostęp dla {name} został cofnięty.',
+  'settings.agents.edit': 'Edytuj ustawienia',
+  'settings.agents.edit.action': 'Edytuj ustawienia: {name}',
+  'settings.agents.edit.title': 'Ustawienia: {name}',
+  'settings.agents.edit.saved': 'Dostęp dla {name} został zaktualizowany.',
+  'settings.agents.edit.scopesRequired':
+    'Wybierz co najmniej jedno uprawnienie.',
   'settings.agents.locked':
     'Dostęp agentów jest w planach Plus i Household. Plan bezpłatny go nie obejmuje.',
   'settings.agents.locked.cta': 'Zobacz plany',
