@@ -93,6 +93,7 @@ describe('oauth access at the MCP door', () => {
         new Request(`${appUrl()}/api/mcp`, {
           method: 'POST',
           headers: {
+            host: new URL(appUrl()).host,
             authorization: `Bearer ${issued.accessToken}`,
             'content-type': 'application/json',
             accept: 'application/json, text/event-stream',
@@ -138,6 +139,7 @@ describe('oauth access at the MCP door', () => {
         new Request(`${appUrl()}/api/mcp`, {
           method: 'POST',
           headers: {
+            host: new URL(appUrl()).host,
             authorization: `Bearer ${issued.accessToken}`,
             'content-type': 'application/json',
             accept: 'application/json, text/event-stream',
