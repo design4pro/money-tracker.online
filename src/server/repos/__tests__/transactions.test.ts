@@ -31,6 +31,7 @@ import { buildEnvelope } from '#/server/errors/envelope'
 
 import { touchLedgerAccount } from '../base'
 import { ConflictError, NotFoundError, RateUnavailableError } from '../errors'
+import { sqliteBatchCallback } from './db-harness'
 import { createScope } from '../scope'
 import {
   applyPolicies,
@@ -82,18 +83,23 @@ function openTestDb() {
       }
     }
   }
-  return drizzle(async (query, params, method) => {
-    executed.push(query)
-    const statement = sqlite.prepare(query)
-    if (method === 'run') {
-      statement.run(...(params as Array<never>))
-      return { rows: [] }
-    }
-    const rows = statement
-      .all(...(params as Array<never>))
-      .map((row) => Object.values(row as Record<string, unknown>))
-    return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  return drizzle(
+    async (query, params, method) => {
+      executed.push(query)
+      const statement = sqlite.prepare(query)
+      if (method === 'run') {
+        statement.run(...(params as Array<never>))
+        return { rows: [] }
+      }
+      const rows = statement
+        .all(...(params as Array<never>))
+        .map((row) => Object.values(row as Record<string, unknown>))
+      return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
+    },
+    sqliteBatchCallback(sqlite, (query) => {
+      executed.push(query)
+    }),
+  )
 }
 
 const EVERYTHING: TransactionPolicies = {

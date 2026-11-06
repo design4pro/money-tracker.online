@@ -38,7 +38,9 @@ import { occurrences } from '#/server/recurring/schedule'
 import { materializeSeries } from '#/server/recurring/materialize'
 import { forecastSeries } from '#/server/recurring/forecast'
 
-import { NotFoundError } from '../errors'
+import { ConflictError, NotFoundError } from '../errors'
+import { createLoan, markInstalmentPaid } from '../loans'
+import { deleteTransaction } from '../transactions'
 import {
   RecurringAutomationConflictError,
   RecurringPeriodPaidError,
@@ -1052,5 +1054,186 @@ describe('tenant isolation', () => {
       .where(eq(recurringSeries.id, id))
     expect(after).toEqual(before)
     expect(NOW.getTime()).toBeGreaterThan(0)
+  })
+})
+
+describe('deleting a transaction that settled a paid period', () => {
+  const policies = {
+    planned: 'include' as const,
+    adjustments: 'include' as const,
+    transfers: 'include' as const,
+    completeness: 'any' as const,
+  }
+
+  it('releases that period and leaves every other period unchanged', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const periods = await listPeriods(world.scope, series.id, TODAY)
+    const settled = periods.at(0)
+    const other = periods.at(1)
+    if (settled === undefined || other === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-netflix',
+      refAmountMinor: 4_999,
+      bookedOn: settled.dueOn,
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+      transactionId: 'txn-netflix',
+    })
+    const settledBefore = await storedPeriod({
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+    })
+    const otherBefore = await storedPeriod({
+      seriesId: series.id,
+      periodStart: other.periodStart,
+    })
+    if (settledBefore === undefined || otherBefore === undefined) {
+      throw new Error('period row missing')
+    }
+    expect(settledBefore.status).toBe('paid')
+    expect(settledBefore.settledTransactionId).toBe('txn-netflix')
+
+    executed.length = 0
+    await deleteTransaction({
+      scope: world.scope,
+      policies,
+      id: 'txn-netflix',
+    })
+    const release = executed.filter((query) =>
+      /recurring_periods|recurring_links|delete from "transactions"/i.test(
+        query,
+      ),
+    )
+    // One batch: the three writes are adjacent, period then link then the delete.
+    // Bound values are parameters, so the status words are not in the SQL text.
+    expect(release).toHaveLength(3)
+    const first = executed.indexOf(release[0] ?? '')
+    expect(executed.slice(first, first + 3)).toEqual(release)
+    expect(release[0]).toMatch(
+      /update "recurring_periods" set "status" = \?, "settled_transaction_id" = \?/,
+    )
+    expect(release[0]).toContain('"recurring_periods"."organization_id"')
+    expect(release[0]).toContain('not exists')
+    expect(release[1]).toMatch(/update "recurring_links" set "status" = \?/)
+    expect(release[1]).toContain('"recurring_links"."organization_id"')
+    expect(release[1]).toContain('not exists')
+    expect(release[2]).toMatch(/^delete from "transactions"/)
+    expect(release[2]).toContain('"transactions"."organization_id"')
+    expect(release[2]).toContain('not exists')
+
+    await expect(
+      world.db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(eq(transactions.id, 'txn-netflix')),
+    ).resolves.toEqual([])
+    const settledAfter = await storedPeriod({
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+    })
+    expect(settledAfter).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+      expectedAmountMinor: settledBefore.expectedAmountMinor,
+      expectedCurrencyCode: settledBefore.expectedCurrencyCode,
+      dueOn: settledBefore.dueOn,
+      periodStart: settledBefore.periodStart,
+      seriesId: series.id,
+    })
+    expect(
+      await storedPeriod({
+        seriesId: series.id,
+        periodStart: other.periodStart,
+      }),
+    ).toEqual(otherBefore)
+    await expect(
+      world.db
+        .select()
+        .from(recurringLinks)
+        .where(eq(recurringLinks.transactionId, 'txn-netflix')),
+    ).resolves.toEqual([])
+  })
+
+  it('leaves the paid period in place when a paid loan instalment refuses the delete', async () => {
+    const series = await createSeries(world.scope, seriesInput())
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: TODAY,
+      ahead: 0,
+    })
+    const period = (await listPeriods(world.scope, series.id, TODAY)).at(0)
+    if (period === undefined) throw new Error('no period materialised')
+    await seedTransaction(world.db, {
+      id: 'txn-both',
+      refAmountMinor: 120_00,
+      bookedOn: period.dueOn,
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: period.periodStart,
+      transactionId: 'txn-both',
+    })
+    const loan = await createLoan(world.scope, {
+      name: 'Loan A',
+      lender: 'Lender A',
+      currencyCode: 'PLN',
+      principalMinor: 500_00,
+      instalmentMinor: 100_00,
+      paymentDay: 20,
+      openedOn: '2026-01-15',
+      endsOn: '2026-04-20',
+      book: 'business',
+      kind: 'credit',
+      instalments: [{ dueOn: '2026-02-20', amountMinor: 120_00 }],
+    })
+    await markInstalmentPaid(world.scope, {
+      loanId: loan.id,
+      sequence: 1,
+      transactionId: 'txn-both',
+    })
+    const before = await storedPeriod({
+      seriesId: series.id,
+      periodStart: period.periodStart,
+    })
+    const linkBefore = await world.db
+      .select()
+      .from(recurringLinks)
+      .where(eq(recurringLinks.transactionId, 'txn-both'))
+
+    await expect(
+      deleteTransaction({
+        scope: world.scope,
+        policies,
+        id: 'txn-both',
+      }),
+    ).rejects.toBeInstanceOf(ConflictError)
+
+    expect(
+      await storedPeriod({
+        seriesId: series.id,
+        periodStart: period.periodStart,
+      }),
+    ).toEqual(before)
+    expect(
+      await world.db
+        .select()
+        .from(recurringLinks)
+        .where(eq(recurringLinks.transactionId, 'txn-both')),
+    ).toEqual(linkBefore)
+    await expect(
+      world.db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(eq(transactions.id, 'txn-both')),
+    ).resolves.toEqual([{ id: 'txn-both' }])
   })
 })

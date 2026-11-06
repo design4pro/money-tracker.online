@@ -154,6 +154,7 @@ import { convertExpectedAmount } from '#/server/transactions/display-expected'
 import { computeRefAmount } from '#/server/transactions/ref-amount'
 import {
   createTransaction,
+  deleteTransaction,
   findAccountCurrencyMismatches,
   getTransaction,
   updateTransaction,
@@ -1163,6 +1164,87 @@ describe('9 — an expected amount is a plan, and the two are never conflated', 
     expect(
       after.find((row) => row.periodStart === second.periodStart)?.status,
     ).not.toBe('paid')
+  })
+
+  it('deletes a settled receipt without recomputing ref_amount_minor or the expected amount', async () => {
+    // docs/MONEY.md §3.1: ref_amount_minor moves only when that row’s amount, currency or
+    // booked_on is written, or on a whole-workspace re-denomination. Deleting a different
+    // receipt is neither. expected_amount_minor is the plan and is not a conversion.
+    const world = await createBudgetWorld()
+    const series = await createSeries(world.scope, {
+      name: 'Rent',
+      expectedAmountMinor: 250_000,
+      expectedCurrencyCode: 'PLN',
+      frequency: 'monthly',
+      startDate: '2026-01-31',
+      accountId: 'acc-a',
+    })
+    await materializeSeries(world.scope, {
+      seriesId: series.id,
+      today: '2026-03-15',
+      ahead: 0,
+    })
+    const periods = await listSeriesPeriods(
+      world.scope,
+      series.id,
+      '2026-03-15',
+    )
+    const settled = periods.at(0)
+    const otherPeriod = periods.at(1)
+    if (settled === undefined || otherPeriod === undefined) {
+      throw new Error('need two materialised periods')
+    }
+    await seedTransaction(world.db, {
+      id: 'txn-receipt',
+      refAmountMinor: 4_999,
+      bookedOn: settled.dueOn,
+    })
+    await seedTransaction(world.db, {
+      id: 'txn-untouched',
+      refAmountMinor: 8_888,
+      bookedOn: '2026-03-02',
+    })
+    await markPaid(world.scope, {
+      seriesId: series.id,
+      periodStart: settled.periodStart,
+      transactionId: 'txn-receipt',
+    })
+    const [untouchedBefore] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, 'txn-untouched'))
+
+    budgetExecuted.length = 0
+    await deleteTransaction({
+      scope: world.scope,
+      policies: EVERYTHING,
+      id: 'txn-receipt',
+    })
+
+    const [untouchedAfter] = await world.db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, 'txn-untouched'))
+    expect(untouchedAfter).toEqual(untouchedBefore)
+    expect(untouchedAfter?.refAmountMinor).toBe(8_888)
+    expect(untouchedAfter?.rateE10).toBe(10_000_000_000)
+    const after = await listSeriesPeriods(world.scope, series.id, '2026-03-15')
+    expect(
+      after.find((row) => row.periodStart === settled.periodStart),
+    ).toMatchObject({
+      status: 'upcoming',
+      settledTransactionId: null,
+      expectedAmountMinor: 250_000,
+    })
+    expect(
+      after.find((row) => row.periodStart === otherPeriod.periodStart),
+    ).toEqual(otherPeriod)
+    expect(
+      budgetExecuted.some((query) => query.includes('exchange_rates')),
+    ).toBe(false)
+    expect(
+      budgetExecuted.some((query) => /update "transactions"/i.test(query)),
+    ).toBe(false)
   })
 })
 

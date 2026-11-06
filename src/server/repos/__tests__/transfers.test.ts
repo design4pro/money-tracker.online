@@ -43,6 +43,7 @@ import { runWithLedgerBatch, setLedgerBatchPorts } from '#/server/ledger/batch'
 import { ConflictError, NotFoundError } from '../errors'
 import { createScope } from '../scope'
 import { deleteTransaction, findTransaction } from '../transactions'
+import { sqliteBatchCallback } from './db-harness'
 import {
   convertToTransfer,
   createTransfer,
@@ -96,7 +97,7 @@ function openTestDb(): Database {
       .all(...(params as Array<never>))
       .map((row) => Object.values(row as Record<string, unknown>))
     return method === 'get' ? { rows: rows.at(0) ?? [] } : { rows }
-  })
+  }, sqliteBatchCallback(sqlite))
 }
 
 const EVERYTHING: TransactionPolicies = {
