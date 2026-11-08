@@ -427,7 +427,7 @@ export function TransactionForm({
           'max-lg:[&_:is(input,textarea,button,[tabindex],[role=spinbutton])]:scroll-mb-4',
         )}
       >
-        <div className="flex min-h-0 flex-col gap-6 max-lg:flex-1 max-lg:overflow-y-auto max-lg:overscroll-contain">
+        <div className="flex min-h-0 flex-col gap-6 max-lg:flex-1 max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:pb-[7.5rem]">
           {serverError === undefined ? null : (
             <div
               role="alert"
@@ -685,17 +685,21 @@ export function TransactionForm({
         </div>
 
         {/*
-          On a phone the actions pin at the foot of the form column, above the bottom bar, so Save
-          stays under the thumb. They are *not* sticky over the fields: the field stack scrolls in
-          the space above this row, so Date and its error stay reachable (spec §8). The one
-          full-width button is Save; the two quieter actions share the row beneath it. From `lg`
-          the bar is gone and the row sits in flow as it always has.
+          On a phone the actions pin to the viewport just above the bottom bar (`fixed`, not
+          in-flow sticky). Chrome layout zoom can leave `100dvh` taller than `innerHeight`, and a
+          parent `overflow-hidden` makes `sticky` dock inside that box — either way Cancel /
+          Save and add another slide under the bar (spec §8, AC3, AC5). `fixed` +
+          `bottom: nav-h + safe-bottom` keeps the full button boxes clear of the bar; the field
+          stack still scrolls in the space above, so Date is not covered. From `lg` the bar is
+          gone and the row sits in flow as it always has. A short 400% viewport may clip the
+          action cluster itself: `max-h` + overflow lets the buttons scroll rather than shrink.
         */}
         <div
           className={cn(
             'shrink-0 border-t border-border-subtle bg-canvas py-3',
             'max-sm:-mx-4 max-sm:px-4',
-            'lg:static lg:border-0 lg:bg-transparent lg:py-0',
+            'max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[calc(var(--nav-h)+var(--safe-bottom))] max-lg:z-10 max-lg:max-h-[calc(100svh-var(--nav-h)-var(--nav-h)-var(--safe-bottom))] max-lg:overflow-y-auto max-lg:px-4 sm:max-lg:px-6',
+            'lg:static lg:border-0 lg:bg-transparent lg:py-0 lg:max-h-none lg:overflow-visible',
           )}
         >
           <FormActions className="pt-0 lg:pt-2">
