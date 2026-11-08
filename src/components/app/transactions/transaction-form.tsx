@@ -350,12 +350,15 @@ export function TransactionForm({
         dateRef.current
           ?.querySelector<HTMLElement>('[role="spinbutton"]')
           ?.focus({ preventScroll: true })
-        dateRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        dateRef.current?.scrollIntoView?.({
+          block: 'nearest',
+          inline: 'nearest',
+        })
       } else {
         amountRef.current
           ?.querySelector('input')
           ?.focus({ preventScroll: true })
-        amountRef.current?.scrollIntoView({
+        amountRef.current?.scrollIntoView?.({
           block: 'nearest',
           inline: 'nearest',
         })
