@@ -54,9 +54,11 @@ describe('TransactionForm phone actions', () => {
     })
     const footer = cancel.parentElement?.parentElement
     expect(footer).toBeTruthy()
-    expect(footer?.className).toContain('max-lg:fixed')
     expect(footer?.className).toContain(
-      'max-lg:bottom-[calc(var(--nav-h)+var(--safe-bottom))]',
+      'max-lg:[@media(min-height:21rem)]:fixed',
+    )
+    expect(footer?.className).toContain(
+      'max-lg:[@media(min-height:21rem)]:bottom-[calc(var(--nav-h)+var(--safe-bottom))]',
     )
     expect(footer?.contains(saveAndNew)).toBe(true)
     expect(cancel.className).toMatch(/\bh-11\b/)

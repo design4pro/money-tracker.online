@@ -331,7 +331,7 @@ function TransactionDetailScreen({
         'mx-auto flex w-full flex-col gap-6',
         isEditing ? 'max-w-3xl' : 'max-w-5xl',
         isEditing &&
-          'max-lg:h-[calc(100dvh-11rem-var(--safe-bottom))] max-lg:min-h-0 max-lg:overflow-hidden',
+          'max-lg:min-h-0 max-lg:[@media(min-height:21rem)]:h-[calc(100dvh-11rem-var(--safe-bottom))] max-lg:[@media(min-height:21rem)]:overflow-hidden',
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
