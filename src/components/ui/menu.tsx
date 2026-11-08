@@ -98,8 +98,10 @@ export function MenuItem<T extends object>({
       className={composeTw(
         className,
         collectionItemBase,
-        // The reason a disabled item is disabled has to stay readable: dim the label, not the row.
-        description && 'group data-[disabled]:opacity-100',
+        // Idle collection rows are `text-ink-2`. A menu action is body text: `ink-2` on
+        // `bg-hover` (RAC 1.22 pointer focus) fails WCAG 1.4.3. Dim the label, never the row
+        // (`DESIGN.md` → Disabled, never hidden).
+        'group text-ink data-[disabled]:opacity-100',
         // `shrink-0`: the menu is a column flex container bounded by the popover, and a row
         // that may shrink is squeezed under its 44px minimum when a long label wraps.
         'shrink-0',
@@ -145,7 +147,7 @@ export function MenuItem<T extends object>({
               </span>
             </span>
           ) : (
-            <span className="min-w-0 flex-1 truncate">
+            <span className="min-w-0 flex-1 truncate group-data-[disabled]:opacity-45">
               {typeof children === 'function'
                 ? children(renderProps)
                 : children}

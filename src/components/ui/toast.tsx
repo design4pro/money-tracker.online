@@ -74,39 +74,47 @@ export function ToastHost({
   const { resolved } = useTheme()
 
   return (
-    <SonnerToaster
-      {...props}
-      theme={resolved}
-      position={position}
-      duration={duration}
-      closeButton
-      containerAriaLabel={regionLabel}
-      icons={{
-        success: <CheckCircle2 className="size-4 text-positive" />,
-        error: <XCircle className="size-4 text-negative" />,
-        warning: <AlertTriangle className="size-4 text-warning" />,
-        info: <Info className="size-4 text-info" />,
-      }}
-      toastOptions={{
-        closeButtonAriaLabel: closeLabel,
-        // Painted entirely from our tokens rather than from sonner's own CSS
-        // variables, so a toast is subject to the same 7:1 contract as every
-        // other surface — including in dark, where sonner's defaults are a
-        // near-black panel with a mid-grey body line.
-        classNames: {
-          toast:
-            'group flex w-full items-start! gap-3! rounded-lg! border! border-border-subtle! bg-surface-raised! p-3.5! text-ink! shadow-popover',
-          title: 'text-label! font-semibold! text-ink!',
-          description: 'text-caption! text-ink-2!',
-          actionButton:
-            'rounded-md bg-accent px-2.5 py-1 text-caption font-semibold text-on-accent',
-          cancelButton:
-            'rounded-md bg-surface-sunken px-2.5 py-1 text-caption font-semibold text-ink',
-          closeButton: CLOSE_BUTTON_CLASSES,
-          content: 'pe-8',
-          icon: 'shrink-0',
-        },
-      }}
-    />
+    // Sonner 2.0.8 puts `data-react-aria-top-layer` on the <section> (className
+    // lands on the inner <ol>). That layer sits over the page and swallows
+    // clicks to row actions and menus. Pass through the region; keep the toast
+    // itself clickable.
+    <div className="contents [&_[data-react-aria-top-layer]]:pointer-events-none">
+      <SonnerToaster
+        {...props}
+        theme={resolved}
+        position={position}
+        duration={duration}
+        closeButton
+        className="pointer-events-none"
+        containerAriaLabel={regionLabel}
+        customAriaLabel={regionLabel}
+        icons={{
+          success: <CheckCircle2 className="size-4 text-positive" />,
+          error: <XCircle className="size-4 text-negative" />,
+          warning: <AlertTriangle className="size-4 text-warning" />,
+          info: <Info className="size-4 text-info" />,
+        }}
+        toastOptions={{
+          closeButtonAriaLabel: closeLabel,
+          // Painted entirely from our tokens rather than from sonner's own CSS
+          // variables, so a toast is subject to the same 7:1 contract as every
+          // other surface — including in dark, where sonner's defaults are a
+          // near-black panel with a mid-grey body line.
+          classNames: {
+            toast:
+              'pointer-events-auto! group flex w-full items-start! gap-3! rounded-lg! border! border-border-subtle! bg-surface-raised! p-3.5! text-ink! shadow-popover',
+            title: 'text-label! font-semibold! text-ink!',
+            description: 'text-caption! text-ink-2!',
+            actionButton:
+              'rounded-md bg-accent px-2.5 py-1 text-caption font-semibold text-on-accent',
+            cancelButton:
+              'rounded-md bg-surface-sunken px-2.5 py-1 text-caption font-semibold text-ink',
+            closeButton: CLOSE_BUTTON_CLASSES,
+            content: 'pe-8',
+            icon: 'shrink-0',
+          },
+        }}
+      />
+    </div>
   )
 }

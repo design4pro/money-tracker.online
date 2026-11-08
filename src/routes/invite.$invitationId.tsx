@@ -81,8 +81,13 @@ function signInTarget(invitationId: string) {
  * it no longer takes the sign-in redirect, because signing in again cannot help it.
  */
 function isUnauthenticated(error: unknown): boolean {
-  if (readFailure(error)?.kind === 'unauthenticated') return true
-  return error instanceof Error && error.name === 'AuthRequirementError'
+  let current: unknown = error
+  while (current instanceof Error) {
+    if (readFailure(current)?.kind === 'unauthenticated') return true
+    if (current.name === 'AuthRequirementError') return true
+    current = current.cause
+  }
+  return readFailure(error)?.kind === 'unauthenticated'
 }
 
 /**

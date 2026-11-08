@@ -21,6 +21,18 @@ describe('ToastHost', () => {
     // axe reports as `role-img-alt` (#730).
     expect(close.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
     expect(close.querySelector('[role="img"]')).toBeNull()
+    // Sonner stamps the RAC top-layer on the section; className lands on the list.
+    const region = screen.getByRole('region', { name: 'Notifications' })
+    expect(region.getAttribute('data-react-aria-top-layer')).toBe('true')
+    expect(region.parentElement?.className).toContain(
+      '[&_[data-react-aria-top-layer]]:pointer-events-none',
+    )
+    expect(region.querySelector('ol')?.className).toContain(
+      'pointer-events-none',
+    )
+    expect((close.closest('li') as HTMLElement).className).toContain(
+      'pointer-events-auto',
+    )
   })
 
   it('holds the close button at a 44px box and keeps the toast text clear of it', async () => {
