@@ -58,57 +58,63 @@ colors:
   series-7: '#a60d47'
   series-8: '#9724b5'
 typography:
-  hero:
+  brand:
     fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
-    fontSize: 'clamp(3.25rem, 8vw, 5rem)'
+    fontSize: '1rem'
     fontWeight: 700
-    lineHeight: '5rem'
+    lineHeight: '1.5rem'
+    letterSpacing: '0'
+  hero:
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '2.5rem'
+    fontWeight: 700
+    lineHeight: '3rem'
     letterSpacing: '0'
   display:
-    fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
-    fontSize: 'clamp(2rem, 4.5vw, 3rem)'
-    fontWeight: 700
-    lineHeight: 1.05
-    letterSpacing: '0'
-  title:
-    fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
     fontSize: '2rem'
     fontWeight: 700
-    lineHeight: 1.1
+    lineHeight: '2.5rem'
+    letterSpacing: '0'
+  title:
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '1.75rem'
+    fontWeight: 700
+    lineHeight: '2.125rem'
     letterSpacing: '0'
   subtitle:
-    fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
     fontSize: '1.25rem'
-    fontWeight: 700
-    lineHeight: 1.25
+    fontWeight: 600
+    lineHeight: '1.75rem'
     letterSpacing: '0'
   body:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
-    fontSize: '0.9375rem'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '1rem'
     fontWeight: 400
-    lineHeight: 1.55
+    lineHeight: '1.5rem'
   label:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
-    fontSize: '0.8125rem'
-    fontWeight: 400
-    lineHeight: 1.5
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '0.875rem'
+    fontWeight: 500
+    lineHeight: '1.25rem'
   caption:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
     fontSize: '0.75rem'
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: '1.125rem'
   micro:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
-    fontSize: '0.6875rem'
-    fontWeight: 700
-    lineHeight: 1.2
-    letterSpacing: '0.06em'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '0.75rem'
+    fontWeight: 500
+    lineHeight: '1.125rem'
+    letterSpacing: '0'
 rounded:
-  sm: '0.125rem'
-  md: '0.125rem'
-  lg: '0.1875rem'
-  xl: '0.25rem'
-  2xl: '0.25rem'
+  sm: '0.375rem'
+  md: '0.5rem'
+  lg: '0.75rem'
+  xl: '1rem'
+  2xl: '1.25rem'
   full: '9999px'
 spacing:
   1: '0.25rem'
@@ -128,7 +134,7 @@ components:
     backgroundColor: '{colors.accent}'
     textColor: '{colors.on-accent}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-primary-hover:
@@ -141,7 +147,7 @@ components:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.ink}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-secondary-hover:
@@ -151,7 +157,7 @@ components:
     backgroundColor: 'transparent'
     textColor: '{colors.ink-2}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-ghost-hover:
@@ -161,21 +167,21 @@ components:
     backgroundColor: '{colors.brand}'
     textColor: '{colors.on-brand}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-danger:
     backgroundColor: '{colors.negative}'
     textColor: '{colors.on-negative}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   field:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.ink}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.3}'
     typography: '{typography.label}'
   card:
@@ -212,13 +218,13 @@ components:
   typed-line:
     backgroundColor: 'transparent'
     textColor: '{colors.ink}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   typed-line-planned:
     backgroundColor: 'transparent'
     textColor: '{colors.ink-2}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   table-row:

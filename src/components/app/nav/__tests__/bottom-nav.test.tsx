@@ -121,6 +121,22 @@ describe('BottomNav', () => {
     expect(navigate).toHaveBeenCalledWith({ href: OVERFLOW.href })
   })
 
+  it('draws five equal cells and keeps the Transactions label whole', async () => {
+    await renderBottomNav('/dashboard')
+
+    const nav = screen.getByRole('navigation', { name: en['nav.primary'] })
+    const cells = nav.querySelectorAll(':scope > ul > li')
+    expect(cells).toHaveLength(5)
+
+    const transactions = screen.getByRole('link', {
+      name: en['nav.transactions'],
+    })
+    expect(transactions.getAttribute('href')).toBe('/transactions')
+    expect(transactions.textContent).toBe(en['nav.transactions'])
+    expect(transactions.className.includes('h-16')).toBe(true)
+    expect(transactions.innerHTML.includes('truncate')).toBe(false)
+  })
+
   it('closes the sheet on the row that is already current, where no path changes', async () => {
     await renderBottomNav(OVERFLOW.href)
 

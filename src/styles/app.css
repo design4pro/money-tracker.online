@@ -120,6 +120,7 @@
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-brand: var(--font-brand);
 
   --text-hero: var(--text-hero);
   --text-hero--line-height: var(--text-hero--line-height);

@@ -23,6 +23,7 @@ import type { ClassValue } from 'clsx'
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
+      'font-family': [{ font: ['sans', 'serif', 'mono', 'display', 'brand'] }],
       'font-size': [
         {
           text: [

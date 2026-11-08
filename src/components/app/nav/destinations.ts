@@ -130,10 +130,7 @@ export const ALL_DESTINATIONS: ReadonlyArray<Destination> = [
  * How many destinations the phone's bottom bar draws as tabs before the rest move into its
  * overflow sheet.
  *
- * Three, so the bar is always four cells wide — three tabs and *More*. The measurement behind the
- * number is in `bottom-nav.tsx`: at 360px four cells get 90px each, which is the narrowest a
- * 12px label survives whole in Polish (`Transakcje`, `Ustawienia`), and a fifth cell takes that to
- * 72px, where it does not.
+ * Three destinations plus create plus More: five equal hitboxes. Labels stay whole (no ellipsis).
  */
 export const BOTTOM_BAR_TAB_COUNT = 3
 

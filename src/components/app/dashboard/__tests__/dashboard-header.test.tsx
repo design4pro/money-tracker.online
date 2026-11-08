@@ -120,9 +120,9 @@ describe('the action row', () => {
     const link = screen.getByRole('link', { name: 'New transaction' })
 
     // jsdom does not lay Tailwind out, so the contract is the classes the size scale produces:
-    // `DESIGN.md` fixes a field and a primary button at the same 40px and the same type step.
+    // `DESIGN.md` fixes a field and a primary button at the same 44px and the same type step.
     for (const control of [trigger, link]) {
-      expect(control.classList.contains('h-10')).toBe(true)
+      expect(control.classList.contains('h-11')).toBe(true)
       expect(control.classList.contains('text-label')).toBe(true)
     }
   })

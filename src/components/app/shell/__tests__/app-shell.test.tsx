@@ -109,4 +109,11 @@ describe('AppShell', () => {
       expect(nav.getAttribute('aria-label')).toBeTruthy()
     }
   })
+
+  it('keeps main from forcing horizontal overflow beside the rail', () => {
+    const { container } = renderShell('/dashboard')
+    const main = container.querySelector(`#${MAIN_CONTENT_ID}`)
+    expect(main?.className).toContain('min-w-0')
+    expect(main?.className).toContain('pb-[calc(5.5rem+var(--safe-bottom))]')
+  })
 })

@@ -27,12 +27,8 @@ export interface BottomNavProps {
 /**
  * The phone's primary navigation: three tabs, the one stamp, and a *More* sheet.
  *
- * This is a designed layout rather than a squeezed rail. At 360px the four labelled cells get
- * 78px each once the 48px stamp cell in the middle has taken its share, and 74px of that is
- * label room: enough for a 20px glyph over a 12px label that stays whole in Polish as well as
- * in English — `Transakcje` is the longest of the four at 72px and it fits. A fifth *labelled*
- * cell would take that to 62px, where it does not, and that measurement rather than the count
- * is what fixes `BOTTOM_BAR_TAB_COUNT` at three.
+ * Five equal cells: three destinations, the create action, and More. Labels stay whole — never
+ * ellipsized — so Polish `Transakcje` is the measurement, not a truncated English stem.
  *
  * ## The stamp in the middle
  *
@@ -78,7 +74,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-nav border-t border-border-subtle bg-canvas pb-[var(--safe-bottom)] lg:hidden">
       <nav aria-label={t('nav.primary')}>
-        <ul className="grid grid-cols-[1fr_1fr_auto_1fr_1fr]">
+        <ul className="grid grid-cols-5">
           {BOTTOM_BAR_DESTINATIONS.map((destination, index) => (
             // The stamp is inserted in the DOM where it is drawn, so the tab order and the
             // visual order agree; a `grid-column` or `order` trick would separate them.
@@ -89,11 +85,11 @@ export function BottomNav({ pathname }: BottomNavProps) {
                     href="/transactions/new"
                     variant="unstyled"
                     aria-label={t('transactions.create')}
-                    className="flex h-16 w-12 items-center justify-center"
+                    className="flex h-16 w-full items-center justify-center"
                   >
                     <span
                       aria-hidden="true"
-                      className="grid size-10 place-items-center rounded-md bg-accent text-on-accent shadow-card"
+                      className="grid size-11 place-items-center rounded-md bg-accent text-on-accent"
                     >
                       <Plus className="size-5" />
                     </span>
@@ -200,7 +196,7 @@ const CREATE_CELL_AT = Math.ceil(BOTTOM_BAR_DESTINATIONS.length / 2)
 
 /** The cell both tab kinds fill. Identical for the link and the button, so they cannot drift. */
 const TAB_SHAPE =
-  'relative flex h-16 w-full flex-col items-center justify-center gap-1 px-0.5 text-caption'
+  'relative flex h-16 min-h-11 w-full flex-col items-center justify-center gap-0.5 px-0.5 text-caption'
 
 /**
  * The current tab is marked three ways - `aria-current`, a one-pixel rule along the top edge, and
@@ -221,7 +217,7 @@ function ActiveRule() {
 
 function tabTone(isActive: boolean): string {
   return isActive
-    ? 'font-semibold text-brand'
+    ? 'bg-surface font-semibold text-brand'
     : 'font-medium text-ink-2 data-[hovered]:text-ink'
 }
 
@@ -241,7 +237,9 @@ function TabFace({ Icon, label }: TabFaceProps) {
   return (
     <span className="flex min-w-0 max-w-full flex-col items-center gap-1">
       <Icon className="size-5 shrink-0" />
-      <span className="max-w-full truncate">{label}</span>
+      <span className="max-w-full text-center leading-[1.125rem] break-words">
+        {label}
+      </span>
     </span>
   )
 }
