@@ -18,7 +18,9 @@ import {
 } from './destinations'
 import { NavLink } from './nav-link'
 
+import type { Translate } from '#/lib/i18n'
 import type { ComponentType, ReactNode } from 'react'
+import type { Destination } from './destinations'
 
 export interface BottomNavProps {
   pathname: string
@@ -28,7 +30,9 @@ export interface BottomNavProps {
  * The phone's primary navigation: three tabs, the one stamp, and a *More* sheet.
  *
  * Five equal cells: three destinations, the create action, and More. Labels stay whole — never
- * ellipsized — so Polish `Transakcje` is the measurement, not a truncated English stem.
+ * ellipsized, never a smaller caption, never squeezed tracking. English `Ledger` is the short
+ * bar label for the transactions tab (accessible name `Ledger — Transactions`); Polish
+ * `Transakcje` is unchanged. The rail and the page title still say Transactions.
  *
  * ## The stamp in the middle
  *
@@ -100,6 +104,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
                 <Link
                   href={destination.href}
                   variant="unstyled"
+                  aria-label={tabAccessibleName(destination, t)}
                   aria-current={
                     destination.id === activeId ? 'page' : undefined
                   }
@@ -111,7 +116,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
                   {destination.id === activeId ? <ActiveRule /> : null}
                   <TabFace
                     Icon={destination.Icon}
-                    label={t(destination.label)}
+                    label={tabVisibleLabel(destination, t)}
                   />
                 </Link>
               </li>
@@ -196,7 +201,30 @@ const CREATE_CELL_AT = Math.ceil(BOTTOM_BAR_DESTINATIONS.length / 2)
 
 /** The cell both tab kinds fill. Identical for the link and the button, so they cannot drift. */
 const TAB_SHAPE =
-  'relative flex h-16 min-h-11 w-full flex-col items-center justify-center gap-0.5 px-0.5 text-caption'
+  'relative flex h-16 min-h-11 w-full flex-col items-center justify-center gap-0.5 px-0 text-caption'
+
+/**
+ * Visible caption on a bar tab. Transactions is the one destination whose English bar label is
+ * shorter than the rail (`Ledger`); every other tab, and Polish, keeps the destination label.
+ */
+function tabVisibleLabel(destination: Destination, t: Translate): string {
+  return destination.id === 'transactions'
+    ? t('nav.transactions.short')
+    : t(destination.label)
+}
+
+/**
+ * Accessible name for a bar tab. Set only when it differs from the visible text, so Polish
+ * `Transakcje` is still the name, and English is exactly `Ledger — Transactions` (WCAG 2.5.3).
+ */
+function tabAccessibleName(
+  destination: Destination,
+  t: Translate,
+): string | undefined {
+  return destination.id === 'transactions'
+    ? t('nav.transactions.barName')
+    : undefined
+}
 
 /**
  * The current tab is marked three ways - `aria-current`, a one-pixel rule along the top edge, and
@@ -217,7 +245,7 @@ function ActiveRule() {
 
 function tabTone(isActive: boolean): string {
   return isActive
-    ? 'bg-surface font-semibold text-brand'
+    ? 'bg-surface font-medium text-brand'
     : 'font-medium text-ink-2 data-[hovered]:text-ink'
 }
 
@@ -237,7 +265,7 @@ function TabFace({ Icon, label }: TabFaceProps) {
   return (
     <span className="flex min-w-0 max-w-full flex-col items-center gap-1">
       <Icon className="size-5 shrink-0" />
-      <span className="max-w-full px-0.5 text-center text-caption leading-4 whitespace-nowrap">
+      <span className="max-w-full px-0 text-center text-caption leading-4 font-medium whitespace-nowrap">
         {label}
       </span>
     </span>

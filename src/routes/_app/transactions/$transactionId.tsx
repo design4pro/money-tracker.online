@@ -330,6 +330,8 @@ function TransactionDetailScreen({
       className={cn(
         'mx-auto flex w-full flex-col gap-6',
         isEditing ? 'max-w-3xl' : 'max-w-5xl',
+        isEditing &&
+          'max-lg:h-[calc(100dvh-var(--nav-h)-5.5rem-var(--safe-bottom))] max-lg:min-h-0',
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -391,6 +393,7 @@ function TransactionDetailScreen({
           serverError={failure.serverError}
           refusedBooking={failure.refusedBooking}
           submitLabel={t('action.saveChanges')}
+          className="min-h-0 flex-1"
           storedSettledOn={
             transaction.isPlanned ? undefined : transaction.bookedOn
           }

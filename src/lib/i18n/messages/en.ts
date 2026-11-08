@@ -60,6 +60,13 @@ const messages = {
   'nav.dashboard': 'Dashboard',
   'nav.accounts': 'Accounts',
   'nav.transactions': 'Transactions',
+  /** Visible on the phone bar only. The rail and the page title stay `nav.transactions`. */
+  'nav.transactions.short': 'Ledger',
+  /**
+   * Accessible name of the phone-bar tab. Must contain the visible short label
+   * (WCAG 2.5.3). Em dash, not hyphen.
+   */
+  'nav.transactions.barName': 'Ledger — Transactions',
   'nav.budgets': 'Budgets',
   'nav.categories': 'Categories',
   'nav.tags': 'Tags',
