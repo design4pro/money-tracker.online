@@ -35,22 +35,40 @@ describe('DashboardHeader', () => {
     ).toBeTruthy()
 
     const terms = screen.getAllByRole('term').map((node) => node.textContent)
-    expect(terms).toEqual(['Money in', 'Money out', 'Difference'])
+    // Difference is the dominant KPI, so it is first in the description list — the same order
+    // the card paints. Money in / Money out stay attached as secondary terms.
+    expect(terms).toEqual(['Difference', 'Money in', 'Money out'])
 
     const values = screen.getAllByRole('definition')
     // Money in carries its `+` and Money out its U+2212 like the difference does: never bare.
     expect(values.map(drawn)).toEqual([
+      '+zł 2,859.50',
       '+zł 8,200.00',
       '−zł 5,340.50',
-      '+zł 2,859.50',
     ])
     // The spoken half names the currency and says the sign as a word, because `zł` is announced
     // inconsistently and U+2212 is frequently announced as nothing at all.
     expect(values.map(reading)).toEqual([
+      'positive 2,859.50 Polish zlotys',
       'positive 8,200.00 Polish zlotys',
       'negative 5,340.50 Polish zlotys',
-      'positive 2,859.50 Polish zlotys',
     ])
+  })
+
+  it('sets the difference at the display step and the secondaries at the subtitle step', async () => {
+    await renderHeader(285950)
+    const values = screen.getAllByRole('definition')
+    const [difference, income, expense] = values
+    expect(difference.querySelector('.tabular')?.className).toContain(
+      'text-display',
+    )
+    expect(income.querySelector('.tabular')?.className).toContain(
+      'text-subtitle',
+    )
+    expect(expense.querySelector('.tabular')?.className).toContain(
+      'text-subtitle',
+    )
+    expect(values[0]?.closest('dl')?.className).toContain('grid')
   })
 
   it('gives the difference its share rather than printing the same figure twice', async () => {

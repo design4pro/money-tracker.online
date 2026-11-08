@@ -58,16 +58,16 @@ import type { PeriodRange } from './period'
  * icon channel on the row where it is doing the most work. Three states, three glyphs, and none
  * of them shared with another tile.
  *
- * ## Three typed lines, not three tiles
+ * ## One dominant figure, two compact secondaries
  *
- * The strip used to be three cards, each a label over a large figure: the metric template, and
- * the one idiom the form refuses. The three figures are now lines of the book - the label at the
- * start of the line, the figure at its end, a rule under each - the way the net-worth panel already
- * sets what is held against what is owed, and the difference keeps its sentence under its figure.
- * Money in carries its `+` and Money out its `−` like the difference does: every amount is
- * written with an explicit sign (the Real Minus Rule), never left for the label alone to carry.
- * `expenseMinor` arrives as a magnitude, so it is negated here the way `DirectionalAmount` negates
- * an expense row.
+ * A stack of three equal lines is the notebook strip this redesign leaves behind, and a stack of
+ * four tall KPI cards is the Planned Costs pattern the brief forbids. Difference is the figure the
+ * period is about — display step, first in the description list — and Money in / Money out sit
+ * beside it as subtitle-step companions. One surface card, not three tiles. Long amounts wrap;
+ * digits are never ellipsised. Money in carries its `+` and Money out its `−` like the difference
+ * does: every amount is written with an explicit sign (the Real Minus Rule), never left for the
+ * label alone to carry. `expenseMinor` arrives as a magnitude, so it is negated here the way
+ * `DirectionalAmount` negates an expense row.
  *
  * ## The one stamp on the page
  *
@@ -127,32 +127,9 @@ export function DashboardHeader({
         move around a page. It is visually hidden because the figures below already say it.
       */}
       <h2 className="sr-only">{t('dashboard.summary.label')}</h2>
-      <dl className="max-w-xl border-b border-border-subtle">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-border-subtle bg-surface p-4 lg:grid-cols-3 lg:gap-6 lg:p-6">
         <Figure
-          icon={<ArrowDownLeft aria-hidden="true" className="size-4" />}
-          label={t('dashboard.income')}
-        >
-          <Amount
-            locale={locale}
-            amountMinor={incomeMinor}
-            currencyCode={baseCurrencyCode}
-            size="lg"
-            signed
-          />
-        </Figure>
-        <Figure
-          icon={<ArrowUpRight aria-hidden="true" className="size-4" />}
-          label={t('dashboard.expenses')}
-        >
-          <Amount
-            locale={locale}
-            amountMinor={negateMinor(expenseMinor)}
-            currencyCode={baseCurrencyCode}
-            size="lg"
-            signed
-          />
-        </Figure>
-        <Figure
+          emphasis="primary"
           icon={
             isZeroMinor(netMinor) ? (
               <Equal aria-hidden="true" className="size-4" />
@@ -175,9 +152,36 @@ export function DashboardHeader({
             locale={locale}
             amountMinor={netMinor}
             currencyCode={baseCurrencyCode}
-            size="lg"
+            size="2xl"
             signed
             tone="value"
+            className="max-w-full whitespace-normal lg:text-hero"
+          />
+        </Figure>
+        <Figure
+          icon={<ArrowDownLeft aria-hidden="true" className="size-4" />}
+          label={t('dashboard.income')}
+        >
+          <Amount
+            locale={locale}
+            amountMinor={incomeMinor}
+            currencyCode={baseCurrencyCode}
+            size="lg"
+            signed
+            className="max-w-full whitespace-normal"
+          />
+        </Figure>
+        <Figure
+          icon={<ArrowUpRight aria-hidden="true" className="size-4" />}
+          label={t('dashboard.expenses')}
+        >
+          <Amount
+            locale={locale}
+            amountMinor={negateMinor(expenseMinor)}
+            currencyCode={baseCurrencyCode}
+            size="lg"
+            signed
+            className="max-w-full whitespace-normal"
           />
         </Figure>
       </dl>
@@ -226,17 +230,28 @@ interface FigureProps {
   readonly icon: ReactNode
   readonly label: string
   readonly detail?: string
+  readonly emphasis?: 'primary' | 'secondary'
   readonly children: ReactNode
 }
 
-function Figure({ icon, label, detail, children }: FigureProps) {
+function Figure({
+  icon,
+  label,
+  detail,
+  emphasis = 'secondary',
+  children,
+}: FigureProps) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-t border-border-subtle py-3">
-      <dt className="flex items-center gap-2 text-micro tracking-label uppercase text-ink-2">
-        <span className="text-ink-2">{icon}</span>
+    <div
+      className={
+        emphasis === 'primary' ? 'col-span-2 min-w-0 lg:col-span-1' : 'min-w-0'
+      }
+    >
+      <dt className="flex items-center gap-2 text-caption text-ink-2">
+        <span className="shrink-0 text-ink-2">{icon}</span>
         {label}
       </dt>
-      <dd className="min-w-0 text-end">
+      <dd className="mt-1 min-w-0">
         {children}
         {detail === undefined ? null : (
           <span className="mt-1 block text-caption font-normal text-ink-2">
