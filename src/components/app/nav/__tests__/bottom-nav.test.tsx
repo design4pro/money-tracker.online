@@ -148,6 +148,9 @@ describe('BottomNav', () => {
     expect(transactions.textContent).not.toBe(en['nav.transactions'])
     expect(transactions.className.includes('h-16')).toBe(true)
     expect(transactions.className.includes('tracking-')).toBe(false)
+    expect(transactions.innerHTML.includes('font-normal')).toBe(true)
+    expect(transactions.innerHTML.includes('font-semibold')).toBe(false)
+    expect(transactions.innerHTML.includes('text-caption')).toBe(true)
     expect(transactions.innerHTML.includes('truncate')).toBe(false)
     expect(transactions.innerHTML.includes('break-words')).toBe(false)
     expect(transactions.innerHTML.includes('ellipsis')).toBe(false)
@@ -155,6 +158,20 @@ describe('BottomNav', () => {
     const dashboard = screen.getByRole('link', { name: en['nav.dashboard'] })
     expect(dashboard.textContent).toBe(en['nav.dashboard'])
     expect(dashboard.getAttribute('aria-label')).toBeNull()
+  })
+
+  it('uses caption 400 on inactive bar labels and 600 on the selected tab', async () => {
+    await renderBottomNav('/transactions')
+
+    const transactions = screen.getByRole('link', {
+      name: en['nav.transactions.barName'],
+    })
+    expect(transactions.innerHTML.includes('font-semibold')).toBe(true)
+    expect(transactions.getAttribute('aria-current')).toBe('page')
+
+    const dashboard = screen.getByRole('link', { name: en['nav.dashboard'] })
+    expect(dashboard.innerHTML.includes('font-normal')).toBe(true)
+    expect(dashboard.innerHTML.includes('font-semibold')).toBe(false)
   })
 
   it('keeps Polish Transakcje as the visible and accessible name on the bar', async () => {

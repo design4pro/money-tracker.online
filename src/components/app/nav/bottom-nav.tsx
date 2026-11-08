@@ -117,6 +117,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
                   <TabFace
                     Icon={destination.Icon}
                     label={tabVisibleLabel(destination, t)}
+                    isActive={destination.id === activeId}
                   />
                 </Link>
               </li>
@@ -143,7 +144,11 @@ export function BottomNav({ pathname }: BottomNavProps) {
               )}
             >
               {isOverflowActive ? <ActiveRule /> : null}
-              <TabFace Icon={Ellipsis} label={t('app.nav.more')} />
+              <TabFace
+                Icon={Ellipsis}
+                label={t('app.nav.more')}
+                isActive={isOverflowActive}
+              />
             </Button>
           </li>
         </ul>
@@ -245,13 +250,14 @@ function ActiveRule() {
 
 function tabTone(isActive: boolean): string {
   return isActive
-    ? 'bg-surface font-medium text-brand'
-    : 'font-medium text-ink-2 data-[hovered]:text-ink'
+    ? 'bg-surface text-brand'
+    : 'text-ink-2 data-[hovered]:text-ink'
 }
 
 interface TabFaceProps {
   Icon: ComponentType<{ className?: string }>
   label: ReactNode
+  isActive: boolean
 }
 
 /**
@@ -261,11 +267,18 @@ interface TabFaceProps {
  * span of its own; handing it a single column child is what keeps the button tab and the link tab
  * looking like the same thing.
  */
-function TabFace({ Icon, label }: TabFaceProps) {
+function TabFace({ Icon, label, isActive }: TabFaceProps) {
   return (
     <span className="flex min-w-0 max-w-full flex-col items-center gap-1">
       <Icon className="size-5 shrink-0" />
-      <span className="max-w-full px-0 text-center text-caption leading-4 font-medium whitespace-nowrap">
+      <span
+        className={cn(
+          // Caption 12/18 (`text-caption`). Spec 1.1: inactive 400, selected 600
+          // on this label only — not a global component weight, not tracking.
+          'max-w-full px-0 text-center text-caption whitespace-nowrap',
+          isActive ? 'font-semibold' : 'font-normal',
+        )}
+      >
         {label}
       </span>
     </span>
