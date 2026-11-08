@@ -394,6 +394,7 @@ export function TransactionForm({
 
   return (
     <div
+      className={cn('flex min-h-0 flex-1 flex-col', className)}
       onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
         // The repeat-entry accelerator. Bound on the wrapper rather than on the button so it fires
         // from the note box too, where a bare Enter has to keep inserting a newline. React Aria's
@@ -417,11 +418,10 @@ export function TransactionForm({
           submit(false)
         }}
         className={cn(
-          'flex min-h-0 flex-col gap-6',
+          'flex min-h-0 flex-1 flex-col gap-6',
           // Below `lg` the actions sit in flow at the foot of this column, not over the fields.
           // The field stack scrolls; the footer never covers Date or its error (spec §8).
           'max-lg:[&_:is(input,textarea,button,[tabindex],[role=spinbutton])]:scroll-mb-4',
-          className,
         )}
       >
         <div className="flex min-h-0 flex-col gap-6 max-lg:flex-1 max-lg:overflow-y-auto max-lg:overscroll-contain">
