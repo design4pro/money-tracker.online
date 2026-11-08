@@ -33,7 +33,7 @@ export function TransactionListSkeleton() {
       {Array.from({ length: SKELETON_ROWS }, (_, index) => (
         <div
           key={index}
-          className="flex h-20 items-center gap-3 border-b border-border-subtle px-3 last:border-b-0 lg:h-10"
+          className="flex h-[76px] items-center gap-3 border-b border-border-subtle px-3 last:border-b-0 lg:h-10"
         >
           <Skeleton className="size-4 shrink-0 rounded-sm" />
           <Skeleton className="h-3 w-8 shrink-0" />

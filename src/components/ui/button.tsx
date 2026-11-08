@@ -55,7 +55,7 @@ export const buttonVariants = cva(
       },
       size: {
         sm: 'h-8 gap-1.5 rounded-sm px-3 text-caption',
-        md: 'h-10 gap-2 rounded-md px-4 text-label',
+        md: 'h-11 gap-2 rounded-md px-4 text-label',
         lg: 'h-12 gap-2.5 rounded-md px-5 text-body',
       },
       shape: {

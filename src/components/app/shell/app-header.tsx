@@ -25,6 +25,9 @@ export interface AppHeaderProps {
  * carries a matching `scroll-padding-block-start` and `<main>` a matching `scroll-margin`: a
  * control that the browser scrolls to must land *below* this bar, not underneath it — WCAG 2.2
  * §2.4.11 and §2.4.12, and §2.4.12 (Enhanced, no part obscured) is a criterion this product claims.
+ * Below `20rem` of viewport height (Chrome 400% layout zoom on a ~900px window is ~192px) it
+ * stops sticking: a sticky header plus a pinned form footer plus the bottom bar leave no
+ * uncovered strip for Amount/Date/Account. Hitboxes stay 44px.
  *
  * Painted with a solid ground rather than a translucent blur. `src/styles/tokens.css` rules out
  * glass panels, and there is a measurement behind the rule as well as a taste: text sitting over a
@@ -32,7 +35,7 @@ export interface AppHeaderProps {
  */
 export function AppHeader({ shell }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-nav border-b border-border-subtle bg-canvas">
+    <header className="sticky top-0 z-nav border-b border-border-subtle bg-canvas [@media(max-height:20rem)]:relative [@media(max-height:20rem)]:z-0">
       <div className="mx-auto flex h-16 w-full max-w-content items-center gap-2 px-4 sm:px-6 lg:px-8">
         {/* Only while there is no rail to hold it. From `lg` the household is pinned to the foot
             of the rail instead, which leaves this bar to the three controls below and gives the

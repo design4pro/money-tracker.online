@@ -18,7 +18,9 @@ import {
 } from './destinations'
 import { NavLink } from './nav-link'
 
+import type { Translate } from '#/lib/i18n'
 import type { ComponentType, ReactNode } from 'react'
+import type { Destination } from './destinations'
 
 export interface BottomNavProps {
   pathname: string
@@ -27,12 +29,10 @@ export interface BottomNavProps {
 /**
  * The phone's primary navigation: three tabs, the one stamp, and a *More* sheet.
  *
- * This is a designed layout rather than a squeezed rail. At 360px the four labelled cells get
- * 78px each once the 48px stamp cell in the middle has taken its share, and 74px of that is
- * label room: enough for a 20px glyph over a 12px label that stays whole in Polish as well as
- * in English — `Transakcje` is the longest of the four at 72px and it fits. A fifth *labelled*
- * cell would take that to 62px, where it does not, and that measurement rather than the count
- * is what fixes `BOTTOM_BAR_TAB_COUNT` at three.
+ * Five equal cells: three destinations, the create action, and More. Labels stay whole — never
+ * ellipsized, never a smaller caption, never squeezed tracking. English `Ledger` is the short
+ * bar label for the transactions tab (accessible name `Ledger — Transactions`); Polish
+ * `Transakcje` is unchanged. The rail and the page title still say Transactions.
  *
  * ## The stamp in the middle
  *
@@ -78,7 +78,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-nav border-t border-border-subtle bg-canvas pb-[var(--safe-bottom)] lg:hidden">
       <nav aria-label={t('nav.primary')}>
-        <ul className="grid grid-cols-[1fr_1fr_auto_1fr_1fr]">
+        <ul className="grid grid-cols-5">
           {BOTTOM_BAR_DESTINATIONS.map((destination, index) => (
             // The stamp is inserted in the DOM where it is drawn, so the tab order and the
             // visual order agree; a `grid-column` or `order` trick would separate them.
@@ -89,11 +89,11 @@ export function BottomNav({ pathname }: BottomNavProps) {
                     href="/transactions/new"
                     variant="unstyled"
                     aria-label={t('transactions.create')}
-                    className="flex h-16 w-12 items-center justify-center"
+                    className="flex h-16 w-full items-center justify-center"
                   >
                     <span
                       aria-hidden="true"
-                      className="grid size-10 place-items-center rounded-md bg-accent text-on-accent shadow-card"
+                      className="grid size-11 place-items-center rounded-md bg-accent text-on-accent"
                     >
                       <Plus className="size-5" />
                     </span>
@@ -104,6 +104,7 @@ export function BottomNav({ pathname }: BottomNavProps) {
                 <Link
                   href={destination.href}
                   variant="unstyled"
+                  aria-label={tabAccessibleName(destination, t)}
                   aria-current={
                     destination.id === activeId ? 'page' : undefined
                   }
@@ -115,7 +116,8 @@ export function BottomNav({ pathname }: BottomNavProps) {
                   {destination.id === activeId ? <ActiveRule /> : null}
                   <TabFace
                     Icon={destination.Icon}
-                    label={t(destination.label)}
+                    label={tabVisibleLabel(destination, t)}
+                    isActive={destination.id === activeId}
                   />
                 </Link>
               </li>
@@ -142,7 +144,11 @@ export function BottomNav({ pathname }: BottomNavProps) {
               )}
             >
               {isOverflowActive ? <ActiveRule /> : null}
-              <TabFace Icon={Ellipsis} label={t('app.nav.more')} />
+              <TabFace
+                Icon={Ellipsis}
+                label={t('app.nav.more')}
+                isActive={isOverflowActive}
+              />
             </Button>
           </li>
         </ul>
@@ -200,7 +206,30 @@ const CREATE_CELL_AT = Math.ceil(BOTTOM_BAR_DESTINATIONS.length / 2)
 
 /** The cell both tab kinds fill. Identical for the link and the button, so they cannot drift. */
 const TAB_SHAPE =
-  'relative flex h-16 w-full flex-col items-center justify-center gap-1 px-0.5 text-caption'
+  'relative flex h-16 min-h-11 w-full flex-col items-center justify-center gap-0.5 px-0 text-caption'
+
+/**
+ * Visible caption on a bar tab. Transactions is the one destination whose English bar label is
+ * shorter than the rail (`Ledger`); every other tab, and Polish, keeps the destination label.
+ */
+function tabVisibleLabel(destination: Destination, t: Translate): string {
+  return destination.id === 'transactions'
+    ? t('nav.transactions.short')
+    : t(destination.label)
+}
+
+/**
+ * Accessible name for a bar tab. Set only when it differs from the visible text, so Polish
+ * `Transakcje` is still the name, and English is exactly `Ledger — Transactions` (WCAG 2.5.3).
+ */
+function tabAccessibleName(
+  destination: Destination,
+  t: Translate,
+): string | undefined {
+  return destination.id === 'transactions'
+    ? t('nav.transactions.barName')
+    : undefined
+}
 
 /**
  * The current tab is marked three ways - `aria-current`, a one-pixel rule along the top edge, and
@@ -221,13 +250,14 @@ function ActiveRule() {
 
 function tabTone(isActive: boolean): string {
   return isActive
-    ? 'font-semibold text-brand'
-    : 'font-medium text-ink-2 data-[hovered]:text-ink'
+    ? 'bg-surface text-brand'
+    : 'text-ink-2 data-[hovered]:text-ink'
 }
 
 interface TabFaceProps {
   Icon: ComponentType<{ className?: string }>
   label: ReactNode
+  isActive: boolean
 }
 
 /**
@@ -237,11 +267,20 @@ interface TabFaceProps {
  * span of its own; handing it a single column child is what keeps the button tab and the link tab
  * looking like the same thing.
  */
-function TabFace({ Icon, label }: TabFaceProps) {
+function TabFace({ Icon, label, isActive }: TabFaceProps) {
   return (
     <span className="flex min-w-0 max-w-full flex-col items-center gap-1">
       <Icon className="size-5 shrink-0" />
-      <span className="max-w-full truncate">{label}</span>
+      <span
+        className={cn(
+          // Caption 12/18 (`text-caption`). Spec 1.1: inactive 400, selected 600
+          // on this label only — not a global component weight, not tracking.
+          'max-w-full px-0 text-center text-caption whitespace-nowrap',
+          isActive ? 'font-semibold' : 'font-normal',
+        )}
+      >
+        {label}
+      </span>
     </span>
   )
 }

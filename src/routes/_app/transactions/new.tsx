@@ -365,8 +365,8 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   })
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <header className="flex flex-col gap-1">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 max-lg:min-h-0 max-lg:[@media(min-height:21rem)]:h-[calc(100dvh-11rem-var(--safe-bottom))] max-lg:[@media(min-height:21rem)]:overflow-hidden">
+      <header className="flex shrink-0 flex-col gap-1">
         <h1 className="text-title font-semibold text-ink">
           {t('transactions.form.newTitle')}
         </h1>
@@ -405,6 +405,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
                 currency: currencyName(droppedCurrency, locale),
               })
         }
+        className="min-h-0 flex-1"
         afterAmount={
           <TemplatePicker
             templates={templates}

@@ -284,7 +284,7 @@ export const fieldSurface = [
  */
 export const fieldSizes = {
   sm: 'h-8 px-2.5 text-caption',
-  md: 'h-10 px-3 text-label',
+  md: 'h-11 px-3 text-label',
   lg: 'h-12 px-3.5 text-body',
 } as const
 

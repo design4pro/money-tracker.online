@@ -5,7 +5,7 @@ import { EmptyState } from '../empty-state'
 
 /**
  * The size contract of the one empty state (#362): a `subtitle` heading, a 44px medallion, a
- * dashed card as the container. Three surfaces once hand-rolled their own at 32px / 56px and
+ * surface card as the container. Three surfaces once hand-rolled their own at 32px / 56px and
  * disagreed with the other nineteen; the class strings below are what the component hands to
  * `class`, which is the seam `DESIGN.md` -> Empty state pins.
  */
@@ -36,19 +36,13 @@ describe('EmptyState', () => {
     expect(medallion?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('is the dashed card, with the 24px side padding and 40px rhythm it always had', () => {
+  it('is a surface card with a hairline, not dashed paper', () => {
     const { container } = renderState()
 
     const root = container.firstElementChild
-    // `cardVariants({ variant: 'dashed' })`, not a re-typed copy of it.
-    for (const token of [
-      'border-dashed',
-      'border-border-strong/60',
-      'bg-transparent',
-      'p-6',
-      'py-10',
-    ])
+    for (const token of ['border-border-subtle', 'bg-surface', 'p-6', 'py-6'])
       expect(root?.classList.contains(token), token).toBe(true)
+    expect(root?.classList.contains('border-dashed')).toBe(false)
   })
 
   it('lets the caller choose the heading level', () => {

@@ -59,6 +59,8 @@ const messages = {
   'nav.dashboard': 'Pulpit',
   'nav.accounts': 'Konta',
   'nav.transactions': 'Transakcje',
+  'nav.transactions.short': 'Transakcje',
+  'nav.transactions.barName': 'Transakcje',
   'nav.budgets': 'Budżety',
   'nav.categories': 'Kategorie',
   'nav.tags': 'Tagi',

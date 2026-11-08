@@ -241,21 +241,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           rel: 'preload',
           as: 'font',
           type: 'font/woff2',
+          href: '/fonts/inter-latin-400.woff2',
+          crossOrigin: 'anonymous' as const,
+        },
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          href: '/fonts/inter-latin-700.woff2',
+          crossOrigin: 'anonymous' as const,
+        },
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
           href: '/fonts/caveat-latin.woff2',
-          crossOrigin: 'anonymous' as const,
-        },
-        {
-          rel: 'preload',
-          as: 'font',
-          type: 'font/woff2',
-          href: '/fonts/courier-prime-latin.woff2',
-          crossOrigin: 'anonymous' as const,
-        },
-        {
-          rel: 'preload',
-          as: 'font',
-          type: 'font/woff2',
-          href: '/fonts/courier-prime-bold-latin.woff2',
           crossOrigin: 'anonymous' as const,
         },
         // For a Polish document `latin-ext` is not an extra subset, it is the
@@ -268,21 +268,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
                 rel: 'preload',
                 as: 'font',
                 type: 'font/woff2',
+                href: '/fonts/inter-latin-ext-400.woff2',
+                crossOrigin: 'anonymous' as const,
+              },
+              {
+                rel: 'preload',
+                as: 'font',
+                type: 'font/woff2',
+                href: '/fonts/inter-latin-ext-700.woff2',
+                crossOrigin: 'anonymous' as const,
+              },
+              {
+                rel: 'preload',
+                as: 'font',
+                type: 'font/woff2',
                 href: '/fonts/caveat-latin-ext.woff2',
-                crossOrigin: 'anonymous' as const,
-              },
-              {
-                rel: 'preload',
-                as: 'font',
-                type: 'font/woff2',
-                href: '/fonts/courier-prime-latin-ext.woff2',
-                crossOrigin: 'anonymous' as const,
-              },
-              {
-                rel: 'preload',
-                as: 'font',
-                type: 'font/woff2',
-                href: '/fonts/courier-prime-bold-latin-ext.woff2',
                 crossOrigin: 'anonymous' as const,
               },
             ]
@@ -341,16 +341,17 @@ function RootDocument({ children }: { children: ReactNode }) {
     // that category: they are server-rendered from the negotiated locale and must match byte for
     // byte after hydration.
     /*
-      `scroll-pt-16` and `scroll-pb-28` are WCAG 2.2 §2.4.11 and §2.4.12, expressed once for the
+      `scroll-pt-16` and the bottom calc are WCAG 2.2 §2.4.11 and §2.4.12, expressed once for the
       whole document: both layouts reserve the top 64px for a sticky header and the guarded shell
-      reserves the bottom for its mobile navigation bar, so anything the browser scrolls to — a
-      focused control, a fragment target — must come to rest inside those edges rather than
-      underneath them. The bottom reservation is dropped at `lg`, where the bar is not on screen.
+      reserves the bottom 64px plus the safe-area inset for its mobile navigation bar, so anything
+      the browser scrolls to — a focused control, a fragment target — must come to rest inside
+      those edges rather than underneath them. The bottom reservation is dropped at `lg`, where
+      the bar is not on screen.
     */
     <html
       lang={locale}
       dir={dir}
-      className="scroll-pt-16 scroll-pb-28 lg:scroll-pb-0"
+      className="scroll-pt-16 scroll-pb-[calc(4rem+var(--safe-bottom))] lg:scroll-pb-0"
       suppressHydrationWarning
     >
       <head>
@@ -406,7 +407,7 @@ function SkipLink() {
   return (
     <a
       href={`#${MAIN_CONTENT_ID}`}
-      className="sr-only-focusable z-modal target-min-h fixed start-4 top-4 inline-flex items-center rounded-md bg-surface px-4 py-2 text-label font-medium text-ink shadow-elevated outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+      className="sr-only-focusable z-modal target-min min-h-11 fixed start-4 top-4 inline-flex items-center rounded-md bg-surface px-4 py-2 text-label font-medium text-ink shadow-elevated outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
     >
       {t('a11y.skipToContent')}
     </a>

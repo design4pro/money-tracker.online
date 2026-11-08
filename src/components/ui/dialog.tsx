@@ -33,7 +33,7 @@ const modalVariants = cva(
     variants: {
       size: {
         sm: 'max-w-sm',
-        md: 'max-w-lg',
+        md: 'max-w-[35rem]',
         lg: 'max-w-2xl',
         xl: 'max-w-4xl',
       },
@@ -61,7 +61,7 @@ const modalVariants = cva(
          */
         center: 'rounded-xl my-auto max-h-[calc(100dvh-2rem)]',
         drawer:
-          'rounded-t-2xl max-w-none sm:max-w-none mt-auto max-h-[92dvh] pb-[var(--safe-bottom)] data-[entering]:animate-drawer-in data-[exiting]:animate-drawer-out',
+          'rounded-t-2xl max-w-none sm:max-w-none mt-auto max-h-[90dvh] pb-[var(--safe-bottom)] data-[entering]:animate-drawer-in data-[exiting]:animate-drawer-out',
         'drawer-end':
           'rounded-s-2xl ms-auto h-full max-h-none w-full max-w-md data-[entering]:animate-fade-in data-[exiting]:animate-fade-out',
       },
@@ -259,7 +259,7 @@ export function DialogHeader({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-start justify-between gap-4 border-b border-border-subtle px-5 py-4',
+        'flex shrink-0 items-start justify-between gap-4 border-b border-border-subtle px-4 py-4 lg:px-6',
         className,
       )}
     >
@@ -309,7 +309,7 @@ export function DialogBody({
         // nearer than the panel, those boxes sat outside this scroll port and
         // outside its clip, giving the scrim hundreds of pixels of scroll range
         // that moved the panel's header off the top of the screen.
-        'relative min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-safe',
+        'relative min-h-0 flex-1 overflow-y-auto px-4 py-4 focus-safe lg:px-6',
         className,
       )}
     />
@@ -324,7 +324,7 @@ export function DialogFooter({
     <div
       {...props}
       className={cn(
-        'flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border-subtle px-5 py-4',
+        'flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border-subtle px-4 py-4 lg:px-6',
         className,
       )}
     />

@@ -238,6 +238,8 @@ export interface TransactionFormProps {
    * server's English; see {@link RefusedBooking}.
    */
   readonly refusedBooking?: RefusedBooking
+  /** Merged onto the form. The entry and edit pages pass a height so the actions pin without overlay. */
+  readonly className?: string
 }
 
 export function TransactionForm({
@@ -256,6 +258,7 @@ export function TransactionForm({
   amountNote,
   storedSettledOn,
   refusedBooking,
+  className,
 }: TransactionFormProps) {
   const t = useTranslate()
   const locale = useLocale()
@@ -304,15 +307,17 @@ export function TransactionForm({
   // Focusing the wrapper's input rather than remounting the field keeps the account and the date
   // exactly as they were, which is the point of the whole interaction.
   useEffect(() => {
-    if (resetToken === 0) {
+    if (!autoFocusAmount && resetToken === 0) {
       return
     }
-    // The next entry is a fresh form, so it starts untouched. Without this the cleared amount is
-    // still measured against the rules the *previous* entry satisfied, and a blank box that
-    // nobody has typed into yet opens reading "enter an amount greater than zero".
-    setTouched(false)
-    amountRef.current?.querySelector('input')?.focus()
-  }, [resetToken])
+    if (resetToken > 0) {
+      // The next entry is a fresh form, so it starts untouched. Without this the cleared amount is
+      // still measured against the rules the *previous* entry satisfied, and a blank box that
+      // nobody has typed into yet opens reading "enter an amount greater than zero".
+      setTouched(false)
+    }
+    amountRef.current?.querySelector('input')?.focus({ preventScroll: true })
+  }, [resetToken, autoFocusAmount])
 
   const account = reference.accounts.find(
     (entry) => entry.id === values.accountId,
@@ -337,12 +342,26 @@ export function TransactionForm({
   const submit = (addAnother: boolean) => {
     setTouched(true)
     if (Object.keys(errors).length > 0) {
-      // The amount comes first in the DOM, so the date only takes focus when it is the first
-      // thing the refusal is about; otherwise the amount error is the one to fix first (WCAG 2.4.3).
+      // Keep the document still: the field stack is the thing that scrolls. Focusing the first
+      // invalid control with preventScroll, then scrolling that control inside the stack, is what
+      // stops the page title from sliding under the sticky header (WCAG 2.4.3 / 2.4.11).
+      window.scrollTo(0, 0)
       if (errors.amountMinor === undefined && errors.bookedOn !== undefined) {
         dateRef.current
           ?.querySelector<HTMLElement>('[role="spinbutton"]')
-          ?.focus()
+          ?.focus({ preventScroll: true })
+        dateRef.current?.scrollIntoView?.({
+          block: 'nearest',
+          inline: 'nearest',
+        })
+      } else {
+        amountRef.current
+          ?.querySelector('input')
+          ?.focus({ preventScroll: true })
+        amountRef.current?.scrollIntoView?.({
+          block: 'nearest',
+          inline: 'nearest',
+        })
       }
       return
     }
@@ -378,6 +397,7 @@ export function TransactionForm({
 
   return (
     <div
+      className={cn('flex min-h-0 flex-1 flex-col', className)}
       onKeyDown={(event: ReactKeyboardEvent<HTMLDivElement>) => {
         // The repeat-entry accelerator. Bound on the wrapper rather than on the button so it fires
         // from the note box too, where a bare Enter has to keep inserting a newline. React Aria's
@@ -401,45 +421,49 @@ export function TransactionForm({
           submit(false)
         }}
         className={cn(
-          'flex flex-col gap-6',
-          // Below `lg` the actions are a sticky footer over the bottom bar, and `<html>` only
-          // budgets scroll padding for the bar. The extra clearance lives on the controls
-          // themselves, since focus scrolls the focused element and nothing else.
-          'max-lg:[&_:is(input,textarea,button,[tabindex])]:scroll-mb-28',
+          'flex min-h-0 flex-1 flex-col gap-6',
+          // Below `lg` the actions sit in flow at the foot of this column, not over the fields.
+          // The field stack scrolls; the footer never covers Date or its error (spec §8).
+          'max-lg:[&_:is(input,textarea,button,[tabindex],[role=spinbutton])]:scroll-mb-4',
         )}
       >
-        {serverError === undefined ? null : (
-          <div
-            role="alert"
-            className="flex items-start gap-3 rounded-lg border border-negative/40 bg-negative-soft px-4 py-3"
-          >
-            <TriangleAlert
-              aria-hidden="true"
-              className="mt-0.5 size-5 shrink-0 text-negative"
-            />
-            <div className="min-w-0">
-              <p className="text-label font-semibold text-ink">
-                {t('transactions.form.error.title')}
-              </p>
-              <p className="mt-0.5 text-body text-ink-2">{serverError}</p>
+        <div className="flex min-h-0 flex-col gap-6 max-lg:flex-1 max-lg:overscroll-contain max-lg:[@media(min-height:21rem)]:overflow-y-auto max-lg:[@media(min-height:21rem)]:pb-[7.5rem]">
+          {serverError === undefined ? null : (
+            <div
+              role="alert"
+              className="flex items-start gap-3 rounded-lg border border-negative/40 bg-negative-soft px-4 py-3"
+            >
+              <TriangleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-5 shrink-0 text-negative"
+              />
+              <div className="min-w-0">
+                <p className="text-label font-semibold text-ink">
+                  {t('transactions.form.error.title')}
+                </p>
+                <p className="mt-0.5 text-body text-ink-2">{serverError}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ---- The three things every entry needs -------------------------- */}
-        <div className="flex flex-col gap-4">
-          <RadioGroup
-            label={t('transactions.filter.direction')}
-            orientation="horizontal"
-            value={values.direction}
-            onChange={(value) => patch({ direction: value as LedgerDirection })}
-          >
-            <Radio value="expense">{t('transactions.direction.expense')}</Radio>
-            <Radio value="income">{t('transactions.direction.income')}</Radio>
-          </RadioGroup>
+          {/* ---- The three things every entry needs -------------------------- */}
+          <div className="flex flex-col gap-4">
+            <RadioGroup
+              label={t('transactions.filter.direction')}
+              orientation="horizontal"
+              value={values.direction}
+              onChange={(value) =>
+                patch({ direction: value as LedgerDirection })
+              }
+            >
+              <Radio value="expense">
+                {t('transactions.direction.expense')}
+              </Radio>
+              <Radio value="income">{t('transactions.direction.income')}</Radio>
+            </RadioGroup>
 
-          <div ref={amountRef}>
-            {/*
+            <div ref={amountRef}>
+              {/*
               Not disabled while the save is in flight, unlike every other field here.
 
               The amount is the one control that is *always* focused when a save starts — it takes
@@ -455,223 +479,225 @@ export function TransactionForm({
               buttons carry `isPending` — which is how every other form in this codebase says
               "saving" without taking a field away from whoever is typing in it.
             */}
-            <MoneyField
-              locale={locale}
-              label={t('transactions.field.amount')}
-              value={values.amountMinor}
-              currencyCode={currencyCode}
-              onChange={(amountMinor) => patch({ amountMinor })}
-              errorMessage={shown.amountMinor}
-              invalidMessage={t('validation.amount.invalid')}
-              size="lg"
-              isRequired
-              autoFocus={autoFocusAmount}
-              description={
-                amountNotes.length === 0
-                  ? undefined
-                  : amountNotes.map((note) => (
-                      <span key={note} className="block">
-                        {note}
-                      </span>
-                    ))
-              }
-            />
-          </div>
+              <MoneyField
+                locale={locale}
+                label={t('transactions.field.amount')}
+                value={values.amountMinor}
+                currencyCode={currencyCode}
+                onChange={(amountMinor) => patch({ amountMinor })}
+                errorMessage={shown.amountMinor}
+                invalidMessage={t('validation.amount.invalid')}
+                size="lg"
+                isRequired
+                autoFocus={false}
+                description={
+                  amountNotes.length === 0
+                    ? undefined
+                    : amountNotes.map((note) => (
+                        <span key={note} className="block">
+                          {note}
+                        </span>
+                      ))
+                }
+              />
+            </div>
 
-          {afterAmount}
+            {afterAmount}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div ref={dateRef}>
-              {/*
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div ref={dateRef}>
+                {/*
                 A settled entry stops at today, a planned one may run ten years ahead. The cap
                 is the larger of today and a legacy row's stored date, so that date can be shown
                 rather than clamped, and the days between today and that date are unavailable.
                 `isInvalid` makes the field render our message instead of React Aria's range
                 default.
               */}
-              <DatePicker
-                label={t('transactions.field.date')}
-                calendarLabel={t('transactions.filter.openCalendar')}
-                isRequired
-                isDisabled={isSubmitting}
-                isInvalid={dateFlagged ? true : undefined}
-                errorMessage={shown.bookedOn}
-                value={safeParseDate(values.bookedOn)}
-                maxValue={
-                  values.isPlanned
-                    ? localToday.add({ years: 10 })
-                    : (safeParseDate(legacyDate ?? todayIso) ?? localToday)
-                }
-                isDateUnavailable={
-                  legacyDate === undefined || values.isPlanned
-                    ? undefined
-                    : (date: DateValue) => {
-                        // Only the stored date is valid past today, so the days between are shown
-                        // as unavailable rather than offered and then rejected.
-                        const iso = date.toString()
-                        return iso > todayIso && iso !== legacyDate
-                      }
-                }
-                onChange={(value: DateValue | null) => {
-                  if (value !== null) {
-                    patch({ bookedOn: value.toString() })
+                <DatePicker
+                  label={t('transactions.field.date')}
+                  calendarLabel={t('transactions.filter.openCalendar')}
+                  isRequired
+                  isDisabled={isSubmitting}
+                  isInvalid={dateFlagged ? true : undefined}
+                  errorMessage={shown.bookedOn}
+                  value={safeParseDate(values.bookedOn)}
+                  maxValue={
+                    values.isPlanned
+                      ? localToday.add({ years: 10 })
+                      : (safeParseDate(legacyDate ?? todayIso) ?? localToday)
                   }
-                }}
-              />
-              {/*
+                  isDateUnavailable={
+                    legacyDate === undefined || values.isPlanned
+                      ? undefined
+                      : (date: DateValue) => {
+                          // Only the stored date is valid past today, so the days between are shown
+                          // as unavailable rather than offered and then rejected.
+                          const iso = date.toString()
+                          return iso > todayIso && iso !== legacyDate
+                        }
+                  }
+                  onChange={(value: DateValue | null) => {
+                    if (value !== null) {
+                      patch({ bookedOn: value.toString() })
+                    }
+                  }}
+                />
+                {/*
                 The error mounts in the date field while focus is on the "planned" checkbox, so
                 the field's own description is never read. This region is announced instead
                 (WCAG 4.1.3); it stays mounted so a later change is announced. A message already
                 present at mount (a prefilled future date) is not, and is read through the
                 field's description on focus.
               */}
-              <p role="status" className="sr-only">
-                {dateFlagged ? shown.bookedOn : ''}
-              </p>
+                <p role="status" className="sr-only">
+                  {dateFlagged ? shown.bookedOn : ''}
+                </p>
+              </div>
+
+              <Select
+                label={t('transactions.field.account')}
+                isRequired
+                isDisabled={isSubmitting}
+                errorMessage={shown.accountId}
+                selectedKey={values.accountId === '' ? null : values.accountId}
+                onSelectionChange={(key) => patch({ accountId: String(key) })}
+              >
+                {reference.accounts.map((option) => (
+                  <SelectItem
+                    key={option.id}
+                    id={option.id}
+                    textValue={`${option.name} · ${option.currencyCode}`}
+                  >
+                    {option.name} · {option.currencyCode}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          {/* ---- Everything else --------------------------------------------- */}
+          <FormSection legend={t('transactions.form.details')}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {reference.categories.length === 0 ? null : (
+                <ComboBox
+                  label={t('transactions.field.category')}
+                  toggleLabel={t('a11y.showSuggestions')}
+                  placeholder={t('transactions.form.categoryPlaceholder')}
+                  emptyState={t('transactions.filter.noMatches')}
+                  isDisabled={isSubmitting}
+                  items={reference.categories}
+                  selectedKey={values.categoryId}
+                  onSelectionChange={(key) =>
+                    patch({ categoryId: key === null ? null : String(key) })
+                  }
+                >
+                  {(option: { id: string; name: string }) => (
+                    <ComboBoxItem id={option.id} textValue={option.name}>
+                      {option.name}
+                    </ComboBoxItem>
+                  )}
+                </ComboBox>
+              )}
+
+              {reference.payees.length === 0 ? null : (
+                <ComboBox
+                  label={t('transactions.field.payee')}
+                  toggleLabel={t('a11y.showSuggestions')}
+                  placeholder={t('transactions.form.payeePlaceholder')}
+                  emptyState={t('transactions.filter.noMatches')}
+                  isDisabled={isSubmitting}
+                  items={reference.payees}
+                  selectedKey={values.payeeId}
+                  onSelectionChange={(key) =>
+                    patch({ payeeId: key === null ? null : String(key) })
+                  }
+                >
+                  {(option: { id: string; name: string }) => (
+                    <ComboBoxItem id={option.id} textValue={option.name}>
+                      {option.name}
+                    </ComboBoxItem>
+                  )}
+                </ComboBox>
+              )}
+
+              <Select
+                label={t('transactions.field.paymentMethod')}
+                isDisabled={isSubmitting}
+                selectedKey={values.paymentMethod ?? 'none'}
+                onSelectionChange={(key) =>
+                  patch({
+                    paymentMethod:
+                      key === 'none' ? null : (key as LedgerPaymentMethod),
+                  })
+                }
+              >
+                <SelectItem id="none" textValue={t('common.none')}>
+                  {t('common.none')}
+                </SelectItem>
+                {LEDGER_PAYMENT_METHODS.map((method) => (
+                  <SelectItem
+                    key={method}
+                    id={method}
+                    textValue={t(PAYMENT_METHOD_KEY[method])}
+                  >
+                    {t(PAYMENT_METHOD_KEY[method])}
+                  </SelectItem>
+                ))}
+              </Select>
             </div>
 
-            <Select
-              label={t('transactions.field.account')}
-              isRequired
+            <TextAreaField
+              label={t('transactions.field.note')}
+              placeholder={t('transactions.form.notePlaceholder')}
+              rows={3}
               isDisabled={isSubmitting}
-              errorMessage={shown.accountId}
-              selectedKey={values.accountId === '' ? null : values.accountId}
-              onSelectionChange={(key) => patch({ accountId: String(key) })}
-            >
-              {reference.accounts.map((option) => (
-                <SelectItem
-                  key={option.id}
-                  id={option.id}
-                  textValue={`${option.name} · ${option.currencyCode}`}
-                >
-                  {option.name} · {option.currencyCode}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
-        </div>
+              errorMessage={shown.note}
+              value={values.note}
+              onChange={(note) => patch({ note })}
+            />
 
-        {/* ---- Everything else --------------------------------------------- */}
-        <FormSection legend={t('transactions.form.details')}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {reference.categories.length === 0 ? null : (
-              <ComboBox
-                label={t('transactions.field.category')}
-                toggleLabel={t('a11y.showSuggestions')}
-                placeholder={t('transactions.form.categoryPlaceholder')}
-                emptyState={t('transactions.filter.noMatches')}
-                isDisabled={isSubmitting}
-                items={reference.categories}
-                selectedKey={values.categoryId}
-                onSelectionChange={(key) =>
-                  patch({ categoryId: key === null ? null : String(key) })
-                }
-              >
-                {(option: { id: string; name: string }) => (
-                  <ComboBoxItem id={option.id} textValue={option.name}>
-                    {option.name}
-                  </ComboBoxItem>
-                )}
-              </ComboBox>
-            )}
-
-            {reference.payees.length === 0 ? null : (
-              <ComboBox
-                label={t('transactions.field.payee')}
-                toggleLabel={t('a11y.showSuggestions')}
-                placeholder={t('transactions.form.payeePlaceholder')}
-                emptyState={t('transactions.filter.noMatches')}
-                isDisabled={isSubmitting}
-                items={reference.payees}
-                selectedKey={values.payeeId}
-                onSelectionChange={(key) =>
-                  patch({ payeeId: key === null ? null : String(key) })
-                }
-              >
-                {(option: { id: string; name: string }) => (
-                  <ComboBoxItem id={option.id} textValue={option.name}>
-                    {option.name}
-                  </ComboBoxItem>
-                )}
-              </ComboBox>
-            )}
-
-            <Select
-              label={t('transactions.field.paymentMethod')}
-              isDisabled={isSubmitting}
-              selectedKey={values.paymentMethod ?? 'none'}
-              onSelectionChange={(key) =>
-                patch({
-                  paymentMethod:
-                    key === 'none' ? null : (key as LedgerPaymentMethod),
-                })
-              }
-            >
-              <SelectItem id="none" textValue={t('common.none')}>
-                {t('common.none')}
-              </SelectItem>
-              {LEDGER_PAYMENT_METHODS.map((method) => (
-                <SelectItem
-                  key={method}
-                  id={method}
-                  textValue={t(PAYMENT_METHOD_KEY[method])}
-                >
-                  {t(PAYMENT_METHOD_KEY[method])}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
-
-          <TextAreaField
-            label={t('transactions.field.note')}
-            placeholder={t('transactions.form.notePlaceholder')}
-            rows={3}
-            isDisabled={isSubmitting}
-            errorMessage={shown.note}
-            value={values.note}
-            onChange={(note) => patch({ note })}
-          />
-
-          {/*
+            {/*
           A checkbox rather than a switch: this is a value the form will submit, not a setting that
           takes effect the moment it is flipped. The distinction is audible — a screen reader says
           "switch, on" for one and "checkbox, checked" for the other — so getting it wrong tells
           somebody the transaction has already been marked planned when it has not.
         */}
-          <Checkbox
-            isSelected={values.isPlanned}
-            isDisabled={isSubmitting}
-            onChange={(isPlanned) => patch({ isPlanned })}
-            description={t('transactions.planned.help')}
-          >
-            {t('transactions.planned')}
-          </Checkbox>
-        </FormSection>
+            <Checkbox
+              isSelected={values.isPlanned}
+              isDisabled={isSubmitting}
+              onChange={(isPlanned) => patch({ isPlanned })}
+              description={t('transactions.planned.help')}
+            >
+              {t('transactions.planned')}
+            </Checkbox>
+          </FormSection>
 
-        {/*
+          {/*
           The hint stays out of the pinned footer: two lines of caption pinned to every scroll
           position would cost the phone a third of its form. It sits in flow above the actions
           below `lg` and drops back under the row from `lg`, where the row is in flow too.
         */}
-        {allowRepeat ? (
-          <p className="text-caption text-ink-2 lg:order-last lg:-mt-3 lg:text-end">
-            {t('transactions.form.saveAndNewHint')}
-          </p>
-        ) : null}
+          {allowRepeat ? (
+            <p className="text-caption text-ink-2 lg:order-last lg:-mt-3 lg:text-end">
+              {t('transactions.form.saveAndNewHint')}
+            </p>
+          ) : null}
+        </div>
 
         {/*
-          On a phone the actions are a footer pinned above the bottom bar, so Save is under the
-          thumb however long the form has grown, and it is the one full-width button: the two
-          quieter actions share the row beneath it, so a thumb aimed at Save cannot land on
-          "add another". The offset is the bar's own height - 64px of tabs, its one-pixel top rule
-          and the safe-area inset it pads for - and the footer is sticky rather than fixed, so at
-          the end of the form it settles into flow and never covers the last field. From `lg` the
-          bar is gone and the row sits in flow as it always has.
+          Phone, tall enough: pin actions above the bottom bar. Phone, short (400% layout
+          zoom can be innerHeight ~192): do *not* pin. Sticky header 64 + a 65px footer +
+          the 64px bar consume the whole screen, so Amount/Date/Account have no band
+          (spec §8 / AC5 / 1.4.10). Below 21rem the actions stay in flow and the page
+          scrolls; hitboxes stay 44px. From `lg` the bar is gone and the row is in flow.
+          When pinned, `mx-0` cancels `max-sm:-mx-4` so spec §4's 16px gutter stays on
+          Save (inset-x-0 + -mx-4 had put the control at 0).
         */}
         <div
           className={cn(
-            'sticky bottom-[calc(4rem+1px+var(--safe-bottom))] border-t border-border-subtle bg-canvas py-3',
+            'shrink-0 border-t border-border-subtle bg-canvas py-3',
             'max-sm:-mx-4 max-sm:px-4',
+            'max-lg:[@media(min-height:21rem)]:fixed max-lg:[@media(min-height:21rem)]:inset-x-0 max-lg:[@media(min-height:21rem)]:mx-0 max-lg:[@media(min-height:21rem)]:bottom-[calc(var(--nav-h)+var(--safe-bottom))] max-lg:[@media(min-height:21rem)]:z-10 max-lg:[@media(min-height:21rem)]:px-4 sm:max-lg:[@media(min-height:21rem)]:px-6',
             'lg:static lg:border-0 lg:bg-transparent lg:py-0',
           )}
         >

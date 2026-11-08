@@ -28,9 +28,8 @@ import type {
  *
  * ## One row of chips under the amount, not a card above it
  *
- * The row is a shortcut, so it takes one line: a caption at the start and one chip per template,
- * scrolling sideways on a phone rather than pushing the amount field down the page, and wrapping
- * where there is room. A chip is
+ * The row is a shortcut: a caption at the start and one chip per template, wrapping as whole
+ * chips so a name is never clipped through the middle of a word. A chip is
  * the template's name and, when the template fixes one, its amount in the second ink; a template
  * that leaves the amount to the person says nothing about it, because an empty amount box under
  * a chip already says that. Both are text on the button, so a screen reader's element list is a
@@ -110,12 +109,12 @@ export function TemplatePicker({
         >
           {t('templates.picker.label')}
         </span>
-        {/* One sideways-scrolling line on a phone, a wrapping row from `sm`. `focus-safe`
-            reserves room for a chip's focus ring inside the scroller; the negative margin gives
-            that room back so the first chip lines up with the field above. */}
+        {/* Whole chips wrap. A sideways scroller at 360px clipped the last name through the
+            middle of the word. `focus-safe` still reserves the focus ring; the negative margin
+            gives that room back so the first chip lines up with the field above. */}
         <ul
           aria-labelledby={labelId}
-          className="-m-1 flex min-w-0 flex-1 gap-2 overflow-x-auto focus-safe sm:flex-wrap"
+          className="-m-1 flex min-w-0 flex-1 flex-wrap gap-2 focus-safe"
         >
           {templates.map((template) => {
             const amount = amountOf(template)

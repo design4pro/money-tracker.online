@@ -63,6 +63,8 @@ export {
 } from './scales'
 export type { BandLayout, Domain, NiceDomainOptions, Range } from './scales'
 
+export { PLOT_HEIGHT_NARROW, PLOT_HEIGHT_WIDE, usePlotSize } from './plot-size'
+
 export { Sparkline } from './sparkline'
 export type { SparklineCopy, SparklineProps } from './sparkline'
 
