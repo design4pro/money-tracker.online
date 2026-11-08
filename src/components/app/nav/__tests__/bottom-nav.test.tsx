@@ -12,12 +12,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
+import pl from '#/lib/i18n/messages/pl'
 import { AriaRouterProvider } from '#/components/app/shell'
 
 import { BottomNav } from '../bottom-nav'
 import { BOTTOM_BAR_OVERFLOW } from '../destinations'
 
-import type { Catalogue } from '#/lib/i18n'
+import type { Catalogue, Locale } from '#/lib/i18n'
 
 /**
  * The phone bar's *More* sheet, asserted against the navigation it contains.
@@ -60,10 +61,14 @@ function plainMessage(message: Catalogue[keyof Catalogue]): string {
  *
  * `pathname` stays a prop, as it is in `_app.tsx`; the router only has to own the move.
  */
-async function renderBottomNav(pathname: string) {
+async function renderBottomNav(
+  pathname: string,
+  locale: Locale = 'en',
+  messages: Catalogue = en as Catalogue,
+) {
   const rootRoute = createRootRoute({
     component: () => (
-      <I18nProvider locale="en" messages={en as Catalogue}>
+      <I18nProvider locale={locale} messages={messages}>
         <AriaRouterProvider>
           <Outlet />
           <BottomNav pathname={pathname} />
@@ -86,7 +91,8 @@ async function renderBottomNav(pathname: string) {
   const navigate = vi.spyOn(router, 'navigate')
 
   render(<RouterProvider router={router} />)
-  await waitFor(() => screen.getByRole('button', { name: en['app.nav.more'] }))
+  const moreLabel = plainMessage(messages['app.nav.more'])
+  await waitFor(() => screen.getByRole('button', { name: moreLabel }))
 
   return { navigate }
 }
@@ -119,6 +125,68 @@ describe('BottomNav', () => {
     await userEvent.click(await openMoreSheet())
 
     expect(navigate).toHaveBeenCalledWith({ href: OVERFLOW.href })
+  })
+
+  it('draws five equal cells and names the English transactions tab Ledger', async () => {
+    await renderBottomNav('/dashboard')
+
+    const nav = screen.getByRole('navigation', { name: en['nav.primary'] })
+    const cells = nav.querySelectorAll(':scope > ul > li')
+    expect(cells).toHaveLength(5)
+
+    const transactions = screen.getByRole('link', {
+      name: en['nav.transactions.barName'],
+    })
+    expect(transactions.getAttribute('href')).toBe('/transactions')
+    expect(transactions.getAttribute('aria-label')).toBe(
+      en['nav.transactions.barName'],
+    )
+    expect(transactions.textContent).toBe(en['nav.transactions.short'])
+    expect(
+      en['nav.transactions.barName'].includes(en['nav.transactions.short']),
+    ).toBe(true)
+    expect(transactions.textContent).not.toBe(en['nav.transactions'])
+    expect(transactions.className.includes('h-16')).toBe(true)
+    expect(transactions.className.includes('tracking-')).toBe(false)
+    expect(transactions.innerHTML.includes('font-normal')).toBe(true)
+    expect(transactions.innerHTML.includes('font-semibold')).toBe(false)
+    expect(transactions.innerHTML.includes('text-caption')).toBe(true)
+    expect(transactions.innerHTML.includes('truncate')).toBe(false)
+    expect(transactions.innerHTML.includes('break-words')).toBe(false)
+    expect(transactions.innerHTML.includes('ellipsis')).toBe(false)
+
+    const dashboard = screen.getByRole('link', { name: en['nav.dashboard'] })
+    expect(dashboard.textContent).toBe(en['nav.dashboard'])
+    expect(dashboard.getAttribute('aria-label')).toBeNull()
+  })
+
+  it('uses caption 400 on inactive bar labels and 600 on the selected tab', async () => {
+    await renderBottomNav('/transactions')
+
+    const transactions = screen.getByRole('link', {
+      name: en['nav.transactions.barName'],
+    })
+    expect(transactions.innerHTML.includes('font-semibold')).toBe(true)
+    expect(transactions.getAttribute('aria-current')).toBe('page')
+
+    const dashboard = screen.getByRole('link', { name: en['nav.dashboard'] })
+    expect(dashboard.innerHTML.includes('font-normal')).toBe(true)
+    expect(dashboard.innerHTML.includes('font-semibold')).toBe(false)
+  })
+
+  it('keeps Polish Transakcje as the visible and accessible name on the bar', async () => {
+    await renderBottomNav('/dashboard', 'pl', pl as Catalogue)
+
+    const transactions = screen.getByRole('link', {
+      name: pl['nav.transactions'],
+    })
+    expect(transactions.getAttribute('href')).toBe('/transactions')
+    expect(transactions.textContent).toBe(pl['nav.transactions'])
+    expect(transactions.getAttribute('aria-label')).toBe(
+      pl['nav.transactions.barName'],
+    )
+    expect(pl['nav.transactions.short']).toBe(pl['nav.transactions'])
+    expect(pl['nav.transactions.barName']).toBe(pl['nav.transactions'])
   })
 
   it('closes the sheet on the row that is already current, where no path changes', async () => {

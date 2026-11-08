@@ -127,7 +127,7 @@ it('declares both halves of every self-hosted face', () => {
   // Latin-ext is what carries every Polish diacritic but `ó`. A face that ships
   // only its `latin` subset renders the PL catalogue in a fallback, one glyph
   // at a time, which reads as a broken font rather than as a missing one.
-  for (const family of ['Caveat', 'Courier Prime']) {
+  for (const family of ['Caveat', 'Inter']) {
     const subsets = [...TOKENS.matchAll(/@font-face\s*\{([^}]*)\}/g)]
       .map((block) => block[1])
       .filter((block) => block.includes(`font-family: '${family}'`))

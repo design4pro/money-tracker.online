@@ -40,7 +40,7 @@ import type { Page } from '@playwright/test'
  *
  * ## Docked placements
  *
- * The bottom sheet (`drawer`) already had a bound — `max-h-[92dvh]` — which is why it behaved while
+ * The bottom sheet (`drawer`) already had a bound — `max-h-[90dvh]` — which is why it behaved while
  * the centred dialog did not. The side drawer (`drawer-end`) did **not**: `h-full` is a height, and
  * its `max-h-none` cancelled the `max-height: inherit` that `Dialog` used to take its bound from, so
  * its body never scrolled either and its content simply spilled past the panel. Both are asserted

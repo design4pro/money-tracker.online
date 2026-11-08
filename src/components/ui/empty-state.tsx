@@ -38,10 +38,11 @@ export interface EmptyStateProps {
  * finds the explanation instead of landing in a silent region. The icon is
  * `aria-hidden` and the message never depends on it.
  *
- * It is the dashed {@link Card} and nothing else, at one size: a `subtitle` heading, a 44px
- * medallion and the default-size action. There is deliberately no `size` prop - three areas once
- * hand-rolled their own at 32px / 56px (#362) and `empty-state-ownership.test.ts` now fails on a
- * fourth. A surface that needs more offers it in a sibling section beside this one.
+ * It is a surface card with a hairline border, at one size: a `subtitle` heading, a 44px
+ * medallion and the default-size action. Dashed paper is not an empty state. There is
+ * deliberately no `size` prop - three areas once hand-rolled their own at 32px / 56px (#362) and
+ * `empty-state-ownership.test.ts` still fails on a fourth dashed card outside `components/ui`. A
+ * surface that needs more offers it in a sibling section beside this one.
  */
 export function EmptyState({
   icon,
@@ -56,10 +57,10 @@ export function EmptyState({
 
   return (
     <Card
-      variant="dashed"
+      variant="default"
       padding="lg"
       className={cn(
-        'flex flex-col items-center gap-3 py-10 text-center',
+        'flex flex-col items-center gap-3 py-6 text-center shadow-none',
         className,
       )}
     >

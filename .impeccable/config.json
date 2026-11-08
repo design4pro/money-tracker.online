@@ -54,6 +54,12 @@
         "value": "1px)`",
         "createdAt": "2026-09-12T08:32:08.345Z",
         "reason": "quoted Tailwind built-in output in a test allowlist reason, not a design decision: rounded-full compiles to border-radius: calc(infinity * 1px)"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-08T09:36:21.798Z",
+        "reason": "Binding redesign spec (Pixel): local Inter latin-ext 400/500/600/700 is the product UI face; Caveat remains the brand lockup exception."
       }
     ]
   }

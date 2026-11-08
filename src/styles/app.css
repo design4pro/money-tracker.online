@@ -120,6 +120,7 @@
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-brand: var(--font-brand);
 
   --text-hero: var(--text-hero);
   --text-hero--line-height: var(--text-hero--line-height);
@@ -284,6 +285,12 @@
        smooth` is already neutralised under reduced motion in `tokens.css`. */
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* Sticky header and the phone bar: a focused control must land in the
+       unobscured well, not under either edge (WCAG 2.2 §2.4.11 / §2.4.12). */
+    scroll-padding-block-start: calc(
+      var(--nav-h) + var(--impersonation-h) + var(--safe-top)
+    );
+    scroll-padding-block-end: calc(4rem + 1px + var(--safe-bottom));
   }
 
   body {

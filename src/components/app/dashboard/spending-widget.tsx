@@ -1,4 +1,4 @@
-import { DonutChart } from '#/components/charts'
+import { DonutChart, usePlotSize } from '#/components/charts'
 import { EmptyState } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
 
@@ -34,6 +34,7 @@ export function SpendingWidget({
   const t = useTranslate()
   const locale = useLocale()
   const copy = spendingCopy(t, locale)
+  const plotSize = usePlotSize()
 
   if (spending.length === 0) {
     return (
@@ -57,7 +58,7 @@ export function SpendingWidget({
       currencyCode={baseCurrencyCode}
       slices={slices}
       copy={copy}
-      size={220}
+      size={plotSize}
     />
   )
 }

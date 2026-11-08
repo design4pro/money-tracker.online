@@ -56,8 +56,9 @@ import type {
  *
  * Below `md` even three is too many. Four stacked full-width controls plus a full-width primary
  * button put the first transaction some 620px down an 844px screen — under two rows of a list the
- * reader opened to read. So on a phone the bar is one row (search, Filters, New) and the date range
- * and the sort move inside the panel, where they are drafted and applied with everything else.
+ * reader opened to read. Date range and sort still move inside the panel. Search takes a full
+ * row below `md` so the short placeholder (`Search` / `Szukaj`) is fully readable at 320 CSS
+ * (spec §7); Filters and New share the row beneath.
  *
  * ## Every active filter is visible and removable
  *
@@ -404,7 +405,7 @@ export function FilterBar({
           onChange={(value) =>
             update({ text: value.trim() === '' ? undefined : value })
           }
-          className="min-w-0 flex-1 sm:min-w-56"
+          className="min-w-0 flex-1 max-md:basis-full sm:min-w-56"
         />
 
         {/* From `md` up these two stay on the bar. Below it they are in the panel instead — see

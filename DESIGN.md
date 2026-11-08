@@ -1,6 +1,6 @@
 ---
 name: money-tracker.online
-description: A passbook kept at the kitchen table - every line is an entry, a balance follows each one, and one violet stamp is spent only on what is settled.
+description: A modern readable ledger - Inter for product UI, Caveat only on the brand lockup, and one violet stamp spent only on what is settled.
 colors:
   canvas: '#f5f4ee'
   surface: '#fbfaf6'
@@ -58,57 +58,63 @@ colors:
   series-7: '#a60d47'
   series-8: '#9724b5'
 typography:
-  hero:
+  brand:
     fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
-    fontSize: 'clamp(3.25rem, 8vw, 5rem)'
+    fontSize: '1rem'
     fontWeight: 700
-    lineHeight: '5rem'
+    lineHeight: '1.5rem'
+    letterSpacing: '0'
+  hero:
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '2.5rem'
+    fontWeight: 700
+    lineHeight: '3rem'
     letterSpacing: '0'
   display:
-    fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
-    fontSize: 'clamp(2rem, 4.5vw, 3rem)'
-    fontWeight: 700
-    lineHeight: 1.05
-    letterSpacing: '0'
-  title:
-    fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
     fontSize: '2rem'
     fontWeight: 700
-    lineHeight: 1.1
+    lineHeight: '2.5rem'
+    letterSpacing: '0'
+  title:
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '1.75rem'
+    fontWeight: 700
+    lineHeight: '2.125rem'
     letterSpacing: '0'
   subtitle:
-    fontFamily: 'Caveat, Caveat Fallback, Bradley Hand, Segoe Script, cursive'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
     fontSize: '1.25rem'
-    fontWeight: 700
-    lineHeight: 1.25
+    fontWeight: 600
+    lineHeight: '1.75rem'
     letterSpacing: '0'
   body:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
-    fontSize: '0.9375rem'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '1rem'
     fontWeight: 400
-    lineHeight: 1.55
+    lineHeight: '1.5rem'
   label:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
-    fontSize: '0.8125rem'
-    fontWeight: 400
-    lineHeight: 1.5
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '0.875rem'
+    fontWeight: 500
+    lineHeight: '1.25rem'
   caption:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
     fontSize: '0.75rem'
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: '1.125rem'
   micro:
-    fontFamily: 'Courier Prime, Courier Prime Fallback, Courier New, Courier, monospace'
-    fontSize: '0.6875rem'
-    fontWeight: 700
-    lineHeight: 1.2
-    letterSpacing: '0.06em'
+    fontFamily: 'Inter, Inter Fallback, system-ui, sans-serif'
+    fontSize: '0.75rem'
+    fontWeight: 500
+    lineHeight: '1.125rem'
+    letterSpacing: '0'
 rounded:
-  sm: '0.125rem'
-  md: '0.125rem'
-  lg: '0.1875rem'
-  xl: '0.25rem'
-  2xl: '0.25rem'
+  sm: '0.375rem'
+  md: '0.5rem'
+  lg: '0.75rem'
+  xl: '1rem'
+  2xl: '1.25rem'
   full: '9999px'
 spacing:
   1: '0.25rem'
@@ -128,7 +134,7 @@ components:
     backgroundColor: '{colors.accent}'
     textColor: '{colors.on-accent}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-primary-hover:
@@ -141,7 +147,7 @@ components:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.ink}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-secondary-hover:
@@ -151,7 +157,7 @@ components:
     backgroundColor: 'transparent'
     textColor: '{colors.ink-2}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-ghost-hover:
@@ -161,21 +167,21 @@ components:
     backgroundColor: '{colors.brand}'
     textColor: '{colors.on-brand}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   button-danger:
     backgroundColor: '{colors.negative}'
     textColor: '{colors.on-negative}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   field:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.ink}'
     rounded: '{rounded.md}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.3}'
     typography: '{typography.label}'
   card:
@@ -212,13 +218,13 @@ components:
   typed-line:
     backgroundColor: 'transparent'
     textColor: '{colors.ink}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   typed-line-planned:
     backgroundColor: 'transparent'
     textColor: '{colors.ink-2}'
-    height: '2.5rem'
+    height: '2.75rem'
     padding: '0 {spacing.4}'
     typography: '{typography.label}'
   table-row:
@@ -247,52 +253,33 @@ components:
 
 ## Overview
 
-**Creative North Star: "The Kitchen-Table Passbook"**
+**Creative North Star: "The Modern Readable Ledger"**
 
-Derived, not chosen: the direction contract's FORM is "Książeczka" (the passbook) and its OWN-WORLD
-block names off-white form paper, printed green ruling, typed entries, a handwritten heading and one
-violet stamp. Every line of the product is an entry and a balance stands after each one, and a
-page has both ends: a balance carried in on its first line and a balance carried forward on its
-last. The
-paper is form paper, not a dashboard: printed rules at a 2.5rem pitch carry the structure that a
-grid of cards would otherwise carry, the entries are typed in a typewriter face so that a column of
-money aligns on its decimal without help, and the headings and margin notes are written by hand,
-pinned to a printed rule rather than floating above the text. The book is kept by an adult; the
-hand is quick, not a schoolroom script, and the typewriter is a working tool, not a prop.
+The kitchen-table passbook (Caveat headings, Courier Prime figures, 2-4px guillotine corners,
+notebook ruling) is the discarded world. Product UI is Inter; Caveat remains only on the brand
+lockup. Structure is cards, lists and a compact mobile shell, not printed 2.5rem rules. Money still
+aligns on tabular figures. There is still one violet stamp: a commanding action and anything the
+product has settled. It is never spent on what is planned. A planned line is written in pencil -
+the second ink at `ink-2` - and the word "Planned" beside it is the channel; the grey only agrees.
+Nothing is struck through. Green ink is money in hand, red ink is money overdrawn, brown ink is a
+warning, each text-grade at 7:1 on the darkest ground it can land on.
 
-There is one stamp. Violet is the colour of a commanding action and of anything the product has
-settled: a primary button, a link, the current destination, the focus ring, the selected row, and
-the one "settled" mark itself - a typed word with a run of highlighter in the stamp wash behind
-it, beside the line that was carried in. It is never spent on what is planned: a page whose last
-entry is planned closes in pencil and is not marked. A planned line is written in pencil - the second ink at
-`ink-2` - and the word "Planned" beside it is the channel; the grey only agrees. Nothing is ever
-struck through, because the product has no voided line. Green ink is money in hand, red ink is
-money overdrawn, brown ink is a warning, and each is text-grade at 7:1 on the darkest ground it can
-land on.
-
-Nothing floats at rest. A slip laid on the paper has a one-pixel under-edge and nothing more, and
-the corners of everything are the corners a guillotine leaves (2-4px). Materials are at full
-strength: typed ink at 12.83:1, printed rules faint on purpose (1.44:1) so a page full of them reads
-as paper rather than as a grid. Dark is the same book read on a phone at night - slate paper, bone
-ink, lilac stamp - designed as a second set of values rather than inverted from the first. The
-three risks the world was built to avoid are: reading as school-like or childish (so the hand is
-bold, adult and never decorated), as retro or nostalgic (so there is no texture, no aged paper, no
-faux stamp graphic - the metaphor lives in rules and type, and the one drawn gesture is the
-highlighter pen, run behind the word of every badge), and as too little like an
-application (so every control is a React Aria primitive with a 3:1 boundary, a 44px target and a
-two-ring focus indicator).
+Nothing floats at rest. A slip has a one-pixel under-edge and nothing more. Radii are 6 / 8 / 12 /
+16 / 20. Materials stay at full strength: ink at 12.83:1, decorative rules faint on purpose. Dark
+is a second designed set (slate ground, bone ink, lilac stamp), not an invert of light. The three
+risks this world avoids: reading as a schoolbook, as retro paper, or as a dashboard of equal KPI
+tiles. Every control is a React Aria primitive with a 3:1 boundary, a 44px target and a two-ring
+focus indicator.
 
 **Key Characteristics:**
 
-- Form paper (`canvas`), ruled in printed green at a 2.5rem pitch; the rules are the layout.
-- Two faces, two jobs: Caveat for anything written by hand, Courier Prime for anything read as a
-  record - body, controls and every figure.
+- Canvas as the ground; surface cards and lists carry structure. No notebook ruling on product UI.
+- Inter for product UI (latin-ext); Caveat only on the brand lockup.
 - One violet stamp for every action and every "settled" mark; never on what is planned.
 - State is line form before hue: planned in pencil, booked in ink, nothing struck through.
-- Rules instead of cards; a heading over a body with a hairline above it is the unit of composition.
-- Square corners (2-4px); `full` radius only on things that are genuinely round.
+- Radius 6/8/12/16/20; `full` only on things that are genuinely round.
 - Nothing floats at rest. The resting shadow is a one-pixel under-edge.
-- Every number that can change is set in the typewriter face and tabular.
+- Every number that can change is tabular.
 - Every colour token carries its measured contrast ratio beside its declaration.
 - Light and dark are two designed sets, both declared at three sites.
 
@@ -440,20 +427,15 @@ every one on each run. A token added without its measurement is not finished.
 
 ## Typography
 
-**Display Font:** Caveat, variable 400-700, self-hosted (with a metric-compensated `Caveat
-Fallback` over Bradley Hand / Segoe Script) - the hand.
-**Body Font:** Courier Prime 400 and 700, self-hosted (with `Courier Prime Fallback` over Courier
-New) - the typewriter. Body, controls and every figure.
-**Label/Mono Font:** none distinct. The body is monospaced; `--font-mono` resolves to the same
-stack.
+**Product UI Font:** Inter 400/500/600/700, self-hosted latin and latin-ext, with `Inter Fallback`
+then system-ui. Headings, body, controls and every figure.
+**Brand lockup:** Caveat, reserved for the wordmark. Not used on figures, labels or headings.
+**Mono Font:** system ui-monospace for technical identifiers only.
 
-**Character:** a quick adult hand over a working typewriter. The hand is bold at display sizes
-because Caveat's x-height is small and needs a third more size than a sans to carry the same
-weight; the typewriter has regular and bold only, which is all a typewriter ever had, so a
-`font-weight: 500` resolves to regular and `600` to bold. There is no negative tracking anywhere: a
-typewriter cannot kern and a hand does not. Both stacks name their fallback face immediately after
-the web face with the web face's own `hhea` metrics as overrides, so the swap can move a line by a
-few characters but never by a pixel of height. `h1`-`h3` take the display face at the base layer.
+**Character:** Inter at 400/500/600/700. There is no negative tracking on product UI. Both stacks
+name their fallback face immediately after the web face with the web face's own `hhea` metrics as
+overrides, so the swap can move a line by a few characters but never by a pixel of height. Caveat
+is the lockup only; it is never a figure, a heading or a control.
 
 ### Hierarchy
 
@@ -477,20 +459,13 @@ few characters but never by a pixel of height. `h1`-`h3` take the display face a
 
 ### Named Rules
 
-**The Typed Line Rule.** A line of the passbook is a 2.5rem box - one rule of the form - and its
-type sits vertically centred in that box. A cell has no vertical padding, and the rule under it
-is drawn as an inset one-pixel shadow rather than a border so it adds no height and the table
-never walks off the pitch. (Owner decision, 2026-11-03: centre the type rather than set its
-baseline 3px above the printed rule.)
+**The Ledger Line Rule.** A wide ledger row is a 52px (3.25rem) box, the redesign floor, with
+type vertically centred. Compact mobile rows are at least 76px and may grow when an amount or
+account wraps. Digits are never ellipsised. A cell on the wide page has no extra vertical padding;
+the rule under it is an inset one-pixel shadow.
 
-**The Hand-On-Rules Rule.** A handwritten heading on ruled paper is placed on the rules the same
-way: the hero by `translate-y-[calc(2.5rem-0.33em)]`, a title by `leading-10` plus
-`translate-y-[calc(1.25rem-0.33em)]`. A hand that floats between rules reads as a sticker.
-
-**The Two Voices Rule.** Anything read as a record is typed; anything said by the keeper is
-written. A heading, a margin note or a section title is Caveat; a figure, a label, a button, a
-cell or a paragraph is Courier Prime. A figure is never set in the hand and a heading is never
-typed.
+**The One Voice Rule.** Product UI is Inter. Caveat is the brand lockup and nothing else. A figure
+is never set in the hand.
 
 **The Tabular Rule.** Any number that can change carries `.tabular` on the element holding the
 digits. The face is monospaced already; the utility stays so a re-rendered total still asks for
@@ -504,14 +479,12 @@ full sentence in an `sr-only` span that names the currency in full and the direc
 
 ## Layout
 
-The page is ruled paper. On the landing, a `repeating-linear-gradient` draws one `border-subtle`
-hairline every 2.5rem (masked out over the last 4rem), and every vertical measure on the page -
-the hero's line box, the typed line, the section rhythm - is a multiple of that pitch. Structure is
-carried by rules, not cards: a section is a heading over a body with a hairline above it, and a
-list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
+The landing may still draw a 2.5rem pitch as a historical marketing surface. Product UI is not
+ruled paper: sections are headings over bodies, lists and cards on `canvas`, with `border-t` or a
+hairline where a division is needed.
 
 - **Rhythm**: a strict 4px grid. `--spacing: 0.25rem` pins Tailwind's numeric scale, so `p-6`,
-  `gap-6` and `--space-6` are the same 24px. The passbook pitch is 2.5rem (`space-10`).
+  `gap-6` and `--space-6` are the same 24px. Inner control padding is 8/12/16/24px.
 - **Marketing well**: 72rem (`max-w-6xl`), padded 16px, 24px from `sm`. Sections are `py-20`,
   `py-28` from `sm`, on a 12-column grid from `lg` (heading 8 or 7 columns, aside 4 or 5).
 - **App shell**: a rail on `surface-sunken` from `lg` (1024px) up behind a `border-subtle` end
@@ -520,17 +493,12 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
 - **Chrome geometry is composed**: `--nav-h` 64px, `--subnav-h` 48px and `--impersonation-h`
   (0 when absent) through the chrome utilities; `<html>` carries a matching scroll padding so a
   focused control is never scrolled under the bar.
-- **The passbook row**: from `sm` up, one typed line per entry - date, description, amount, and
-  the balance-after column on the right behind a 2px `border-panel` spine, each cell separated by a
-  `border-subtle` vertical rule. Below `sm` the row becomes a two-column grid (`1fr auto`): the
-  description and its date over the amount and balance, the date column hidden, the paper's own
-  ruling standing in for the cell rules. Explicit ARIA table roles keep it a table when the CSS
-  display changes. The page has both ends: the opening line carries last month's balance in and
-  wears the settled mark; the closing line ("Carried forward to April", dated the last day of the
-  month) reads its balance from the last line rather than retyping it, and sits over the heavier
-  `border-panel` rule that is the foot of the form - the same rule that sits under the column
-  headings. When the last entry is planned, the balance carried forward is written in pencil
-  like the line that produced it, and the page is not marked.
+- **The ledger row**: from `lg` (1024px) up, a semantic table - date, description (category and
+  account on tracks), amount, optional balance-after behind a 2px `border-panel` spine. Below `lg`
+  the row is a compact list: description and full amount first, category and account secondary,
+  amounts and account names wrap, never ellipsis on digits. Explicit ARIA table roles keep it a
+  table when the CSS display changes. Header min 44px, wide row min 52px, compact row min 76px,
+  day band 40px.
 - **The summary strip**: a `dl` of three items, each a small label over its figure, one pattern
   for every item, the strip's items vertically centred - never three tiles. (Owner decision,
   2026-11-03.)
@@ -557,12 +525,9 @@ list of items is a `dl` or `ul` whose rows sit on `border-t` rules.
 
 ### Named Rules
 
-**The Rules-Not-Cards Rule.** A section, a list item or a callout is a heading over a body with a
-hairline above it. A card is a slip laid on the paper for content that genuinely needs its own
-ground (a chart, a form); it is never the scaffold of a page.
-
-**The On-Pitch Rule.** Anything drawn on ruled paper is a whole number of rules tall. A line box is
-a length (2.5rem), not a ratio, and a cell adds no padding the rule did not budget for.
+**The Cards-Where-Needed Rule.** A section, a list item or a callout is a heading over a body,
+often with a hairline. A card is a surface for content that needs its own ground (a chart, a form,
+a KPI summary); it is not a grid of equal icon tiles.
 
 **The Closed-Ladder Rule.** Nothing invents a `z-index`. Eight named rungs (`base` 0, `nav` 30,
 `dropdown` 40, `overlay` 50, `modal` 60, `popover` 65, `tooltip` 70, `toast` 80).
@@ -621,8 +586,9 @@ tab a one-pixel top rule, the selected table row a one-pixel inset frame.
 
 ### Named Rules
 
-**The Guillotine Rule.** No radius above 4px on a rectangle. A rounded rectangle is a pill and a
-pill is a sticker; the form has neither.
+**The Radius Scale.** Rectangles use 6 / 8 / 12 / 16 / 20px (`sm` through `2xl`). `full` is
+reserved for avatars, chips and indicators that are genuinely round. Caveat remains only on the
+brand lockup.
 
 **The Rule-Not-Stripe Rule.** No coloured border wider than 1px on a card, a list item, a callout
 or an alert; the spine before the balance column (2px `border-panel`) is the one heavier rule and
@@ -824,7 +790,10 @@ screen is what made it shared.
 - **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
   button; the app shell always passes `closeLabel` (`action.close`, EN + PL) and `regionLabel`
   (`notifications.title`, EN + PL). `ToastHost` retains English defaults for both props. The
-  icon-only close control always has an accessible name.
+  icon-only close control always has an accessible name. The region is `z-nav`, not sonner's
+  999999999: a toast may cover the bottom bar, never a menu or a dialog. On a phone the stack
+  is offset by the same `5.5rem + safe-area` clearance `<main>` uses, so it does not sit on
+  the five-cell bar.
 - **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
   §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
   never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is
@@ -1056,7 +1025,7 @@ is the second line of the opening entry.
 
 ### Tables
 
-The passbook inside the app. A `border-subtle` frame at `lg` radius on `surface`; a sticky header
+The ledger inside the app. A `border-subtle` frame at `lg` radius on `surface`; a sticky header
 band on `surface-sunken` in micro uppercase `ink-2`; cells separated by `border-subtle` vertical
 rules and rows by `border-subtle` horizontal ones, cell padding 12 / 10px. Hover paints the `hover`
 wash. **Selection** paints `brand-soft` plus a one-pixel inset frame in `brand`
@@ -1383,12 +1352,12 @@ still fire.
 
 ### Do:
 
-- **Do** set every heading, margin note and section title in Caveat, and every figure, label,
-  control and paragraph in Courier Prime.
-- **Do** put a line of the passbook in a 2.5rem box with its type vertically centred in the
-  rule, and draw the rule under a cell as an inset one-pixel shadow.
-- **Do** build a section, a list or a summary as headings over bodies on `border-t` rules; reach
-  for a card only when the content needs its own ground.
+- **Do** set product UI in Inter (latin-ext), and keep Caveat on the brand lockup only.
+- **Do** put a wide ledger line in a 52px box with its type vertically centred, and draw the
+  rule under a cell as an inset one-pixel shadow. Compact mobile rows are at least 76px and wrap
+  amounts and accounts.
+- **Do** build a section, a list or a summary as headings over bodies; reach for a card when the
+  content needs its own ground (KPI strip, chart, form).
 - **Do** spend violet on actions and on what is settled - the primary button, links, the current
   destination, the focus ring, the selected row - and nowhere else.
 - **Do** write a planned line in `ink-2` with the word beside it, and a booked line in `ink`.
@@ -1398,7 +1367,7 @@ still fire.
 - **Do** give every amount an explicit sign (U+2212 for out, `+` for in), set inflow bold and
   outflow regular, and mark a transfer with the repeat glyph.
 - **Do** mark a current or selected thing with a one-pixel frame or a one-pixel rule in `brand`.
-- **Do** keep every radius at 2-4px on a rectangle and reserve `full` for things that are round.
+- **Do** keep radii on the 6/8/12/16/20 scale and reserve `full` for things that are round.
 - **Do** record every colour token's measured contrast beside its declaration and declare every
   themed colour at all three sites.
 - **Do** grow hit areas to 44px inside the primitive with `target-min`, write `outline-solid`
@@ -1417,11 +1386,11 @@ still fire.
   figure elsewhere is a typed line with its label at the start and the figure at the end. The
   totals strip is the documented exception (owner decision, 2026-11-03): there the label sits
   over the figure, still as items of a `dl`, never as cards.
-- **Don't** set a figure in the hand or a heading in the typewriter.
+- **Don't** set a figure, heading, label or control in Caveat.
 - **Don't** use gradient text, glass, blur, a translucent bar, or a hard offset shadow anywhere.
 - **Don't** put a coloured border wider than 1px on a card, list item, callout or alert, or mark
   selection with a bar; the 2px spine is neutral and belongs to the balance column only.
-- **Don't** put a radius above 4px on a rectangle; no pills on chips, badges or panels.
+- **Don't** invent a radius off the 6/8/12/16/20 scale; no unearned pills on panels.
 - **Don't** use emoji, a glyph icon set, or a system display face; icons are lucide and the faces
   are the two self-hosted ones.
 - **Don't** spend violet on a planned line, a decoration, a heading or a divider; never put the

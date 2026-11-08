@@ -246,4 +246,4 @@ export const fieldEndButton = cn(
  * `Label` above dim itself when the container is disabled without the caller
  * threading a prop through.
  */
-export const fieldRow = 'group/field flex flex-col gap-1.5 min-w-0'
+export const fieldRow = 'group/field flex flex-col gap-2 min-w-0'

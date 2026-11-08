@@ -37,8 +37,8 @@ export interface AppShellProps {
  * Exactly one element clears each fixed edge and the content well accounts for both, once:
  *
  * - the header at the top, cleared because it is `sticky` inside the same scroll flow;
- * - the bottom bar at the bottom, cleared by `pb-28` below `lg` — 112px, which is the bar's 64px
- *   plus room for a focus ring and the safe-area inset the bar itself pads for.
+ * - the bottom bar at the bottom, cleared by `pb-[calc(5.5rem+var(--safe-bottom))]` below `lg` —
+ *   88px plus the safe-area inset the bar itself pads for.
  *
  * A sticky sub-header inside a screen composes those values rather than re-deriving them. Two
  * elements both claiming to clear the same edge is how a focused input ends up under a phone
@@ -88,13 +88,13 @@ export function AppShell({ shell, pathname, children }: AppShellProps) {
             </div>
           </div>
 
-          <div className="flex min-h-dvh flex-col lg:ps-55">
+          <div className="flex min-h-dvh min-w-0 flex-col lg:ps-55">
             <AppHeader shell={shell} />
 
             <main
               id={MAIN_CONTENT_ID}
               tabIndex={-1}
-              className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-28 outline-none sm:px-6 lg:px-8 lg:pb-12"
+              className="mx-auto min-w-0 w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-[calc(5.5rem+var(--safe-bottom))] outline-none sm:px-6 lg:px-8 lg:pb-8"
             >
               {children}
             </main>
@@ -149,7 +149,7 @@ export function AppShellFallback({ children }: AppShellFallbackProps) {
             </div>
           </div>
 
-          <div className="flex min-h-dvh flex-col lg:ps-55">
+          <div className="flex min-h-dvh min-w-0 flex-col lg:ps-55">
             <div
               aria-hidden="true"
               className="sticky top-0 z-nav h-16 shrink-0 border-b border-border-subtle bg-canvas"
@@ -157,7 +157,7 @@ export function AppShellFallback({ children }: AppShellFallbackProps) {
             <main
               id={MAIN_CONTENT_ID}
               tabIndex={-1}
-              className="mx-auto w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-12 outline-none sm:px-6 lg:px-8"
+              className="mx-auto min-w-0 w-full max-w-content flex-1 scroll-mt-16 px-4 pt-6 pb-12 outline-none sm:px-6 lg:px-8"
             >
               {children}
             </main>
