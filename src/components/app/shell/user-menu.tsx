@@ -9,6 +9,7 @@ import {
   MenuSeparator,
   MenuTrigger,
   Popover,
+  initialsFrom,
 } from '#/components/ui'
 import { signOut } from '#/lib/auth-client'
 import { useTranslate } from '#/lib/i18n'
@@ -34,6 +35,7 @@ export interface UserMenuProps {
 export function UserMenu({ user }: UserMenuProps) {
   const t = useTranslate()
   const [isSigningOut, setSigningOut] = useState(false)
+  const initials = initialsFrom(user.name)
 
   return (
     <MenuTrigger>
@@ -42,7 +44,16 @@ export function UserMenu({ user }: UserMenuProps) {
         shape="icon"
         // The name rather than a generic "account": with two people sharing a household the avatar
         // is the only thing distinguishing two otherwise identical headers.
-        aria-label={`${t('app.account.menu')}: ${user.name}`}
+        //
+        // The trigger's only *visible* text is the initials disc. WCAG 2.2 §2.5.3 (axe
+        // `label-content-name-mismatch`) requires that string inside the accessible name:
+        // "DH" is not a substring of "Demo Household", so the name alone is not enough.
+        // `@axe-core/playwright` 4.14 flags it on every signed-in surface.
+        aria-label={
+          initials
+            ? `${t('app.account.menu')}: ${user.name} (${initials})`
+            : `${t('app.account.menu')}: ${user.name}`
+        }
         isPending={isSigningOut}
         icon={
           <Avatar size="md" name={user.name} src={user.image} isDecorative />
