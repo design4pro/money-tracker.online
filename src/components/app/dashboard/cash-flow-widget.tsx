@@ -143,7 +143,7 @@ export function CashFlowWidget({
       series={series}
       copy={copy}
       layout="grouped"
-      height={220}
+      height={240}
       emphasis={emphasis}
       extraTableRows={extraTableRows}
       footnote={

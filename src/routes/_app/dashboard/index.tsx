@@ -119,13 +119,6 @@ function DashboardRoute() {
           />
         </WidgetFrame>
 
-        <WidgetFrame title={t('dashboard.widget.spendingByCategory')}>
-          <SpendingWidget
-            baseCurrencyCode={data.baseCurrencyCode}
-            spending={data.spending}
-          />
-        </WidgetFrame>
-
         <WidgetFrame title={t('dashboard.widget.accountsOverview')}>
           <AccountsWidget
             baseCurrencyCode={data.baseCurrencyCode}
@@ -137,6 +130,13 @@ function DashboardRoute() {
           <RecentTransactionsWidget
             baseCurrencyCode={data.baseCurrencyCode}
             transactions={data.recent}
+          />
+        </WidgetFrame>
+
+        <WidgetFrame title={t('dashboard.widget.spendingByCategory')}>
+          <SpendingWidget
+            baseCurrencyCode={data.baseCurrencyCode}
+            spending={data.spending}
           />
         </WidgetFrame>
       </WidgetGrid>

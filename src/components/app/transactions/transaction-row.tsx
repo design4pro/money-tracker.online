@@ -59,8 +59,8 @@ import type { LedgerRow } from './types'
  * ## Nothing may leave its column
  *
  * The table is `table-fixed`, which fixes the track widths but does nothing about content wider
- * than its track. Every text node in this row is therefore either `truncate`d or short by
- * construction.
+ * than its track. On the wide page, secondary text may truncate. Amounts and account names on
+ * the compact list wrap instead: digits are never ellipsised.
  *
  * ## Why every prop is a scalar
  *
@@ -138,15 +138,15 @@ export function descriptionTracks(showAccount: boolean): string {
  * rule under both lines there, since its cells draw none.
  */
 const ROW =
-  'max-sm:grid max-sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_2.75rem] max-sm:grid-rows-[2.5rem_2.5rem] max-sm:shadow-[inset_0_-1px_0_0_var(--color-border-subtle)]'
+  'max-lg:grid max-lg:grid-cols-[2.75rem_minmax(0,1fr)_auto_2.75rem] max-lg:auto-rows-min max-lg:items-stretch max-lg:gap-x-2 max-lg:py-3 max-lg:shadow-[inset_0_-1px_0_0_var(--color-border-subtle)]'
 
 /** Where each cell lands in that grid. */
-const AT_SELECT = 'max-sm:col-start-1 max-sm:row-start-1 max-sm:row-span-2'
-const AT_TITLE = 'max-sm:col-start-2 max-sm:row-start-1'
-const AT_META = 'max-sm:col-start-2 max-sm:row-start-2'
-const AT_AMOUNT = 'max-sm:col-start-3 max-sm:row-start-1'
-const AT_BALANCE = 'max-sm:col-start-3 max-sm:row-start-2'
-const AT_ACTIONS = 'max-sm:col-start-4 max-sm:row-start-1 max-sm:row-span-2'
+const AT_SELECT = 'max-lg:col-start-1 max-lg:row-start-1 max-lg:row-span-2'
+const AT_TITLE = 'max-lg:col-start-2 max-lg:row-start-1'
+const AT_META = 'max-lg:col-start-2 max-lg:row-start-2'
+const AT_AMOUNT = 'max-lg:col-start-3 max-lg:row-start-1'
+const AT_BALANCE = 'max-lg:col-start-3 max-lg:row-start-2'
+const AT_ACTIONS = 'max-lg:col-start-4 max-lg:row-start-1 max-lg:row-span-2'
 
 /**
  * `scroll-mt-10` is WCAG 2.2 §2.4.11 for this grid specifically: `<html>` reserves scroll padding
@@ -167,15 +167,13 @@ export const CELL_RULE = 'sm:border-s sm:border-border-subtle'
 export const CELL_SPINE = 'sm:border-s-2 sm:border-border-panel'
 
 /** A cell holding a target rather than type: the target centred on the first rule. */
-const TARGET_LINE = 'flex h-10 items-center justify-center max-sm:h-full'
+const TARGET_LINE = 'flex h-11 items-center justify-center max-lg:h-full'
 
 /** The meta line: the secondary facts of an entry, typed in pencil on one truncating line. */
 const META_LINE = cn(
   'text-caption',
   rowWashSecondary,
-  TYPED_LINE,
-  // After the typed line, whose `block` this replaces; the line-height it set stays.
-  'flex min-w-0 items-center gap-1.5 overflow-hidden',
+  'flex min-w-0 flex-wrap items-center gap-1.5 lg:flex-nowrap lg:overflow-hidden lg:leading-10',
 )
 
 /** U+2014. Stands in for a category a row does not have, so no track is ever blank. */
@@ -243,7 +241,7 @@ function CategoryFacts({
       ) : (
         <>
           <CategoryMark color={categoryColor} />
-          <span className="truncate">{categoryName}</span>
+          <span className="max-lg:break-words lg:truncate">{categoryName}</span>
         </>
       )}
     </>
@@ -269,7 +267,12 @@ function AccountFacts({
   return (
     <>
       {showAccount ? (
-        <span className={cn('truncate', afterDot && 'min-w-0 flex-1')}>
+        <span
+          className={cn(
+            'max-lg:break-words lg:truncate',
+            afterDot && 'min-w-0 flex-1',
+          )}
+        >
           {afterDot ? (
             <>
               <Dot />{' '}
@@ -360,7 +363,11 @@ function TransactionRowImpl({
       role="row"
       aria-rowindex={ariaRowIndex}
       aria-selected={isSelected}
-      style={{ height: rowHeightFor(row, isWide) }}
+      style={
+        isWide
+          ? { height: rowHeightFor(row, true) }
+          : { minHeight: rowHeightFor(row, false) }
+      }
       className={cn(
         ROW,
         'bg-surface text-ink',
@@ -407,7 +414,7 @@ function TransactionRowImpl({
         <span
           aria-hidden="true"
           className={cn(
-            'truncate text-caption tabular max-sm:hidden',
+            'truncate text-caption tabular max-lg:hidden',
             TYPED_LINE,
           )}
         >
@@ -418,7 +425,7 @@ function TransactionRowImpl({
             and the account, with the date typed in front of them only where no day heading names
             it. `hidden` is `display: none`, so only one of the two readings of this cell ever
             reaches the accessibility tree. */}
-        <span className={cn(META_LINE, 'sm:hidden')}>
+        <span className={cn(META_LINE, 'lg:hidden')}>
           {isGrouped ? null : (
             <>
               <span aria-hidden="true" className="shrink-0 tabular">
@@ -451,13 +458,13 @@ function TransactionRowImpl({
             // The row's one tap path: a 44px box around the 40px line, the extra 4px given back by
             // the negative margins so nothing moves. `relative` keeps it above the static text of
             // the line under it. The typed line is the span inside, so the box stays on its rule.
-            className="relative -my-0.5 block min-w-0 overflow-hidden py-0.5 no-underline hover:underline"
+            className="relative -my-0.5 block min-w-0 py-0.5 no-underline hover:underline max-lg:overflow-visible lg:overflow-hidden"
           >
             <span
               className={cn(
-                'truncate text-label font-medium',
+                'text-label font-medium break-words',
                 row.isPlanned ? rowWashSecondary : 'text-ink',
-                TYPED_LINE,
+                isWide ? cn('truncate', TYPED_LINE) : 'leading-5',
               )}
             >
               {title}
@@ -466,11 +473,6 @@ function TransactionRowImpl({
 
           {/* Between `sm` and `lg`: one meta line under the title. Exactly one of the three
               readings of the meta facts is ever displayed, so no reader sees them twice. */}
-          <span className={cn(META_LINE, 'max-sm:hidden lg:hidden')}>
-            <CategoryFacts {...facts} />
-            <AccountFacts {...facts} afterDot />
-          </span>
-
           {/* From `lg` up: tracks of their own, under their own headings. */}
           <span className={cn(META_LINE, 'hidden lg:flex')}>
             <CategoryFacts {...facts} />
@@ -494,7 +496,7 @@ function TransactionRowImpl({
           'text-end',
           // With no balance under it the cell keeps both phone lines, so a converted figure
           // takes the second rather than widening the column at the title's expense.
-          hasBalance ? null : 'max-sm:row-span-2',
+          hasBalance ? null : 'max-lg:row-span-2',
         )}
       >
         <span className={cn('text-label', TYPED_LINE)}>
@@ -506,7 +508,7 @@ function TransactionRowImpl({
             direction={row.direction}
             isPlanned={row.isPlanned}
             transferKind={row.transferKind}
-            className="align-top"
+            className="align-top max-lg:whitespace-normal"
           />
           {/* The base-currency figure on the rule under the amount where the row has one to
               spare. On a phone passbook that rule belongs to the balance and the figure is left to
@@ -515,7 +517,10 @@ function TransactionRowImpl({
             <ConvertedAmount
               refAmountMinor={row.refAmountMinor}
               refCurrencyCode={row.refCurrencyCode}
-              className={cn('leading-10', hasBalance && 'max-sm:hidden')}
+              className={cn(
+                'leading-5 lg:leading-10',
+                hasBalance && 'max-lg:hidden',
+              )}
             />
           )}
         </span>

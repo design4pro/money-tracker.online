@@ -79,23 +79,23 @@ export const HEADER_ROW = 0
 /**
  * How tall one row is, and the virtualiser is told so rather than measuring.
  *
- * Measurement buys nothing here - the row's content is truncated by construction - and it costs a
- * `ResizeObserver` per visible row plus a scroll-position correction every time one settles. A
- * fixed height also makes the scrollbar honest at ten thousand rows, which a measured list only
- * becomes after the reader has scrolled past everything once.
+ * Measurement buys nothing here on the wide page - the row's content is truncated by construction
+ * - and it costs a `ResizeObserver` per visible row plus a scroll-position correction every time
+ * one settles. A fixed height also makes the scrollbar honest at ten thousand rows, which a
+ * measured list only becomes after the reader has scrolled past everything once.
  *
- * The row is on the pitch of the form: a whole number of {@link LINE_PX} rules. From `lg` up an
- * entry is one typed line - description, category and account on tracks beside the date and the
+ * The wide row is on the pitch of the form: a whole number of {@link LINE_PX} rules. From `lg` up
+ * an entry is one typed line - description, category and account on tracks beside the date and the
  * amount - and a second rule only where a converted figure sits under a foreign-currency amount.
- * Below `lg` the category (and the date, below `sm`) move under the description, so every entry is
- * two rules, and the converted figure shares the amount's cell without adding a third.
+ * Below `lg` the list is compact cards, not ruled paper: min 76px, and a long account or amount
+ * is allowed to grow the row rather than ellipsise digits.
  */
 export function rowHeightFor(
   row: Pick<LedgerRow, 'currencyCode' | 'refCurrencyCode'>,
   isWide: boolean,
 ): number {
   if (!isWide) {
-    return LINE_PX * 2
+    return 76
   }
   return row.currencyCode === row.refCurrencyCode ? LINE_PX : LINE_PX * 2
 }

@@ -57,7 +57,7 @@ export function SpendingWidget({
       currencyCode={baseCurrencyCode}
       slices={slices}
       copy={copy}
-      size={220}
+      size={240}
     />
   )
 }

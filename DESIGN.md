@@ -290,15 +290,14 @@ two-ring focus indicator).
 
 **Key Characteristics:**
 
-- Form paper (`canvas`), ruled in printed green at a 2.5rem pitch; the rules are the layout.
-- Two faces, two jobs: Caveat for anything written by hand, Courier Prime for anything read as a
-  record - body, controls and every figure.
+- Form paper (`canvas`) as the ground; cards and lists carry structure without notebook ruling on
+  the product UI.
+- Inter for product UI (latin-ext); Caveat only on the brand lockup.
 - One violet stamp for every action and every "settled" mark; never on what is planned.
 - State is line form before hue: planned in pencil, booked in ink, nothing struck through.
-- Rules instead of cards; a heading over a body with a hairline above it is the unit of composition.
-- Square corners (2-4px); `full` radius only on things that are genuinely round.
+- Radius 6/8/12/16/20; `full` only on things that are genuinely round.
 - Nothing floats at rest. The resting shadow is a one-pixel under-edge.
-- Every number that can change is set in the typewriter face and tabular.
+- Every number that can change is tabular.
 - Every colour token carries its measured contrast ratio beside its declaration.
 - Light and dark are two designed sets, both declared at three sites.
 
@@ -446,12 +445,10 @@ every one on each run. A token added without its measurement is not finished.
 
 ## Typography
 
-**Display Font:** Caveat, variable 400-700, self-hosted (with a metric-compensated `Caveat
-Fallback` over Bradley Hand / Segoe Script) - the hand.
-**Body Font:** Courier Prime 400 and 700, self-hosted (with `Courier Prime Fallback` over Courier
-New) - the typewriter. Body, controls and every figure.
-**Label/Mono Font:** none distinct. The body is monospaced; `--font-mono` resolves to the same
-stack.
+**Product UI Font:** Inter 400/500/600/700, self-hosted latin and latin-ext, with `Inter Fallback`
+then system-ui. Headings, body, controls and every figure.
+**Brand lockup:** Caveat, reserved for the wordmark. Not used on figures, labels or headings.
+**Mono Font:** system ui-monospace for technical identifiers only.
 
 **Character:** a quick adult hand over a working typewriter. The hand is bold at display sizes
 because Caveat's x-height is small and needs a third more size than a sans to carry the same
@@ -493,10 +490,8 @@ baseline 3px above the printed rule.)
 way: the hero by `translate-y-[calc(2.5rem-0.33em)]`, a title by `leading-10` plus
 `translate-y-[calc(1.25rem-0.33em)]`. A hand that floats between rules reads as a sticker.
 
-**The Two Voices Rule.** Anything read as a record is typed; anything said by the keeper is
-written. A heading, a margin note or a section title is Caveat; a figure, a label, a button, a
-cell or a paragraph is Courier Prime. A figure is never set in the hand and a heading is never
-typed.
+**The One Voice Rule.** Product UI is Inter. Caveat is the brand lockup and nothing else. A figure
+is never set in the hand.
 
 **The Tabular Rule.** Any number that can change carries `.tabular` on the element holding the
 digits. The face is monospaced already; the utility stays so a re-rendered total still asks for
@@ -627,8 +622,9 @@ tab a one-pixel top rule, the selected table row a one-pixel inset frame.
 
 ### Named Rules
 
-**The Guillotine Rule.** No radius above 4px on a rectangle. A rounded rectangle is a pill and a
-pill is a sticker; the form has neither.
+**The Radius Scale.** Rectangles use 6 / 8 / 12 / 16 / 20px (`sm` through `2xl`). `full` is
+reserved for avatars, chips and indicators that are genuinely round. Caveat remains only on the
+brand lockup.
 
 **The Rule-Not-Stripe Rule.** No coloured border wider than 1px on a card, a list item, a callout
 or an alert; the spine before the balance column (2px `border-panel`) is the one heavier rule and
@@ -1389,8 +1385,7 @@ still fire.
 
 ### Do:
 
-- **Do** set every heading, margin note and section title in Caveat, and every figure, label,
-  control and paragraph in Courier Prime.
+- **Do** set product UI in Inter (latin-ext), and keep Caveat on the brand lockup only.
 - **Do** put a line of the passbook in a 2.5rem box with its type vertically centred in the
   rule, and draw the rule under a cell as an inset one-pixel shadow.
 - **Do** build a section, a list or a summary as headings over bodies on `border-t` rules; reach
@@ -1404,7 +1399,7 @@ still fire.
 - **Do** give every amount an explicit sign (U+2212 for out, `+` for in), set inflow bold and
   outflow regular, and mark a transfer with the repeat glyph.
 - **Do** mark a current or selected thing with a one-pixel frame or a one-pixel rule in `brand`.
-- **Do** keep every radius at 2-4px on a rectangle and reserve `full` for things that are round.
+- **Do** keep radii on the 6/8/12/16/20 scale and reserve `full` for things that are round.
 - **Do** record every colour token's measured contrast beside its declaration and declare every
   themed colour at all three sites.
 - **Do** grow hit areas to 44px inside the primitive with `target-min`, write `outline-solid`
@@ -1423,11 +1418,11 @@ still fire.
   figure elsewhere is a typed line with its label at the start and the figure at the end. The
   totals strip is the documented exception (owner decision, 2026-11-03): there the label sits
   over the figure, still as items of a `dl`, never as cards.
-- **Don't** set a figure in the hand or a heading in the typewriter.
+- **Don't** set a figure, heading, label or control in Caveat.
 - **Don't** use gradient text, glass, blur, a translucent bar, or a hard offset shadow anywhere.
 - **Don't** put a coloured border wider than 1px on a card, list item, callout or alert, or mark
   selection with a bar; the 2px spine is neutral and belongs to the balance column only.
-- **Don't** put a radius above 4px on a rectangle; no pills on chips, badges or panels.
+- **Don't** invent a radius off the 6/8/12/16/20 scale; no unearned pills on panels.
 - **Don't** use emoji, a glyph icon set, or a system display face; icons are lucide and the faces
   are the two self-hosted ones.
 - **Don't** spend violet on a planned line, a decoration, a heading or a divider; never put the

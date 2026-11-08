@@ -186,13 +186,13 @@ describe('columnsFor', () => {
 })
 
 describe('rowHeightFor', () => {
-  it('keeps every row on the pitch: one rule wide, two rules where the type wraps', () => {
+  it('keeps every wide row on the pitch; compact mobile rows are at least 76px', () => {
     const same = row('a', '2026-03-04', 1000)
     const foreign = { ...same, currencyCode: EUR }
     expect(rowHeightFor(same, true)).toBe(LINE_PX)
     expect(rowHeightFor(foreign, true)).toBe(LINE_PX * 2)
-    expect(rowHeightFor(same, false)).toBe(LINE_PX * 2)
-    expect(rowHeightFor(foreign, false)).toBe(LINE_PX * 2)
+    expect(rowHeightFor(same, false)).toBe(76)
+    expect(rowHeightFor(foreign, false)).toBe(76)
   })
 })
 

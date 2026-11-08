@@ -138,16 +138,16 @@ function useIsWide(): boolean {
 
 /**
  * The column headings: one typed rule on `surface-sunken`, pinned directly beneath the app header
- * from `sm` up, over the heavier rule the headings sit on.
+ * from `lg` up, over the heavier rule the headings sit on.
  *
  * The offset composes the shell's chrome rather than restating a number: `top-0` alone pinned this
- * row at the *viewport* top, which is inside the 64px app header. Below `sm` the header is two
- * rules (see {@link HEADER_ROW_GRID}) and is not pinned: eighty pixels of headings under sixty-four
- * of chrome would leave a phone a third of its height to read the ledger in.
+ * row at the *viewport* top, which is inside the 64px app header. Below `lg` the column headings
+ * are not drawn: an eighty-pixel empty table header would spend a third of a 360px screen before
+ * the first record.
  */
 const HEADER_CELL = cn(
   CELL_BASE,
-  'sm:sticky sm:top-[calc(var(--nav-h)+var(--impersonation-h))] z-nav sm:bg-surface-sunken sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
+  'lg:sticky lg:top-[calc(var(--nav-h)+var(--impersonation-h))] z-nav lg:bg-surface-sunken lg:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]',
 )
 
 /**
@@ -157,7 +157,7 @@ const HEADER_CELL = cn(
  * paint no background, or they would cover it).
  */
 const HEADER_ROW_GRID =
-  'max-sm:grid max-sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_2.75rem] max-sm:grid-rows-[2.5rem_2.5rem] max-sm:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]'
+  'max-lg:grid max-lg:grid-cols-[2.75rem_minmax(0,1fr)_auto_2.75rem] max-lg:auto-rows-min max-lg:shadow-[inset_0_-1px_0_0_var(--color-border-panel)]'
 
 const HEAD_TEXT = cn(
   'text-micro font-semibold tracking-label uppercase text-ink-2',
@@ -211,8 +211,8 @@ interface DayBandProps {
  */
 function DayBand({ columnCount, label, figureLabel, figure }: DayBandProps) {
   return (
-    <tr aria-hidden="true" className="max-sm:block">
-      <td colSpan={columnCount} className="p-0 max-sm:block">
+    <tr aria-hidden="true" className="max-lg:block">
+      <td colSpan={columnCount} className="p-0 max-lg:block">
         <div
           style={{ height: DAY_BAND_HEIGHT_PX }}
           className="flex items-center justify-between gap-3 bg-surface-sunken ps-12 pe-13 shadow-[inset_0_1px_0_0_var(--color-border-strong),inset_0_-1px_0_0_var(--color-border-panel)] sm:ps-15 sm:pe-14"
@@ -234,7 +234,7 @@ function DayBand({ columnCount, label, figureLabel, figure }: DayBandProps) {
               )}
             >
               {/* A phone line has room for the date and the figure, not for the word too. */}
-              <span className="max-sm:sr-only">{figureLabel}</span>
+              <span className="max-lg:sr-only">{figureLabel}</span>
               {figure}
             </span>
           )}
@@ -622,10 +622,10 @@ export function TransactionList({
   const dayBand = (row: LedgerRow) => {
     const dayLabel = (
       <>
-        <span className="sm:hidden">
+        <span className="lg:hidden">
           {formatCalendarDate(locale, row.bookedOn, 'medium')}
         </span>
-        <span className="max-sm:hidden">
+        <span className="max-lg:hidden">
           {formatCalendarDate(locale, row.bookedOn, 'long')}
         </span>
       </>
@@ -684,7 +684,7 @@ export function TransactionList({
         onKeyDown={handleKeyDown}
         // Below `sm` the table parts are blocks and each row lays itself out as a grid; the
         // explicit ARIA roles on every part keep it a table for assistive technology there.
-        className="w-full table-fixed border-separate border-spacing-0 max-sm:block"
+        className="w-full table-fixed border-separate border-spacing-0 max-lg:block"
       >
         <caption className="sr-only">{caption}</caption>
         {/*
@@ -701,7 +701,7 @@ export function TransactionList({
           <col className="w-11" />
         </colgroup>
 
-        <thead className="max-sm:block">
+        <thead className="hidden lg:table-header-group">
           <tr
             role="row"
             aria-rowindex={1}
@@ -711,10 +711,10 @@ export function TransactionList({
               {...headerCellProps(column.select)}
               className={cn(
                 HEADER_CELL,
-                'text-center max-sm:col-start-1 max-sm:row-start-1 max-sm:row-span-2',
+                'text-center max-lg:col-start-1 max-lg:row-start-1 max-lg:row-span-2',
               )}
             >
-              <span className="flex h-10 items-center justify-center max-sm:h-full">
+              <span className="flex h-10 items-center justify-center max-lg:h-full">
                 <Checkbox
                   excludeFromTabOrder
                   // See `transaction-row.tsx`: a label-less checkbox is 18px wide, and
@@ -733,7 +733,7 @@ export function TransactionList({
               className={cn(
                 HEADER_CELL,
                 CELL_RULE,
-                'text-start max-sm:col-start-2 max-sm:row-start-2',
+                'text-start max-lg:col-start-2 max-lg:row-start-2',
               )}
             >
               {/* The sort control fills the rule. Its line box is the arrow's height, so the arrow
@@ -767,7 +767,7 @@ export function TransactionList({
               className={cn(
                 HEADER_CELL,
                 CELL_RULE,
-                'text-start max-sm:col-start-2 max-sm:row-start-1',
+                'text-start max-lg:col-start-2 max-lg:row-start-1',
               )}
             >
               <div className={descriptionTracks(showAccount)}>
@@ -789,7 +789,7 @@ export function TransactionList({
               className={cn(
                 HEADER_CELL,
                 CELL_RULE,
-                'text-end max-sm:col-start-3 max-sm:row-start-1',
+                'text-end max-lg:col-start-3 max-lg:row-start-1',
               )}
             >
               <span className={HEAD_TEXT}>
@@ -802,7 +802,7 @@ export function TransactionList({
                 className={cn(
                   HEADER_CELL,
                   CELL_SPINE,
-                  'text-end max-sm:col-start-3 max-sm:row-start-2',
+                  'text-end max-lg:col-start-3 max-lg:row-start-2',
                 )}
               >
                 <span className={HEAD_TEXT}>
@@ -815,7 +815,7 @@ export function TransactionList({
               className={cn(
                 HEADER_CELL,
                 CELL_RULE,
-                'text-center max-sm:col-start-4 max-sm:row-start-1 max-sm:row-span-2',
+                'text-center max-lg:col-start-4 max-lg:row-start-1 max-lg:row-span-2',
               )}
             >
               <span className="sr-only">
@@ -825,12 +825,12 @@ export function TransactionList({
           </tr>
         </thead>
 
-        <tbody className="max-sm:block">
+        <tbody className="max-lg:block">
           {paddingTop > 0 ? (
-            <tr aria-hidden="true" className="max-sm:block">
+            <tr aria-hidden="true" className="max-lg:block">
               <td
                 colSpan={columns.length}
-                className="max-sm:block"
+                className="max-lg:block"
                 style={{ height: paddingTop }}
               />
             </tr>
@@ -881,10 +881,10 @@ export function TransactionList({
           })}
 
           {paddingBottom > 0 ? (
-            <tr aria-hidden="true" className="max-sm:block">
+            <tr aria-hidden="true" className="max-lg:block">
               <td
                 colSpan={columns.length}
-                className="max-sm:block"
+                className="max-lg:block"
                 style={{ height: paddingBottom }}
               />
             </tr>
