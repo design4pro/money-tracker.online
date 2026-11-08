@@ -27,11 +27,12 @@ describe('UserMenu', () => {
       </I18nProvider>,
     )
 
-    // WCAG 2.2 §2.5.3: the disc paints "DH", which is not a substring of the
-    // person's name, so the aria-label has to mention the initials explicitly.
+    // WCAG 2.2 §2.5.3 / axe 4.14: the disc paints "DH". That token is not in
+    // the person's name, and parentheticals are stripped before the match, so
+    // the initials have to appear as a bare word in the aria-label.
     expect(
       screen.getByRole('button', {
-        name: 'Your account: Demo Household (DH)',
+        name: 'Your account: Demo Household DH',
       }),
     ).toBeTruthy()
   })

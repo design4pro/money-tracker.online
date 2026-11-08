@@ -46,12 +46,13 @@ export function UserMenu({ user }: UserMenuProps) {
         // is the only thing distinguishing two otherwise identical headers.
         //
         // The trigger's only *visible* text is the initials disc. WCAG 2.2 §2.5.3 (axe
-        // `label-content-name-mismatch`) requires that string inside the accessible name:
-        // "DH" is not a substring of "Demo Household", so the name alone is not enough.
-        // `@axe-core/playwright` 4.14 flags it on every signed-in surface.
+        // `label-content-name-mismatch`) requires that string as a word in the accessible
+        // name. "DH" is not a token of "Demo Household", and axe-core 4.14's matcher
+        // strips parentheticals before comparing, so wrapping the initials in `(DH)`
+        // still fails the gate on every signed-in surface.
         aria-label={
           initials
-            ? `${t('app.account.menu')}: ${user.name} (${initials})`
+            ? `${t('app.account.menu')}: ${user.name} ${initials}`
             : `${t('app.account.menu')}: ${user.name}`
         }
         isPending={isSigningOut}
