@@ -135,6 +135,7 @@ describe('BottomNav', () => {
     expect(transactions.textContent).toBe(en['nav.transactions'])
     expect(transactions.className.includes('h-16')).toBe(true)
     expect(transactions.innerHTML.includes('truncate')).toBe(false)
+    expect(transactions.innerHTML.includes('break-words')).toBe(false)
   })
 
   it('closes the sheet on the row that is already current, where no path changes', async () => {

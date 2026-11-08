@@ -237,7 +237,7 @@ function TabFace({ Icon, label }: TabFaceProps) {
   return (
     <span className="flex min-w-0 max-w-full flex-col items-center gap-1">
       <Icon className="size-5 shrink-0" />
-      <span className="max-w-full text-center leading-[1.125rem] break-words">
+      <span className="max-w-full px-0.5 text-center text-caption leading-4">
         {label}
       </span>
     </span>
