@@ -201,7 +201,7 @@ describe('GroupTree menu', () => {
     const submenu = (await screen.findAllByRole('menu')).at(-1)!
     expect(
       within(submenu)
-        .getByRole('menuitem', { name: 'Joint' })
+        .getByRole('menuitem', { name: 'Joint Already there' })
         .getAttribute('aria-disabled'),
     ).toBe('true')
     await user.click(
@@ -232,11 +232,12 @@ describe('GroupTree menu', () => {
 
   it('disables an ordering item that changes nothing and says why, beside it', async () => {
     const { menu } = await openMenu('Joint')
-    const up = within(menu).getByRole('menuitem', { name: 'Move up' })
+    const up = within(menu).getByRole('menuitem', {
+      name: 'Move up Already first',
+    })
     expect(up.getAttribute('aria-disabled')).toBe('true')
-    // The reason is the item's description, so it is read with it and painted under it.
+    // The reason is painted under the item and included in its name (WCAG 2.2 §2.5.3).
     expect(within(up).getByText('Already first')).not.toBeNull()
-    expect(up.getAttribute('aria-describedby')).not.toBeNull()
     expect(
       within(menu)
         .getByRole('menuitem', { name: 'Move down' })
@@ -246,14 +247,18 @@ describe('GroupTree menu', () => {
 
   it('says a last group is already last', async () => {
     const { menu } = await openMenu('Savings')
-    const down = within(menu).getByRole('menuitem', { name: 'Move to bottom' })
+    const down = within(menu).getByRole('menuitem', {
+      name: 'Move to bottom Already last',
+    })
     expect(down.getAttribute('aria-disabled')).toBe('true')
     expect(within(down).getByText('Already last')).not.toBeNull()
   })
 
   it('disables Add sub-group on a sub-group, with the one-level rule beside it', async () => {
     const { menu } = await openMenu('Trips, inside Joint')
-    const add = within(menu).getByRole('menuitem', { name: 'Add sub-group' })
+    const add = within(menu).getByRole('menuitem', {
+      name: 'Add sub-group A sub-group cannot have its own sub-groups',
+    })
     expect(add.getAttribute('aria-disabled')).toBe('true')
     expect(
       within(add).getByText('A sub-group cannot have its own sub-groups'),
@@ -264,7 +269,9 @@ describe('GroupTree menu', () => {
     const { user, menu } = await openMenu('Joint')
     await user.click(within(menu).getByRole('menuitem', { name: 'Move to…' }))
     const submenu = (await screen.findAllByRole('menu')).at(-1)!
-    const business = within(submenu).getByRole('menuitem', { name: 'Business' })
+    const business = within(submenu).getByRole('menuitem', {
+      name: 'Business A sub-group cannot have its own sub-groups',
+    })
     expect(business.getAttribute('aria-disabled')).toBe('true')
     expect(
       within(business).getByText('A sub-group cannot have its own sub-groups'),
@@ -275,7 +282,9 @@ describe('GroupTree menu', () => {
     const { user, menu } = await openMenu('Business')
     await user.click(within(menu).getByRole('menuitem', { name: 'Move to…' }))
     const submenu = (await screen.findAllByRole('menu')).at(-1)!
-    const none = within(submenu).getByRole('menuitem', { name: 'No parent' })
+    const none = within(submenu).getByRole('menuitem', {
+      name: 'No parent Already there',
+    })
     expect(none.getAttribute('aria-disabled')).toBe('true')
     expect(within(none).getByText('Already there')).not.toBeNull()
   })
