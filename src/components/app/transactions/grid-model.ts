@@ -84,11 +84,11 @@ export const HEADER_ROW = 0
  * one settles. A fixed height also makes the scrollbar honest at ten thousand rows, which a
  * measured list only becomes after the reader has scrolled past everything once.
  *
- * The wide row is on the pitch of the form: a whole number of {@link LINE_PX} rules. From `lg` up
- * an entry is one typed line - description, category and account on tracks beside the date and the
- * amount - and a second rule only where a converted figure sits under a foreign-currency amount.
- * Below `lg` the list is compact cards, not ruled paper: min 76px, and a long account or amount
- * is allowed to grow the row rather than ellipsise digits.
+ * The wide row is a whole number of {@link LINE_PX} (52px) lines. From `lg` up an entry is one
+ * line - description, category and account on tracks beside the date and the amount - and a
+ * second line only where a converted figure sits under a foreign-currency amount. Below `lg` the
+ * list is compact: min 76px, and a long account or amount is allowed to grow the row rather than
+ * ellipsise digits.
  */
 export function rowHeightFor(
   row: Pick<LedgerRow, 'currencyCode' | 'refCurrencyCode'>,
@@ -100,8 +100,8 @@ export function rowHeightFor(
   return row.currencyCode === row.refCurrencyCode ? LINE_PX : LINE_PX * 2
 }
 
-/** The band that opens or closes a day is one rule too, so the pitch holds across it. */
-export const DAY_BAND_HEIGHT_PX = LINE_PX
+/** The day band is a compact 40px header, not a full ledger line. */
+export const DAY_BAND_HEIGHT_PX = 40
 
 /** How many rows a Page Up / Page Down moves. */
 const PAGE_ROWS = 10

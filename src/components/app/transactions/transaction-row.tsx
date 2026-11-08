@@ -32,7 +32,7 @@ import type { LedgerColumn } from './grid-model'
 import type { LedgerRow } from './types'
 
 /**
- * One line of the passbook.
+ * One ledger line.
  *
  * ## Shape
  *
@@ -173,7 +173,7 @@ const TARGET_LINE = 'flex h-11 items-center justify-center max-lg:h-full'
 const META_LINE = cn(
   'text-caption',
   rowWashSecondary,
-  'flex min-w-0 flex-wrap items-center gap-1.5 lg:flex-nowrap lg:overflow-hidden lg:leading-10',
+  'flex min-w-0 flex-wrap items-center gap-1.5 lg:flex-nowrap lg:overflow-hidden lg:leading-[3.25rem]',
 )
 
 /** U+2014. Stands in for a category a row does not have, so no track is ever blank. */
@@ -518,7 +518,7 @@ function TransactionRowImpl({
               refAmountMinor={row.refAmountMinor}
               refCurrencyCode={row.refCurrencyCode}
               className={cn(
-                'leading-5 lg:leading-10',
+                'leading-5 lg:leading-[3.25rem]',
                 hasBalance && 'max-lg:hidden',
               )}
             />

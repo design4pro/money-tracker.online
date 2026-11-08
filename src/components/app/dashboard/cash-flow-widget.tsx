@@ -1,4 +1,4 @@
-import { BarChart, chartAmount } from '#/components/charts'
+import { BarChart, chartAmount, usePlotSize } from '#/components/charts'
 import { EmptyState } from '#/components/ui'
 import { useLocale, useTranslate } from '#/lib/i18n'
 import { isZeroMinor } from '#/lib/money'
@@ -52,6 +52,7 @@ export function CashFlowWidget({
   const t = useTranslate()
   const locale = useLocale()
   const copy = cashFlowCopy(t)
+  const plotHeight = usePlotSize()
 
   const hasMovement = buckets.some(bucketHasMovement)
 
@@ -143,7 +144,7 @@ export function CashFlowWidget({
       series={series}
       copy={copy}
       layout="grouped"
-      height={240}
+      height={plotHeight}
       emphasis={emphasis}
       extraTableRows={extraTableRows}
       footnote={
