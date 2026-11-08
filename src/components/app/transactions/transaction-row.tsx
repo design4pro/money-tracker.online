@@ -241,7 +241,9 @@ function CategoryFacts({
       ) : (
         <>
           <CategoryMark color={categoryColor} />
-          <span className="max-lg:break-words lg:truncate">{categoryName}</span>
+          <span className="max-lg:whitespace-normal lg:truncate">
+            {categoryName}
+          </span>
         </>
       )}
     </>
@@ -269,7 +271,7 @@ function AccountFacts({
       {showAccount ? (
         <span
           className={cn(
-            'max-lg:break-words lg:truncate',
+            'max-lg:whitespace-normal lg:truncate',
             afterDot && 'min-w-0 flex-1',
           )}
         >
