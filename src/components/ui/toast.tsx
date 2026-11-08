@@ -79,6 +79,17 @@ export function ToastHost({
       theme={resolved}
       position={position}
       duration={duration}
+      // Sonner's stylesheet pins the region at z-index 999999999, above menus.
+      // Keep it with the sticky chrome so a success toast cannot eat the click
+      // that deletes the group it just announced (`z-dropdown` / popovers sit
+      // above `--z-nav`). Below `lg` the bottom bar already owns that edge, so
+      // the stack sits on the same clearance `<main>` uses.
+      style={{ zIndex: 'var(--z-nav)' }}
+      mobileOffset={{
+        bottom: 'calc(5.5rem + var(--safe-bottom))',
+        right: '1rem',
+        left: '1rem',
+      }}
       closeButton
       containerAriaLabel={regionLabel}
       icons={{

@@ -826,7 +826,10 @@ screen is what made it shared.
 - **The shape.** One `ToastHost`, mounted once in the app shell. Every toast carries a close
   button; the app shell always passes `closeLabel` (`action.close`, EN + PL) and `regionLabel`
   (`notifications.title`, EN + PL). `ToastHost` retains English defaults for both props. The
-  icon-only close control always has an accessible name.
+  icon-only close control always has an accessible name. The region is `z-nav`, not sonner's
+  999999999: a toast may cover the bottom bar, never a menu or a dialog. On a phone the stack
+  is offset by the same `5.5rem + safe-area` clearance `<main>` uses, so it does not sit on
+  the five-cell bar.
 - **The close-button rule.** The button is a real 44x44 box (WCAG 2.2 §2.5.5, `docs/ACCESSIBILITY.md`
   §3.4) pinned inside the toast's inline-end top corner, so the whole box is on screen at 360px and
   never overlaps a neighbouring toast. The 20px chip is drawn by `::before`; the glyph is

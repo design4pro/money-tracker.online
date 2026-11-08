@@ -21,6 +21,10 @@ describe('ToastHost', () => {
     // axe reports as `role-img-alt` (#730).
     expect(close.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
     expect(close.querySelector('[role="img"]')).toBeNull()
+
+    const region = document.querySelector('[data-sonner-toaster]')
+    expect(region).not.toBeNull()
+    expect((region as HTMLElement).style.zIndex).toBe('var(--z-nav)')
   })
 
   it('holds the close button at a 44px box and keeps the toast text clear of it', async () => {

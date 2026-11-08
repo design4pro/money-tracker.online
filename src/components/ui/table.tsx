@@ -133,7 +133,12 @@ export function Column({
             align === 'end' && 'justify-end',
           )}
         >
-          <span className="truncate">
+          {/*
+            Headings stay whole. Truncating them is how a 360px members table clips
+            Polish `Działania` while the grid still has room to scroll: the floor on
+            the column is a promise about the word, not a box to ellipsis inside.
+          */}
+          <span className="whitespace-nowrap">
             {typeof children === 'function' ? children(renderProps) : children}
           </span>
           {renderProps.allowsSorting ? (
