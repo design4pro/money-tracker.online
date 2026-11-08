@@ -342,12 +342,23 @@ export function TransactionForm({
   const submit = (addAnother: boolean) => {
     setTouched(true)
     if (Object.keys(errors).length > 0) {
-      // The amount comes first in the DOM, so the date only takes focus when it is the first
-      // thing the refusal is about; otherwise the amount error is the one to fix first (WCAG 2.4.3).
+      // Keep the document still: the field stack is the thing that scrolls. Focusing the first
+      // invalid control with preventScroll, then scrolling that control inside the stack, is what
+      // stops the page title from sliding under the sticky header (WCAG 2.4.3 / 2.4.11).
+      window.scrollTo(0, 0)
       if (errors.amountMinor === undefined && errors.bookedOn !== undefined) {
         dateRef.current
           ?.querySelector<HTMLElement>('[role="spinbutton"]')
-          ?.focus()
+          ?.focus({ preventScroll: true })
+        dateRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      } else {
+        amountRef.current
+          ?.querySelector('input')
+          ?.focus({ preventScroll: true })
+        amountRef.current?.scrollIntoView({
+          block: 'nearest',
+          inline: 'nearest',
+        })
       }
       return
     }

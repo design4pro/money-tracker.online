@@ -407,7 +407,7 @@ function SkipLink() {
   return (
     <a
       href={`#${MAIN_CONTENT_ID}`}
-      className="sr-only-focusable z-modal target-min fixed start-4 top-4 inline-flex items-center rounded-md bg-surface px-4 py-2 text-label font-medium text-ink shadow-elevated outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
+      className="sr-only-focusable z-modal target-min min-h-11 fixed start-4 top-4 inline-flex items-center rounded-md bg-surface px-4 py-2 text-label font-medium text-ink shadow-elevated outline-focus focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2"
     >
       {t('a11y.skipToContent')}
     </a>

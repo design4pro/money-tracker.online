@@ -365,7 +365,7 @@ function NewTransactionEditor({ reference, source, isDuplicate }: EditorProps) {
   })
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 max-lg:h-[calc(100dvh-var(--nav-h)-5.5rem-var(--safe-bottom))] max-lg:min-h-0">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 max-lg:h-[calc(100dvh-11rem-var(--safe-bottom))] max-lg:min-h-0 max-lg:overflow-hidden">
       <header className="flex shrink-0 flex-col gap-1">
         <h1 className="text-title font-semibold text-ink">
           {t('transactions.form.newTitle')}
