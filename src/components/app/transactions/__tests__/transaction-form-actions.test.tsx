@@ -60,6 +60,9 @@ describe('TransactionForm phone actions', () => {
     expect(footer?.className).toContain(
       'max-lg:[@media(min-height:21rem)]:bottom-[calc(var(--nav-h)+var(--safe-bottom))]',
     )
+    expect(footer?.className).toContain(
+      'max-lg:[@media(min-height:21rem)]:mx-0',
+    )
     expect(footer?.contains(saveAndNew)).toBe(true)
     expect(cancel.className).toMatch(/\bh-11\b/)
     expect(saveAndNew.className).toMatch(/\bh-11\b/)

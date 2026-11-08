@@ -690,12 +690,14 @@ export function TransactionForm({
           the 64px bar consume the whole screen, so Amount/Date/Account have no band
           (spec §8 / AC5 / 1.4.10). Below 21rem the actions stay in flow and the page
           scrolls; hitboxes stay 44px. From `lg` the bar is gone and the row is in flow.
+          When pinned, `mx-0` cancels `max-sm:-mx-4` so spec §4's 16px gutter stays on
+          Save (inset-x-0 + -mx-4 had put the control at 0).
         */}
         <div
           className={cn(
             'shrink-0 border-t border-border-subtle bg-canvas py-3',
             'max-sm:-mx-4 max-sm:px-4',
-            'max-lg:[@media(min-height:21rem)]:fixed max-lg:[@media(min-height:21rem)]:inset-x-0 max-lg:[@media(min-height:21rem)]:bottom-[calc(var(--nav-h)+var(--safe-bottom))] max-lg:[@media(min-height:21rem)]:z-10 max-lg:[@media(min-height:21rem)]:px-4 sm:max-lg:[@media(min-height:21rem)]:px-6',
+            'max-lg:[@media(min-height:21rem)]:fixed max-lg:[@media(min-height:21rem)]:inset-x-0 max-lg:[@media(min-height:21rem)]:mx-0 max-lg:[@media(min-height:21rem)]:bottom-[calc(var(--nav-h)+var(--safe-bottom))] max-lg:[@media(min-height:21rem)]:z-10 max-lg:[@media(min-height:21rem)]:px-4 sm:max-lg:[@media(min-height:21rem)]:px-6',
             'lg:static lg:border-0 lg:bg-transparent lg:py-0',
           )}
         >
