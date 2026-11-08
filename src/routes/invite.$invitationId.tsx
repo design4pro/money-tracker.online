@@ -1,7 +1,9 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
 import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
+import { failureEnvelopeSchema } from '#/lib/failure-envelope'
 import { failureOf, readFailure } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
@@ -33,7 +35,26 @@ import { pageHead } from '#/routes/-lib/page-title'
  * state here: a screen that renders "not valid" for any id is an oracle for guessing them.
  */
 
+/**
+ * Whether an account is signed in. Returns a flag instead of throwing, because Start 1.169
+ * delivers a GET `401` from `loadInvitation` as a document status (and sometimes a Response)
+ * that the loader `catch` no longer classifies as `unauthenticated`. `_app` uses the same
+ * shape for `loadShell`.
+ */
+const peekSignedInAccount = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<{ readonly signedIn: boolean }> => {
+    const { getSession } = await import('#/server/auth/index')
+    return { signedIn: (await getSession()) !== null }
+  },
+)
+
 export const Route = createFileRoute('/invite/$invitationId')({
+  beforeLoad: async ({ params }) => {
+    const { signedIn } = await peekSignedInAccount()
+    if (!signedIn) {
+      throw redirect(signInTarget(params.invitationId))
+    }
+  },
   loader: async ({ params }) => {
     try {
       return {
@@ -81,13 +102,20 @@ function signInTarget(invitationId: string) {
  * it no longer takes the sign-in redirect, because signing in again cannot help it.
  */
 function isUnauthenticated(error: unknown): boolean {
+  if (error instanceof Response && error.status === 401) return true
   let current: unknown = error
-  while (current instanceof Error) {
+  while (current) {
     if (readFailure(current)?.kind === 'unauthenticated') return true
-    if (current.name === 'AuthRequirementError') return true
-    current = current.cause
+    const envelope = failureEnvelopeSchema.safeParse(current)
+    if (envelope.success && envelope.data.kind === 'unauthenticated') {
+      return true
+    }
+    if (current instanceof Error && current.name === 'AuthRequirementError') {
+      return true
+    }
+    current = current instanceof Error ? current.cause : undefined
   }
-  return readFailure(error)?.kind === 'unauthenticated'
+  return false
 }
 
 /**
