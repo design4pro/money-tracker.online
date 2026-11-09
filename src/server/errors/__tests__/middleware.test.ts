@@ -6,7 +6,7 @@
  * serialises that whole object, and the default `$TSR/Error` plugin writes the error's `message`. So
  * the boundary has to replace the thrown value, and a test that calls the middleware's function directly would prove
  * nothing about what leaves. These cases build a real `createServerFn` value with a real
- * `.inputValidator(...)` and per-function middleware, register the middleware the way
+ * `.validator(...)` and per-function middleware, register the middleware the way
  * `src/start.ts` does (as `functionMiddleware` of the Start options, which the framework prepends to
  * the function's own list), and read the `{ result, error, context }` that `__executeServer`
  * returns - the value the wire is built from.
@@ -79,7 +79,7 @@ type ServerFunction = {
 type Middleware = ReturnType<typeof createFailureMiddleware>
 
 type Spec = {
-  /** What the function's `.inputValidator(...)` is; none when absent. */
+  /** What the function's `.validator(...)` is; none when absent. */
   validator?: z.ZodType
   /** Per-function middleware, run after the global one. */
   middleware?: ReadonlyArray<Middleware>
@@ -93,7 +93,7 @@ type Spec = {
 function serverFunction(spec: Spec): ServerFunction {
   let builder: any = createServerFn({ method: 'POST' })
   if (spec.middleware) builder = builder.middleware([...spec.middleware])
-  if (spec.validator) builder = builder.inputValidator(spec.validator)
+  if (spec.validator) builder = builder.validator(spec.validator)
   return builder.handler(
     Object.assign(() => undefined, { serverFnMeta: {} }),
     spec.handler ?? (async () => 'ok'),

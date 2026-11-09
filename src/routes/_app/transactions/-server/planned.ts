@@ -48,7 +48,7 @@ const plannedScreenSchema = z.strictObject({
 })
 
 export const loadPlannedScreen = createServerFn({ method: 'GET' })
-  .inputValidator(plannedScreenSchema)
+  .validator(plannedScreenSchema)
   .handler(async ({ data }): Promise<PlannedScreenPage> => {
     const scope = await requireOrg()
     const { env } = await import('cloudflare:workers')

@@ -120,7 +120,7 @@ const MAX_INPUT_VALIDATION_ISSUES = 100
  * The issues behind a validation failure, or `null` when `error` is not one.
  *
  * Two shapes qualify. A `ZodError` (a repository's second parse) carries its issues. The framework's
- * `inputValidator` failure is `new Error(JSON.stringify(issues))`, a plain `Error` that no class
+ * `.validator` failure is `new Error(JSON.stringify(issues))`, a plain `Error` that no class
  * identifies, so it is recognised by its structure and only when the constructor is exactly `Error`:
  * a message that parses to a non-empty array whose first 100 items are objects, each with a `path`
  * array of strings and numbers and a string `code`. Only `path` and `code` are carried out; the

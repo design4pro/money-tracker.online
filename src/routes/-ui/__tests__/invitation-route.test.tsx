@@ -6,6 +6,7 @@ import { isRedirect } from '@tanstack/react-router'
 import { toast } from '#/components/ui'
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
+import { PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE } from '#/lib/public-failure'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
 import { Route } from '../../invite.$invitationId'
@@ -47,6 +48,8 @@ const INVITATION_ID = 'inv-1'
 const SIGN_IN = {
   to: '/login',
   search: { redirect: `/invite/${INVITATION_ID}` },
+  href: `/login?redirect=${encodeURIComponent(`/invite/${INVITATION_ID}`)}`,
+  reloadDocument: true,
 }
 
 /** An error as the client rebuilds it from the wire: fixed message, the envelope as a property. */
@@ -55,7 +58,7 @@ function envelopeError(kind: FailureEnvelope['kind']) {
   return Object.assign(new Error('This could not be completed.'), { envelope })
 }
 
-async function loaderOutcome(error: Error) {
+async function loaderOutcome(error: unknown) {
   vi.mocked(loadInvitation).mockRejectedValue(error)
   const loader = Route.options.loader as (ctx: {
     params: { invitationId: string }
@@ -94,6 +97,26 @@ describe('/invite/$invitationId, the loader', () => {
     const error = new Error('Sign in to continue.')
 
     expect(await loaderOutcome(error)).toBe(error)
+  })
+
+  it('redirects when Start 1.169 stripped the envelope and left the unauthenticated fallback message', async () => {
+    const thrown = await loaderOutcome(
+      new Error(PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE),
+    )
+
+    expect(isRedirect(thrown)).toBe(true)
+    expect((thrown as { options: unknown }).options).toMatchObject(SIGN_IN)
+  })
+
+  it('redirects when the thrown value is the envelope itself', async () => {
+    const thrown = await loaderOutcome({
+      v: 1,
+      kind: 'unauthenticated',
+      message: { key: 'failure.unauthenticated' },
+    })
+
+    expect(isRedirect(thrown)).toBe(true)
+    expect((thrown as { options: unknown }).options).toMatchObject(SIGN_IN)
   })
 })
 

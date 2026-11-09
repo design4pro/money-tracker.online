@@ -48,6 +48,7 @@
  * builds for itself and never deploys.
  */
 
+import { createIsomorphicFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
 
 import {
@@ -118,11 +119,17 @@ export function workspaceCivilDay(
  * request at all - the cron handler, and any unit test that imports a repository. Letting it throw
  * would turn "nobody pinned anything" into a failed job.
  */
+const readPinnedDayHeader = createIsomorphicFn()
+  .client((): string | undefined => undefined)
+  .server((): string | undefined => {
+    try {
+      return getRequestHeader(SERVER_TODAY_HEADER)
+    } catch {
+      return undefined
+    }
+  })
+
 function pinnedDay(): string | null {
-  try {
-    const value = getRequestHeader(SERVER_TODAY_HEADER)
-    return value !== undefined && ISO_DAY.test(value) ? value : null
-  } catch {
-    return null
-  }
+  const value = readPinnedDayHeader()
+  return value !== undefined && ISO_DAY.test(value) ? value : null
 }

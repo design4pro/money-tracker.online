@@ -9,7 +9,8 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { failureOf, readFailure } from '../failure'
+import { failureOf, isUnauthenticatedFailure, readFailure } from '../failure'
+import { PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE } from '../public-failure'
 
 import type { FailureEnvelope } from '../failure-envelope'
 
@@ -103,6 +104,17 @@ describe('readFailure', () => {
   it('reads an envelope off a non-Error object, as a flattened client may deliver it', () => {
     expect(readFailure({ envelope: LOCKED })).toEqual(LOCKED)
   })
+
+  it('reads a bare envelope, as Start 1.169 GET RPC may throw the adapter payload itself', () => {
+    expect(readFailure(LOCKED)).toEqual(LOCKED)
+    expect(
+      isUnauthenticatedFailure({
+        v: 1,
+        kind: 'unauthenticated',
+        message: { key: 'failure.unauthenticated' },
+      }),
+    ).toBe(true)
+  })
 })
 
 describe('failureOf', () => {
@@ -131,5 +143,41 @@ describe('failureOf', () => {
 
   it('hands out a fresh object each time', () => {
     expect(failureOf(null)).not.toBe(failureOf(null))
+  })
+})
+
+describe('isUnauthenticatedFailure', () => {
+  it('is true for an unauthenticated envelope', () => {
+    expect(
+      isUnauthenticatedFailure(
+        wireError({
+          v: 1,
+          kind: 'unauthenticated',
+          message: { key: 'failure.unauthenticated' },
+        }),
+      ),
+    ).toBe(true)
+  })
+
+  it('is true for the legacy AuthRequirementError name', () => {
+    const error = new Error('whatever the server said')
+    error.name = 'AuthRequirementError'
+    expect(isUnauthenticatedFailure(error)).toBe(true)
+  })
+
+  it('is true for the Start 1.169 shallow Error that kept only the unauthenticated fallback message', () => {
+    expect(
+      isUnauthenticatedFailure(
+        new Error(PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE),
+      ),
+    ).toBe(true)
+  })
+
+  it('is false for a forbidden envelope, a different sentence, and a plain error', () => {
+    expect(isUnauthenticatedFailure(wireError(LOCKED))).toBe(false)
+    expect(isUnauthenticatedFailure(new Error('Sign in to continue.'))).toBe(
+      false,
+    )
+    expect(isUnauthenticatedFailure(new Error('boom'))).toBe(false)
   })
 })

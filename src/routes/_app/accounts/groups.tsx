@@ -10,6 +10,7 @@ import { useDataRefresh } from '../-lib/refresh'
 import { GroupsScreen } from './-ui/groups-screen'
 import { GroupTreeSkeleton } from './-ui/group-states'
 
+import type { ErrorComponentProps } from '@tanstack/react-router'
 import type { Account } from '#/server/db/types'
 import type { AccountGroupWithMembers } from '#/server/repos/accounts'
 
@@ -38,7 +39,7 @@ export const Route = createFileRoute('/_app/accounts/groups')({
   component: GroupsRoute,
 })
 
-function GroupsError({ reset }: { error: Error; reset: () => void }) {
+function GroupsError({ reset }: ErrorComponentProps) {
   const t = useTranslate()
   // The error's own message is not printed: it is English, and may name an id or carry SQL.
   return (

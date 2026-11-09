@@ -54,7 +54,7 @@ import { classifyFailure, validationIssuesOf } from '../classify'
 
 import type { FailureKind } from '#/lib/failure-envelope'
 
-/** What the framework throws for a bad `inputValidator` input, built the way `execValidator` builds it. */
+/** What the framework throws for a bad `.validator` input, built the way `execValidator` builds it. */
 async function inputValidationError(
   schema: z.ZodType,
   input: unknown,

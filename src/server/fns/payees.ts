@@ -66,7 +66,7 @@ const rowIdSchema = z.strictObject({
 
 /** Every payee, alphabetically, with the alias count the list column shows. */
 export const listPayees = createServerFn({ method: 'GET' })
-  .inputValidator(listPayeesSchema)
+  .validator(listPayeesSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<PayeeSummary>> => {
     const scope = await requireOrg()
     return listPayeesRow(scope, data)
@@ -74,7 +74,7 @@ export const listPayees = createServerFn({ method: 'GET' })
 
 /** One payee with its aliases. An id from another workspace is a `NotFoundError`. */
 export const getPayee = createServerFn({ method: 'GET' })
-  .inputValidator(payeeIdSchema)
+  .validator(payeeIdSchema)
   .handler(async ({ data }): Promise<PayeeDetail> => {
     const scope = await requireOrg()
     return getPayeeRow(scope, data.payeeId).catch(rethrowAsNotFound)
@@ -105,7 +105,7 @@ export const listCategorySuggestions = createServerFn({
 
 /** Which payee a raw bank description belongs to. Never creates one — see the repository. */
 export const resolvePayee = createServerFn({ method: 'GET' })
-  .inputValidator(resolvePayeeSchema)
+  .validator(resolvePayeeSchema)
   .handler(async ({ data }): Promise<PayeeMatch> => {
     const scope = await requireOrg()
     return resolvePayeeRow(scope, data)
@@ -117,7 +117,7 @@ export const resolvePayee = createServerFn({ method: 'GET' })
 
 /** Creates a payee. Initials are derived when none were given, so it always has a visual. */
 export const createPayee = createServerFn({ method: 'POST' })
-  .inputValidator(createPayeeSchema)
+  .validator(createPayeeSchema)
   .handler(async ({ data }): Promise<PayeeRow> => {
     const scope = await requireOrg()
     return createPayeeRow(scope, data)
@@ -130,7 +130,7 @@ const updatePayeeInputSchema = z.strictObject({
 
 /** Edits a payee, and re-files its history when the edit turns `enforce` on. */
 export const updatePayee = createServerFn({ method: 'POST' })
-  .inputValidator(updatePayeeInputSchema)
+  .validator(updatePayeeInputSchema)
   .handler(async ({ data }): Promise<PayeeRow> => {
     const scope = await requireOrg()
     return updatePayeeRow(scope, data.payeeId, data.patch)
@@ -138,7 +138,7 @@ export const updatePayee = createServerFn({ method: 'POST' })
 
 /** Deletes a payee. Allowed with history: the ledger loses a label, never a row. */
 export const deletePayee = createServerFn({ method: 'POST' })
-  .inputValidator(payeeIdSchema)
+  .validator(payeeIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deletePayeeRow(scope, data.payeeId)
@@ -146,7 +146,7 @@ export const deletePayee = createServerFn({ method: 'POST' })
 
 /** Folds one payee into another, keeping the loser's name as an alias of the survivor. */
 export const mergePayees = createServerFn({ method: 'POST' })
-  .inputValidator(mergePayeesSchema)
+  .validator(mergePayeesSchema)
   .handler(async ({ data }): Promise<PayeeRow> => {
     const scope = await requireOrg()
     return mergePayeesRow(scope, data)
@@ -154,7 +154,7 @@ export const mergePayees = createServerFn({ method: 'POST' })
 
 /** Teaches a payee one more string. The normalised key is unique per workspace. */
 export const addAlias = createServerFn({ method: 'POST' })
-  .inputValidator(addAliasSchema)
+  .validator(addAliasSchema)
   .handler(async ({ data }): Promise<PayeeAliasRow> => {
     const scope = await requireOrg()
     return addAliasRow(scope, data)
@@ -162,7 +162,7 @@ export const addAlias = createServerFn({ method: 'POST' })
 
 /** Forgets one alias. */
 export const removeAlias = createServerFn({ method: 'POST' })
-  .inputValidator(rowIdSchema)
+  .validator(rowIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await removeAliasRow(scope, data.id)
@@ -170,7 +170,7 @@ export const removeAlias = createServerFn({ method: 'POST' })
 
 /** Adds a string the importer must never turn into a payee. Idempotent on the normalised key. */
 export const addIgnoredName = createServerFn({ method: 'POST' })
-  .inputValidator(ignoredNameSchema)
+  .validator(ignoredNameSchema)
   .handler(async ({ data }): Promise<PayeeIgnoredNameRow> => {
     const scope = await requireOrg()
     return addIgnoredNameRow(scope, data)
@@ -178,7 +178,7 @@ export const addIgnoredName = createServerFn({ method: 'POST' })
 
 /** Stops ignoring a string. */
 export const removeIgnoredName = createServerFn({ method: 'POST' })
-  .inputValidator(rowIdSchema)
+  .validator(rowIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await removeIgnoredNameRow(scope, data.id)

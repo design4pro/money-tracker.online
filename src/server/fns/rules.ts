@@ -58,7 +58,7 @@ export const loadRules = createServerFn({ method: 'GET' }).handler(
 
 /** One rule, for the editor. A foreign id is a `NotFoundError`, decided by the repository. */
 export const loadRule = createServerFn({ method: 'GET' })
-  .inputValidator(ruleIdSchema)
+  .validator(ruleIdSchema)
   .handler(async ({ data }): Promise<Rule> => {
     const scope = await requireOrg()
     return getRuleRow(scope, data.ruleId).catch(rethrowAsNotFound)
@@ -70,7 +70,7 @@ export const loadRule = createServerFn({ method: 'GET' })
 
 /** Creates a rule at the end of the order. Both ceilings are enforced inside the repository. */
 export const createRule = createServerFn({ method: 'POST' })
-  .inputValidator(createRuleSchema)
+  .validator(createRuleSchema)
   .handler(async ({ data }): Promise<{ readonly ruleId: string }> => {
     const scope = await requireOrg()
     const rule = await createRuleRow(scope, data)
@@ -84,7 +84,7 @@ const updateInputSchema = z.strictObject({
 
 /** Edits a rule. An edit clears a pause, because replacing the broken reference is the fix. */
 export const updateRule = createServerFn({ method: 'POST' })
-  .inputValidator(updateInputSchema)
+  .validator(updateInputSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await updateRuleRow(scope, data.ruleId, data.patch)
@@ -92,7 +92,7 @@ export const updateRule = createServerFn({ method: 'POST' })
 
 /** Deletes a rule. Nothing it has already written to a transaction is undone. */
 export const deleteRule = createServerFn({ method: 'POST' })
-  .inputValidator(ruleIdSchema)
+  .validator(ruleIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteRuleRow(scope, data.ruleId)
@@ -106,7 +106,7 @@ export const deleteRule = createServerFn({ method: 'POST' })
  * asked for.
  */
 export const reorderRules = createServerFn({ method: 'POST' })
-  .inputValidator(reorderRulesSchema)
+  .validator(reorderRulesSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await reorderRulesRow(scope, data.ids)
@@ -119,7 +119,7 @@ const setActiveInputSchema = z.strictObject({
 
 /** Switches a rule on or off. Not a pause: a pause is `14-S3`, and it has a reason attached. */
 export const setRuleActive = createServerFn({ method: 'POST' })
-  .inputValidator(setActiveInputSchema)
+  .validator(setActiveInputSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await setRuleActiveRow(scope, data.ruleId, data.isActive)
@@ -141,7 +141,7 @@ const applyRulesInputSchema = z.strictObject({
 })
 
 export const applyRules = createServerFn({ method: 'POST' })
-  .inputValidator(applyRulesInputSchema)
+  .validator(applyRulesInputSchema)
   .handler(
     async ({
       data,
