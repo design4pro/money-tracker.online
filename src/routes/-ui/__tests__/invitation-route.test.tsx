@@ -6,6 +6,7 @@ import { isRedirect } from '@tanstack/react-router'
 import { toast } from '#/components/ui'
 import { I18nProvider } from '#/lib/i18n'
 import en from '#/lib/i18n/messages/en'
+import { PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE } from '#/lib/public-failure'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
 import { Route } from '../../invite.$invitationId'
@@ -94,6 +95,15 @@ describe('/invite/$invitationId, the loader', () => {
     const error = new Error('Sign in to continue.')
 
     expect(await loaderOutcome(error)).toBe(error)
+  })
+
+  it('redirects when Start 1.169 stripped the envelope and left the unauthenticated fallback message', async () => {
+    const thrown = await loaderOutcome(
+      new Error(PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE),
+    )
+
+    expect(isRedirect(thrown)).toBe(true)
+    expect((thrown as { options: unknown }).options).toMatchObject(SIGN_IN)
   })
 })
 

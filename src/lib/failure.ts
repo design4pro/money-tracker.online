@@ -13,7 +13,10 @@
  */
 
 import { failureEnvelopeSchema } from '#/lib/failure-envelope'
-import { internalEnvelope } from '#/lib/public-failure'
+import {
+  PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE,
+  internalEnvelope,
+} from '#/lib/public-failure'
 
 import type { FailureEnvelope } from '#/lib/failure-envelope'
 
@@ -39,4 +42,22 @@ export function readFailure(error: unknown): FailureEnvelope | null {
  */
 export function failureOf(error: unknown): FailureEnvelope {
   return readFailure(error) ?? internalEnvelope()
+}
+
+/**
+ * Whether a caught server-function error means "nobody is signed in".
+ *
+ * The envelope is the real answer. The error `name` covers one release of
+ * Workers that predate the adapter. The fallback `message` covers Start 1.169
+ * GET RPC where `$TSR/Error` kept only {@link PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE}.
+ */
+export function isUnauthenticatedFailure(error: unknown): boolean {
+  if (readFailure(error)?.kind === 'unauthenticated') return true
+  if (error instanceof Error && error.name === 'AuthRequirementError') {
+    return true
+  }
+  return (
+    error instanceof Error &&
+    error.message === PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE
+  )
 }

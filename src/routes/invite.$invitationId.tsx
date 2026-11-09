@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
-import { failureOf, readFailure } from '#/lib/failure'
+import { failureOf, isUnauthenticatedFailure } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
@@ -44,7 +44,7 @@ export const Route = createFileRoute('/invite/$invitationId')({
     } catch (error) {
       // An unauthenticated visitor is sent to sign in and brought back here, rather than being
       // told the invitation is broken — which it is not.
-      if (isUnauthenticated(error)) {
+      if (isUnauthenticatedFailure(error)) {
         throw redirect(signInTarget(params.invitationId))
       }
       throw error
@@ -67,22 +67,6 @@ function signInTarget(invitationId: string) {
     to: '/login',
     search: { redirect: `/invite/${invitationId}` },
   } as const
-}
-
-/**
- * Whether the loader failed because nobody is signed in.
- *
- * The server's failure middleware replaces the error with one whose name and message are fixed, so
- * the answer is the `unauthenticated` kind of its public envelope (`readFailure`). The error's name
- * stays as a second condition for one release, for a Worker that predates the middleware; the
- * message regex is gone, because the sentence is no longer the server's to vary.
- *
- * A banned account is refused with a 403 by the same user guard, which classifies as `forbidden`:
- * it no longer takes the sign-in redirect, because signing in again cannot help it.
- */
-function isUnauthenticated(error: unknown): boolean {
-  if (readFailure(error)?.kind === 'unauthenticated') return true
-  return error instanceof Error && error.name === 'AuthRequirementError'
 }
 
 /**
@@ -170,7 +154,7 @@ function InvitationRoute() {
               setJoining(false)
               // The session ended between loading this card and pressing the button: sign in and
               // come back, as the loader does, rather than toasting a sentence with no way on.
-              if (readFailure(error)?.kind === 'unauthenticated') {
+              if (isUnauthenticatedFailure(error)) {
                 void router.navigate(signInTarget(params.invitationId))
                 return
               }

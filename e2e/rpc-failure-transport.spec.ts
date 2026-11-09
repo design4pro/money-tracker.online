@@ -2,6 +2,8 @@ import { expect, test } from './support/console'
 import { gotoApp, uniqueToken, useLocale } from './support/app'
 import { storageStateFor } from './support/session'
 
+import type { APIResponse } from '@playwright/test'
+
 import en from '#/lib/i18n/messages/en'
 import pl from '#/lib/i18n/messages/pl'
 
@@ -98,7 +100,11 @@ for (const locale of ['en', 'pl'] as const) {
             expect(missing.status()).toBe(foreign.status())
             expect(await missing.text()).toBe(await foreign.text())
             expect(await foreign.text()).toContain('not_found')
-            expect(missing.headers()).toEqual(foreign.headers())
+            // Tenancy: the two refusals must look the same on the wire. `date` is
+            // not a tenancy signal; Start 1.169 can emit it a second apart.
+            expect(headersWithoutDate(missing)).toEqual(
+              headersWithoutDate(foreign),
+            )
           } finally {
             await other.dispose()
           }
@@ -150,4 +156,9 @@ for (const locale of ['en', 'pl'] as const) {
       )
     }
   })
+}
+
+function headersWithoutDate(response: APIResponse): Record<string, string> {
+  const { date: _date, ...rest } = response.headers()
+  return rest
 }
