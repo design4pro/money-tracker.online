@@ -1059,8 +1059,9 @@ because what a row can do differs (a category archives, a group deletes).
 - **Disabled, never hidden, and the reason is written.** An item that would change nothing, or
   that the one-level rule forbids, stays in the menu disabled. The group tree also writes the
   reason as the item's description ("Already first", "A sub-group cannot have its own
-  sub-groups"), painted under the item at full contrast (only the label dims) and wired as its
-  description, so the reason does not depend on a tooltip. Arrow keys skip a disabled item, so it
+  sub-groups"), painted under the item at full contrast (only the label dims) and included in
+  the item's accessible name, so the reason does not depend on a tooltip and the visible text
+  is in the name (WCAG 2.2 §2.5.3). Arrow keys skip a disabled item, so it
   is reached by a virtual cursor and by sight; the category tree disables the item without a description yet.
 - **Drop and focus rules.** A drop lands _beside_ a row, never on it, and the dropped row takes
   that row's parent: one rule, no nesting-by-hovering. Rows that are not part of the order
