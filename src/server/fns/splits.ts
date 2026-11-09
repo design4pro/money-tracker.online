@@ -36,7 +36,7 @@ import type { TransactionSplit } from '#/server/db/types'
 
 /** A transaction's split lines in display order, empty when it is not split. */
 export const listSplits = createServerFn({ method: 'GET' })
-  .inputValidator(transactionIdSchema)
+  .validator(transactionIdSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<TransactionSplit>> => {
     const scope = await requireOrg()
     return listSplitsRows(scope, data)
@@ -44,7 +44,7 @@ export const listSplits = createServerFn({ method: 'GET' })
 
 /** Replaces the whole set. The sum, the transfer refusal and the rounding are the repository's. */
 export const setSplits = createServerFn({ method: 'POST' })
-  .inputValidator(setSplitsSchema)
+  .validator(setSplitsSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<TransactionSplit>> => {
     const scope = await requireOrg()
     return setSplitsRows(scope, data)
@@ -52,7 +52,7 @@ export const setSplits = createServerFn({ method: 'POST' })
 
 /** Un-splits a transaction. Returns how many lines went. */
 export const clearSplits = createServerFn({ method: 'POST' })
-  .inputValidator(transactionIdSchema)
+  .validator(transactionIdSchema)
   .handler(async ({ data }): Promise<number> => {
     const scope = await requireOrg()
     return clearSplitsRows(scope, data)

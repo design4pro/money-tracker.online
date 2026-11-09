@@ -81,7 +81,7 @@ export const confirmMappingSchema = z.strictObject({
 
 /** Stores the confirmed mapping. What it does, and why, is in {@link confirmImportMappingFor}. */
 export const confirmImportMapping = createServerFn({ method: 'POST' })
-  .inputValidator(confirmMappingSchema)
+  .validator(confirmMappingSchema)
   .handler(async ({ data }): Promise<ImportBatchDto> => {
     const scope = await requireOrg()
     return confirmImportMappingFor(scope, data)
@@ -108,7 +108,7 @@ export const offerPresetSchema = z.strictObject({
  * `mappingSchema` again on the way back in.
  */
 export const offerMappingPreset = createServerFn({ method: 'GET' })
-  .inputValidator(offerPresetSchema)
+  .validator(offerPresetSchema)
   .handler(async ({ data }): Promise<ImportMappingPresetRow | null> => {
     const scope = await requireOrg()
     return offerImportPreset(scope, {
@@ -230,7 +230,7 @@ export function signedAmountMinor(row: SignedRow): number {
 
 /** The preview. What it does, and why, is in {@link previewImportBatchFor}. */
 export const previewImportBatch = createServerFn({ method: 'POST' })
-  .inputValidator(previewImportSchema)
+  .validator(previewImportSchema)
   .handler(async ({ data }): Promise<ImportPreviewResult> => {
     const scope = await requireOrg()
     return previewImportBatchFor(scope, await filesBucket(), data)

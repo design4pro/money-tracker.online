@@ -51,7 +51,7 @@ const transferIdSchema = z.strictObject({
 
 /** Both legs of a transfer, by the `transfer_id` they share. A miss is a `NotFoundError`. */
 export const loadTransferPair = createServerFn({ method: 'GET' })
-  .inputValidator(transferIdSchema)
+  .validator(transferIdSchema)
   .handler(async ({ data }): Promise<TransferPair> => {
     const scope = await requireOrg()
     return getTransferPairRow(scope, data.transferId)
@@ -63,7 +63,7 @@ export const loadTransferPair = createServerFn({ method: 'GET' })
 
 /** Creates a transfer: two legs for `internal`, one for `external_out` / `external_in`. */
 export const createTransfer = createServerFn({ method: 'POST' })
-  .inputValidator(createTransferSchema)
+  .validator(createTransferSchema)
   .handler(async ({ data }): Promise<TransferPair> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -82,7 +82,7 @@ const updateSchema = z.strictObject({
 
 /** Edits a transfer. The edit reaches both legs, always; §4.1.2 forbids their dates diverging. */
 export const updateTransfer = createServerFn({ method: 'POST' })
-  .inputValidator(updateSchema)
+  .validator(updateSchema)
   .handler(async ({ data }): Promise<TransferPair> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -97,7 +97,7 @@ export const updateTransfer = createServerFn({ method: 'POST' })
 
 /** Deletes every leg. There is no single-leg delete, because there is no orphan-leg state. */
 export const deleteTransfer = createServerFn({ method: 'POST' })
-  .inputValidator(transferIdSchema)
+  .validator(transferIdSchema)
   .handler(async ({ data }): Promise<void> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -107,7 +107,7 @@ export const deleteTransfer = createServerFn({ method: 'POST' })
 
 /** Turns the legs back into ordinary transactions. The only way to change a transfer's nature. */
 export const unlinkTransfer = createServerFn({ method: 'POST' })
-  .inputValidator(transferIdSchema)
+  .validator(transferIdSchema)
   .handler(async ({ data }): Promise<ReadonlyArray<Transaction>> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()
@@ -117,7 +117,7 @@ export const unlinkTransfer = createServerFn({ method: 'POST' })
 
 /** Promotes an existing transaction to a transfer leg, minting the counter leg when there is one. */
 export const convertToTransfer = createServerFn({ method: 'POST' })
-  .inputValidator(convertToTransferSchema)
+  .validator(convertToTransferSchema)
   .handler(async ({ data }): Promise<TransferPair> =>
     runWithLedgerBatch(async () => {
       const scope = await requireOrg()

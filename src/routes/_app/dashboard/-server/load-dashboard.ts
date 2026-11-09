@@ -29,7 +29,7 @@ const inputSchema = z.strictObject({
 })
 
 export const loadDashboard = createServerFn({ method: 'GET' })
-  .inputValidator(inputSchema)
+  .validator(inputSchema)
   .handler(async ({ data }): Promise<DashboardData> =>
     dashboardFor(await requireOrg(), data.period),
   )

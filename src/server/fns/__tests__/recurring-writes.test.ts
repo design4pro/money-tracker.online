@@ -58,10 +58,15 @@ const requireOrg = vi.hoisted(() => vi.fn())
 const writeSeries = vi.hoisted(() => vi.fn())
 
 vi.mock('@tanstack/react-start', () => ({
+  createIsomorphicFn: () => ({
+    client: () => ({
+      server: (serverImpl: () => unknown) => serverImpl,
+    }),
+  }),
   createServerFn: () => {
     let validate: (data: unknown) => unknown = (data) => data
     const builder = {
-      inputValidator(validator: unknown) {
+      validator(validator: unknown) {
         validate =
           typeof validator === 'function'
             ? (validator as (data: unknown) => unknown)

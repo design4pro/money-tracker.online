@@ -71,7 +71,7 @@ export interface RulePreviewResult {
 const MAX_SAMPLES = 10
 
 export const previewRule = createServerFn({ method: 'POST' })
-  .inputValidator(previewInputSchema)
+  .validator(previewInputSchema)
   .handler(async ({ data }): Promise<RulePreviewResult> => {
     const scope = await requireOrg()
     const targets = await loadRulePreviewTargets(scope, RULE_PREVIEW_SCAN_LIMIT)
