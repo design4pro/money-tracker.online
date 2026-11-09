@@ -84,7 +84,7 @@ export interface MeterProps extends Omit<RACMeterProps, 'children'> {
  * React Aria renders `role="meter progressbar"` — an ARIA *fallback role list*,
  * where an agent takes the first token it supports and older ones land on the
  * `progressbar` behind it. axe-core 4.13.0 does not split that list in its
- * `aria-allowed-attr` check, resolves the element to no role at all, and calls
+ * `aria-allowed-attr` check (4.13 and 4.14), resolves the element to no role at all, and calls
  * the four `aria-value*` attributes disallowed. Chrome and WebKit both compute
  * `role=meter` here, so the finding is a tool defect, not a defect in this
  * component. `e2e/accessibility.spec.ts` drops that one node shape and asserts

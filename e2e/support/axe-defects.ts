@@ -61,7 +61,7 @@ const METER_VALUE_ATTRIBUTES: ReadonlySet<string> = new Set([
  *
  * ## What axe reports, and why it is wrong
  *
- * axe 4.13.0 raises `aria-allowed-attr` at `critical` on the credit meter on `/accounts`, saying
+ * axe 4.13.0 and 4.14.0 raise `aria-allowed-attr` at `critical` on the credit meter on `/accounts`, saying
  * `aria-valuenow`, `aria-valuemin`, `aria-valuemax` and `aria-valuetext` are "not allowed". All
  * four are allowed on `role="meter"`. The cause is in axe's own source: `ariaAllowedAttrEvaluate`
  * calls `getRole(virtualNode)` **without** `{ fallback: true }`, and `getExplicitRole` then does
@@ -100,9 +100,39 @@ const METER_VALUE_ATTRIBUTES: ReadonlySet<string> = new Set([
  * its two call sites. Tracking: dequelabs/axe-core#3768 "Support fallback roles", open, milestoned
  * for axe-core 5.0 with no date, and reported there against this very component — "We noticed this
  * on the Adobe React Spectrum meter component". axe-core 4.11 taught `aria-prohibited-attr` to
- * split the list (#4325) and deliberately stopped there, so `aria-allowed-attr` is not fixed by a
- * patch upgrade and this must be re-read rather than assumed.
+ * split the list (#4325) and deliberately stopped there. **4.14.0 was re-read:** `getRole` is still
+ * called without `{ fallback: true }`; the only change is `this.data` shape (`{ messageKey, values }`
+ * instead of a string array). A parser that only accepted the 4.13 array left the false positive
+ * in the gate.
  */
+
+/**
+ * The attribute list axe attached to a failed `aria-allowed-attr` check.
+ *
+ * 4.13: `this.data(invalid.map(attr => attr + '="' + value + '"'))` — a string array.
+ * 4.14: `this.data({ messageKey, values: invalidValues })` — the same strings under `values`.
+ * Anything else is not this check's payload.
+ */
+export function ariaAllowedAttrFlaggedValues(
+  data: unknown,
+): readonly string[] | null {
+  if (Array.isArray(data) && data.every((entry) => typeof entry === 'string')) {
+    return data
+  }
+  if (
+    data !== null &&
+    typeof data === 'object' &&
+    'values' in data &&
+    Array.isArray((data as { values: unknown }).values) &&
+    (data as { values: unknown[] }).values.every(
+      (entry) => typeof entry === 'string',
+    )
+  ) {
+    return (data as { values: string[] }).values
+  }
+  return null
+}
+
 async function isMeterFallbackRoleArtefact(
   page: Page,
   node: NodeResult,
@@ -125,14 +155,14 @@ async function isMeterFallbackRoleArtefact(
   }
 
   const check = node.all.find((entry) => entry.id === 'aria-allowed-attr')
-  const flagged: unknown = check?.data
-  if (!Array.isArray(flagged) || flagged.length === 0) {
+  const flagged = ariaAllowedAttrFlaggedValues(check?.data)
+  if (flagged === null || flagged.length === 0) {
     return false
   }
 
-  // `data` is a list of `attr="value"` strings; only the name decides.
+  // Each entry is `attr="value"`; only the name decides.
   return flagged.every((entry) =>
-    METER_VALUE_ATTRIBUTES.has(String(entry).split('=')[0]),
+    METER_VALUE_ATTRIBUTES.has(entry.split('=')[0] ?? ''),
   )
 }
 
