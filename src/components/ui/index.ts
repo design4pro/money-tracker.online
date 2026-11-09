@@ -16,7 +16,7 @@
  * `src/components/app` or in a route.
  */
 
-export { Avatar, AvatarGroup, avatarVariants } from './avatar'
+export { Avatar, AvatarGroup, avatarVariants, initialsFrom } from './avatar'
 export type { AvatarProps, AvatarGroupProps } from './avatar'
 
 export { Badge, badgeVariants } from './badge'

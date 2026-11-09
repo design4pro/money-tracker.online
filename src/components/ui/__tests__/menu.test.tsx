@@ -194,7 +194,7 @@ describe('Menu', () => {
 })
 
 describe('MenuItem description', () => {
-  it('shows the reason beside a disabled item and names the item without it', async () => {
+  it('shows the reason beside a disabled item and includes it in the name', async () => {
     const user = userEvent.setup()
     render(
       <MenuTrigger>
@@ -214,13 +214,12 @@ describe('MenuItem description', () => {
 
     // The reason is on screen as text, not in a tooltip a keyboard user never opens …
     expect(screen.getByText('Already first')).toBeTruthy()
-    // … the item's name stays the label alone …
-    const item = screen.getByRole('menuitem', { name: 'Move up' })
+    // … and in the accessible name, because axe-core 4.14's 2.5.3 check counts
+    // visible description text that `aria-describedby` does not put in the name.
+    const item = screen.getByRole('menuitem', {
+      name: 'Move up Already first',
+    })
     expect(item.getAttribute('aria-disabled')).toBe('true')
-    // … and the reason is its description, so a screen reader hears it with the item.
-    expect(item.getAttribute('aria-describedby')).toBe(
-      screen.getByText('Already first').id,
-    )
   })
 
   it('leaves an item without a description exactly as it was', async () => {
