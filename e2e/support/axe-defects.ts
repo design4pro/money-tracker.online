@@ -29,20 +29,11 @@ export type Violation = AxeResults['violations'][number]
 type NodeResult = Violation['nodes'][number]
 
 /**
- * The ARIA **fallback role list** React Aria puts on every `Meter`.
+ * The ARIA **fallback role list** older React Aria `Meter` releases put on the node.
  *
- * ARIA 1.2 defines `role` as a *space-separated list of role tokens* and requires a user agent to
- * take the first token it supports. That is the standard way to ship a newer role with an older one
- * behind it, and `@react-aria/meter` emits exactly this list on purpose — its own comment cites the
- * Chromium and Firefox bugs for `meter` as the reason. Both have long since shipped it (Firefox 93,
- * October 2021), so the second token is vestigial for every engine this product is tested in. It is
- * still upstream's call to make, not this repository's to rewrite at runtime.
- *
- * And the list is not a prop this side can override. `useMeter()` returns it inside `meterProps`,
- * and `Meter` in `react-aria-components` spreads `meterProps` **last** in its `mergeProps` call, so
- * it wins over anything passed in. Dropping the second token means either writing to the DOM node
- * behind React's back after mount or forking the component — which is why this file, not the
- * component, carries the correction. `docs/ACCESSIBILITY.md` §5.5 weighs both.
+ * `react-aria-components` 1.22.1 emits a single `role="meter"`, so `isMeterFallbackRoleArtefact`
+ * currently matches nothing. The constant stays because a revert to the list would re-open the
+ * axe-core 4.13 `aria-allowed-attr` resolution failure documented in `docs/ACCESSIBILITY.md` §5.5.
  */
 export const RAC_METER_FALLBACK_ROLE = 'meter progressbar'
 

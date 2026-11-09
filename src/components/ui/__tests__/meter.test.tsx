@@ -8,23 +8,19 @@ import { Meter } from '../meter'
  * than through a colour, so a case that asserts a colour cannot select on the answer.
  */
 const fillClass = (root: HTMLElement) =>
-  root
-    .querySelector('[role="meter progressbar"] > div > div')
-    ?.getAttribute('class') ?? ''
+  root.querySelector('[role="meter"] > div > div')?.getAttribute('class') ?? ''
 
 /**
  * What a reader is told a `Meter` is, and how much of it is full.
  *
- * The first case is not a style assertion. `e2e/accessibility.spec.ts` corrects one axe-core
- * defect — `aria-allowed-attr` fails to resolve an ARIA *fallback role list* — and the correction
- * is scoped to the exact string React Aria emits. If a React Aria upgrade changes that string,
- * the correction silently stops matching and four `critical` findings come back with no
- * explanation attached; if it changes it to a *different* list, the correction would keep
- * matching a shape nobody has reasoned about. This test is the tripwire on that string, and it
- * fails in `pnpm test` — seconds — rather than in a browser suite minutes later.
+ * The first case is not a style assertion. `docs/ACCESSIBILITY.md` §5.5 records an axe-core
+ * defect against the older React Aria fallback list `meter progressbar`. 1.22.1 emits a single
+ * `role="meter"`; the e2e correction is scoped to the old string and is therefore dormant.
+ * This test is the tripwire on the live attribute, and it fails in `pnpm test` rather than in
+ * a browser suite minutes later.
  */
 describe('Meter', () => {
-  it('carries the ARIA fallback role list, with the value attributes that list needs', () => {
+  it('carries role=meter, with the value attributes that role needs', () => {
     render(
       <Meter
         label="1 692,11 zł of 10 000,00 zł used"
@@ -37,15 +33,13 @@ describe('Meter', () => {
 
     const meter = screen.getByRole('meter')
 
-    // `role="meter progressbar"`, exactly. ARIA 1.2 reads `role` as a list of tokens and takes
-    // the first one the agent supports, so the second token is what an agent that has never
-    // heard of `meter` falls back to — a value-bearing `progressbar` rather than a bare `<div>`.
-    // The string is spelled out rather than matched loosely because the e2e correction compares
-    // it character for character.
-    expect(meter.getAttribute('role')).toBe('meter progressbar')
+    // `role="meter"`, exactly. `react-aria-components` 1.22.1 dropped the vestigial
+    // `progressbar` fallback token. The string is spelled out rather than matched loosely
+    // because the e2e correction in `axe-defects.ts` still keys off the old list, and a
+    // silent revert to that list would re-open the axe 4.13 resolution failure.
+    expect(meter.getAttribute('role')).toBe('meter')
 
-    // The four attributes ARIA allows on `meter` — and the four axe 4.13.0 wrongly reports as
-    // disallowed once it has failed to resolve the list above.
+    // The four attributes ARIA allows on `meter`.
     expect(meter.getAttribute('aria-valuenow')).toBe('0.17')
     expect(meter.getAttribute('aria-valuemin')).toBe('0')
     expect(meter.getAttribute('aria-valuemax')).toBe('1')
