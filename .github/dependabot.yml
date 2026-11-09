@@ -60,10 +60,21 @@ updates:
           - '@testing-library/*'
       # Everything else, as long as it is not a major. Majors stay individual so each gets its
       # own review and its own red CI run.
+      #
+      # TanStack Start (and the Router packages that have to move with it) stay out of this
+      # group. 1.169 dropped `createServerFn.inputValidator` and tightened client import
+      # protection on `@tanstack/react-start/server`; mixing that into a 40-package bump makes
+      # the weekly PR unfixable in place (Dependabot rewrites the branch). The `tanstack` group
+      # above still opens its own PR for `@tanstack/*`.
       minor-and-patch:
         update-types:
           - minor
           - patch
+        exclude-patterns:
+          - '@tanstack/react-start*'
+          - '@tanstack/react-router*'
+          - '@tanstack/router-*'
+          - '@tanstack/start-*'
 
   - package-ecosystem: github-actions
     # Workflows live at the root; the composite actions need naming separately, because
