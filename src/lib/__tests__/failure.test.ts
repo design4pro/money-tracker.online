@@ -104,6 +104,17 @@ describe('readFailure', () => {
   it('reads an envelope off a non-Error object, as a flattened client may deliver it', () => {
     expect(readFailure({ envelope: LOCKED })).toEqual(LOCKED)
   })
+
+  it('reads a bare envelope, as Start 1.169 GET RPC may throw the adapter payload itself', () => {
+    expect(readFailure(LOCKED)).toEqual(LOCKED)
+    expect(
+      isUnauthenticatedFailure({
+        v: 1,
+        kind: 'unauthenticated',
+        message: { key: 'failure.unauthenticated' },
+      }),
+    ).toBe(true)
+  })
 })
 
 describe('failureOf', () => {

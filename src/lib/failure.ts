@@ -23,6 +23,8 @@ import type { FailureEnvelope } from '#/lib/failure-envelope'
 export function readFailure(error: unknown): FailureEnvelope | null {
   if (typeof error !== 'object' || error === null) return null
   try {
+    const direct = failureEnvelopeSchema.safeParse(error)
+    if (direct.success) return direct.data
     const parsed = failureEnvelopeSchema.safeParse(
       (error as { readonly envelope?: unknown }).envelope,
     )

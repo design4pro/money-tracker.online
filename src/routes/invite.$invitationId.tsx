@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
 import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
@@ -33,7 +34,21 @@ import { pageHead } from '#/routes/-lib/page-title'
  * state here: a screen that renders "not valid" for any id is an oracle for guessing them.
  */
 
+/** Signed-in account, no workspace. Dynamic import keeps `#/server/auth` out of the client graph. */
+const loadInviteSession = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<boolean> => {
+    const { getSession } = await import('#/server/auth/index')
+    const session = await getSession()
+    return session !== null && !session.user.banned
+  },
+)
+
 export const Route = createFileRoute('/invite/$invitationId')({
+  beforeLoad: async ({ params }) => {
+    if (!(await loadInviteSession())) {
+      throw redirect(signInTarget(params.invitationId))
+    }
+  },
   loader: async ({ params }) => {
     try {
       return {
@@ -63,9 +78,15 @@ export const Route = createFileRoute('/invite/$invitationId')({
 
 /** The sign-in screen, carrying this invitation as the return target (`safeRedirect` contract). */
 function signInTarget(invitationId: string) {
+  const path = `/invite/${invitationId}`
   return {
     to: '/login',
-    search: { redirect: `/invite/${invitationId}` },
+    search: { redirect: path },
+    // Start 1.169: a `to`+`search` redirect thrown from this route's loader after a
+    // same-document cookie clear can stay on `/invite/…` (error component) unless
+    // the Location is absolute and the next load is a fresh document.
+    href: `/login?redirect=${encodeURIComponent(path)}`,
+    reloadDocument: true,
   } as const
 }
 
