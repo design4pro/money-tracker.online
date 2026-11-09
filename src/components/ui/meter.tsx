@@ -79,19 +79,13 @@ export interface MeterProps extends Omit<RACMeterProps, 'children'> {
  * hairline token so that edge is legible on `surface`, `canvas` and `sunken`
  * alike.
  *
- * ## Why axe reports this element and the build stays green
+ * ## Role string
  *
- * React Aria renders `role="meter progressbar"` — an ARIA *fallback role list*,
- * where an agent takes the first token it supports and older ones land on the
- * `progressbar` behind it. axe-core 4.13.0 does not split that list in its
- * `aria-allowed-attr` check (4.13 and 4.14), resolves the element to no role at all, and calls
- * the four `aria-value*` attributes disallowed. Chrome and WebKit both compute
- * `role=meter` here, so the finding is a tool defect, not a defect in this
- * component. `e2e/accessibility.spec.ts` drops that one node shape and asserts
- * the real behaviour instead; `docs/ACCESSIBILITY.md` §5.5 is the record, with
- * the evidence and the date it is to be re-checked. `__tests__/meter.test.tsx`
- * pins the role string the correction is scoped to — do not "clean it up", and
- * do not strip the second token with a ref, without reading both.
+ * `react-aria-components` 1.22.1 renders a single `role="meter"`. Earlier
+ * releases emitted the fallback list `meter progressbar`, which axe-core 4.13
+ * failed to resolve (`docs/ACCESSIBILITY.md` §5.5). `__tests__/meter.test.tsx`
+ * pins the live attribute so a later React Aria change fails here rather than
+ * in a browser suite. Do not write a second token onto the node with a ref.
  */
 export function Meter({
   label,
