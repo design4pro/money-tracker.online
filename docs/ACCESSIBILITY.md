@@ -323,7 +323,7 @@ nor to switch the rule off — it is to establish what a reader actually gets, c
 narrowest possible amount, and assert the behaviour the correction claims. This section is the whole
 list. It has one entry.
 
-#### axe-core 4.13.0 · `aria-allowed-attr` · the credit meter on `/accounts`
+#### axe-core 4.13.0 / 4.14.0 · `aria-allowed-attr` · the credit meter on `/accounts`
 
 |                 |                                                                                                                                                                                                                           |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -348,15 +348,17 @@ supports, which makes the list the standard way to ship a newer role with an old
 October 2021** — so the second token is now vestigial for every engine this product is tested in.
 All four attributes axe names are allowed on `meter`.
 
-**What axe does wrong.** In `axe-core@4.13.0`, `ariaAllowedAttrEvaluate` calls `getRole(vNode)`
-**without** `{ fallback: true }`, and `getExplicitRole` then evaluates
+**What axe does wrong.** In `axe-core@4.13.0` and still in `4.14.0`, `ariaAllowedAttrEvaluate` calls
+`getRole(vNode)` **without** `{ fallback: true }`, and `getExplicitRole` then evaluates
 `const roleList = fallback ? tokenList(roleAttr) : [roleAttr]` — so `"meter progressbar"` is looked
 up as though it were one role name, nothing matches, and the element resolves to _no role at all_.
 A role-less element is allowed only the global attributes, so every value attribute on it is
 flagged. axe owns the token-list splitter; this one check does not ask for it. Reproduced on a
 minimal fixture: 4.13.0 flags `role="meter progressbar"` **and** `role="progressbar meter"`, and
 does not flag `role="meter"` — token order makes no difference, which is the signature of a
-resolution failure rather than a judgement about `meter`.
+resolution failure rather than a judgement about `meter`. 4.14.0 was the next upgrade this entry
+named: `getRole` is unchanged; `this.data` moved from a string array to
+`{ messageKey, values: string[] }`. The correction reads both shapes.
 
 **What a reader actually gets.** Chrome's own accessibility tree, dumped over CDP on this page,
 computes the node as `role: "meter"`, `name: "zł 1,692.11 of zł 10,000.00 used, 17%"`,

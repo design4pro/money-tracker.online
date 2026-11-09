@@ -43,7 +43,7 @@ export interface AvatarProps extends VariantProps<typeof avatarVariants> {
  * replacement boxes. Polish names are the easy case here; the workspace names
  * users actually type are not.
  */
-function initialsFrom(name: string): string {
+export function initialsFrom(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
   if (words.length === 0) return ''
 
