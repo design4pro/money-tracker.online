@@ -49,7 +49,7 @@
     "@internationalized/number": "^3.6.9",
     "@modelcontextprotocol/server": "2.4.0",
     "@react-email/components": "^1.0.12",
-    "@sentry/cloudflare": "^10.72.0",
+    "@sentry/cloudflare": "^11.11.0",
     "@sentry/react": "^10.72.0",
     "@tailwindcss/vite": "^4.3.4",
     "@tanstack/react-form": "^1.33.5",
