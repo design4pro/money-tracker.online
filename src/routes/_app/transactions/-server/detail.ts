@@ -79,7 +79,7 @@ export interface TransactionDetail {
 }
 
 export const loadTransactionDetail = createServerFn({ method: 'GET' })
-  .inputValidator(inputSchema)
+  .validator(inputSchema)
   .handler(async ({ data }): Promise<TransactionDetail> => {
     const scope = await requireOrg()
 

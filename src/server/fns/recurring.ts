@@ -142,7 +142,7 @@ export interface RecurringOverview {
  * so a second reader in the same minute writes nothing.
  */
 export const loadRecurring = createServerFn({ method: 'GET' })
-  .inputValidator(listInputSchema)
+  .validator(listInputSchema)
   .handler(async ({ data }): Promise<RecurringOverview> => {
     const scope = await requireOrg()
     const today = await todayFor(scope)
@@ -239,7 +239,7 @@ export interface SeriesDetail {
 }
 
 export const loadSeriesDetail = createServerFn({ method: 'GET' })
-  .inputValidator(seriesIdSchema)
+  .validator(seriesIdSchema)
   .handler(async ({ data }): Promise<SeriesDetail> => {
     const scope = await requireOrg()
     const today = await todayFor(scope)
@@ -296,7 +296,7 @@ export interface CandidateRow {
 
 /** The proposals waiting for a decision, best first. */
 export const loadCandidates = createServerFn({ method: 'GET' })
-  .inputValidator(z.strictObject({}))
+  .validator(z.strictObject({}))
   .handler(async (): Promise<ReadonlyArray<CandidateRow>> => {
     const scope = await requireOrg()
     const rows = await listCandidatesRow(scope, 'pending')
@@ -318,7 +318,7 @@ export const loadCandidates = createServerFn({ method: 'GET' })
  * a person sees after saving be an empty screen is not a defensible default.
  */
 export const createSeries = createServerFn({ method: 'POST' })
-  .inputValidator(createSeriesSchema)
+  .validator(createSeriesSchema)
   .handler(async ({ data }): Promise<{ readonly seriesId: string }> => {
     const scope = await requireOrg()
     return writeSeries(scope, {
@@ -343,7 +343,7 @@ const updateInputSchema = z.strictObject({
  * happened.
  */
 export const updateSeries = createServerFn({ method: 'POST' })
-  .inputValidator(updateInputSchema)
+  .validator(updateInputSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await writeSeries(scope, {
@@ -355,7 +355,7 @@ export const updateSeries = createServerFn({ method: 'POST' })
 
 /** Stops the cron acting on a series. Its history stays, and so do its unpaid periods. */
 export const pauseSeries = createServerFn({ method: 'POST' })
-  .inputValidator(seriesIdSchema)
+  .validator(seriesIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await pauseSeriesRow(scope, data.seriesId)
@@ -363,7 +363,7 @@ export const pauseSeries = createServerFn({ method: 'POST' })
 
 /** Restarts a paused series and catches its schedule up to today. */
 export const resumeSeries = createServerFn({ method: 'POST' })
-  .inputValidator(seriesIdSchema)
+  .validator(seriesIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await writeSeries(scope, {
@@ -375,7 +375,7 @@ export const resumeSeries = createServerFn({ method: 'POST' })
 
 /** Ends a series for good. Distinct from pausing: nothing further is ever materialised. */
 export const completeSeries = createServerFn({ method: 'POST' })
-  .inputValidator(seriesIdSchema)
+  .validator(seriesIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await completeSeriesRow(scope, data.seriesId)
@@ -383,7 +383,7 @@ export const completeSeries = createServerFn({ method: 'POST' })
 
 /** Deletes a series that never settled a period. The repository refuses — with the count — if it did. */
 export const deleteSeries = createServerFn({ method: 'POST' })
-  .inputValidator(seriesIdSchema)
+  .validator(seriesIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteSeriesRow(scope, data.seriesId)
@@ -401,7 +401,7 @@ export const deleteSeries = createServerFn({ method: 'POST' })
  * balance rebuild behind a button whose label says nothing about money moving.
  */
 export const markPeriodPaid = createServerFn({ method: 'POST' })
-  .inputValidator(markPaidSchema)
+  .validator(markPaidSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await markPaidRow(scope, data)
@@ -409,7 +409,7 @@ export const markPeriodPaid = createServerFn({ method: 'POST' })
 
 /** Records that a period was deliberately not paid. */
 export const skipPeriod = createServerFn({ method: 'POST' })
-  .inputValidator(periodKeySchema)
+  .validator(periodKeySchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await markSkippedRow(scope, data)
@@ -417,7 +417,7 @@ export const skipPeriod = createServerFn({ method: 'POST' })
 
 /** Undoes a mark-paid or a skip. The link is retired, never deleted. */
 export const revertPeriod = createServerFn({ method: 'POST' })
-  .inputValidator(periodKeySchema)
+  .validator(periodKeySchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await revertPeriodRow(scope, data)
@@ -425,7 +425,7 @@ export const revertPeriod = createServerFn({ method: 'POST' })
 
 /** Detaches a transaction a matcher adopted. The transaction itself is not touched. */
 export const unlinkTransaction = createServerFn({ method: 'POST' })
-  .inputValidator(
+  .validator(
     z.strictObject({
       seriesId: z.string().trim().min(1).max(64),
       transactionId: z.string().trim().min(1).max(64),
@@ -456,7 +456,7 @@ export interface DetectionReport {
  * month, and an acceptance is history. That is what makes this safe to put behind a button.
  */
 export const detectRecurring = createServerFn({ method: 'POST' })
-  .inputValidator(z.strictObject({}))
+  .validator(z.strictObject({}))
   .handler(async (): Promise<DetectionReport> => {
     const scope = await requireOrg()
     const today = await todayFor(scope)
@@ -511,9 +511,7 @@ export const detectRecurring = createServerFn({ method: 'POST' })
 
 /** Refuses a proposal, permanently. The detector will not make it again. */
 export const dismissCandidate = createServerFn({ method: 'POST' })
-  .inputValidator(
-    z.strictObject({ candidateId: z.string().trim().min(1).max(64) }),
-  )
+  .validator(z.strictObject({ candidateId: z.string().trim().min(1).max(64) }))
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await dismissCandidateRow(scope, data.candidateId)
@@ -527,7 +525,7 @@ export const dismissCandidate = createServerFn({ method: 'POST' })
  * transaction: the samples that produced the proposal stay exactly as they are.
  */
 export const acceptCandidate = createServerFn({ method: 'POST' })
-  .inputValidator(
+  .validator(
     z.strictObject({
       candidateId: z.string().trim().min(1).max(64),
       series: createSeriesSchema,

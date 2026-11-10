@@ -71,9 +71,7 @@ describe('the credit utilisation block', () => {
 
     // The caption precedes the track in document order, so the number and the mark that draws it
     // are adjacent rather than at opposite ends of the row.
-    const track = must(
-      container.querySelector('[role="meter progressbar"] > div'),
-    )
+    const track = must(container.querySelector('[role="meter"] > div'))
     expect(must(caption).compareDocumentPosition(track)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
@@ -108,9 +106,7 @@ describe('the credit utilisation block', () => {
       <CreditUtilisation {...WITHIN} currencyCode="PLN" />,
     )
 
-    const fill = container.querySelector(
-      '[role="meter progressbar"] > div > div',
-    )
+    const fill = container.querySelector('[role="meter"] > div > div')
     const painted = fill?.getAttribute('class') ?? ''
     // Green rewards the reader for owing money, and it spends the one positive hue the palette
     // has on a neutral quantity — leaving nothing to escalate a dangerous level with.
@@ -149,7 +145,7 @@ describe('the credit utilisation block', () => {
     // which one #171 actually shipped.
     expect(
       approaching.container
-        .querySelector('[role="meter progressbar"] > div > div')
+        .querySelector('[role="meter"] > div > div')
         ?.getAttribute('class'),
     ).toContain('bg-warning-bold')
     approaching.unmount()
@@ -169,7 +165,7 @@ describe('the credit utilisation block', () => {
     // card: the same adjacency `BudgetMeter` earns `negative-bold` on, and now the same red.
     expect(
       over.container
-        .querySelector('[role="meter progressbar"] > div > div')
+        .querySelector('[role="meter"] > div > div')
         ?.getAttribute('class'),
     ).toContain('bg-negative-bold')
   })

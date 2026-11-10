@@ -66,7 +66,7 @@ const inputSchema = z.strictObject({
 })
 
 export const loadAccountDetail = createServerFn({ method: 'GET' })
-  .inputValidator(inputSchema)
+  .validator(inputSchema)
   .handler(async ({ data }): Promise<AccountDetail> => {
     const scope = await requireOrg()
 

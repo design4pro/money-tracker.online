@@ -49,6 +49,16 @@ const FALLBACK_MESSAGES: Readonly<Record<FailureKind, string>> = {
   internal: GENERIC_MESSAGE,
 }
 
+/**
+ * `Error.message` of an unauthenticated {@link PublicFailureError}.
+ *
+ * Start 1.169's `$TSR/Error` plugin can serialise only this string on a GET
+ * server-function round trip, dropping `envelope`. Loaders that must still send
+ * the visitor to `/login` match this constant — never a catalogue sentence.
+ */
+export const PUBLIC_FAILURE_UNAUTHENTICATED_MESSAGE =
+  FALLBACK_MESSAGES.unauthenticated
+
 /** The envelope of a failure that could not be read. A fresh object each time, never shared. */
 export function internalEnvelope(): FailureEnvelope {
   return {

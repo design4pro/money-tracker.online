@@ -21,6 +21,11 @@ import { authOptions } from '../config'
 
 vi.mock('@tanstack/react-start', () => ({
   createServerFn: () => ({ handler: (run: unknown) => run }),
+  createIsomorphicFn: () => ({
+    client: () => ({
+      server: (serverImpl: () => unknown) => serverImpl,
+    }),
+  }),
 }))
 vi.mock('@tanstack/react-start/server', () => ({
   getRequestHeader: () => undefined,

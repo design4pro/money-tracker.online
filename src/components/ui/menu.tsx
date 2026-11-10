@@ -8,7 +8,6 @@ import {
   Separator as RACSeparator,
   SubmenuTrigger as RACSubmenuTrigger,
 } from 'react-aria-components/Menu'
-import { Text as RACText } from 'react-aria-components/Text'
 import { Check, ChevronRight } from 'lucide-react'
 
 import { cn } from '#/lib/cn'
@@ -60,9 +59,10 @@ export function Menu<T extends object>({ className, ...props }: MenuProps<T>) {
 export interface MenuItemProps<T extends object> extends RACMenuItemProps<T> {
   icon?: ReactNode
   /**
-   * A second line under the label: why an item is disabled, or what it will do. It is wired as
-   * the item's `aria-describedby`, so a screen reader hears it with the item, and it stays
-   * visible, so a disabled item explains itself to a sighted keyboard user as well.
+   * A second line under the label: why an item is disabled, or what it will do. It stays
+   * visible, and `aria-label` repeats the label and this reason so the accessible name
+   * contains that visible text (WCAG 2.2 §2.5.3). `slot="description"` would put it on
+   * `aria-describedby` only, which axe-core 4.14 flags as `label-content-name-mismatch`.
    */
   description?: ReactNode
   /** A keyboard hint, a count, an amount. Decoration. */
@@ -90,6 +90,11 @@ export function MenuItem<T extends object>({
     <RACMenuItem
       {...props}
       textValue={textValue}
+      aria-label={
+        typeof description === 'string' && textValue !== undefined
+          ? `${textValue} ${description}`
+          : props['aria-label']
+      }
       className={composeTw(
         className,
         collectionItemBase,
@@ -129,18 +134,15 @@ export function MenuItem<T extends object>({
             </span>
           ) : null}
           {description ? (
-            <span className="flex min-w-0 flex-1 flex-col">
-              <RACText
-                slot="label"
-                className="truncate group-data-[disabled]:opacity-45"
-              >
+            <span className="min-w-0 flex-1 font-normal">
+              <span className="block truncate font-medium group-data-[disabled]:opacity-45">
                 {typeof children === 'function'
                   ? children(renderProps)
                   : children}
-              </RACText>
-              <RACText slot="description" className="text-caption text-ink-2">
+              </span>{' '}
+              <span className="block text-caption text-ink-2">
                 {description}
-              </RACText>
+              </span>
             </span>
           ) : (
             <span className="min-w-0 flex-1 truncate">

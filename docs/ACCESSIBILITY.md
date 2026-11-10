@@ -323,7 +323,7 @@ nor to switch the rule off — it is to establish what a reader actually gets, c
 narrowest possible amount, and assert the behaviour the correction claims. This section is the whole
 list. It has one entry.
 
-#### axe-core 4.13.0 · `aria-allowed-attr` · the credit meter on `/accounts`
+#### axe-core 4.13.0 / 4.14.0 · `aria-allowed-attr` · the credit meter on `/accounts`
 
 |                 |                                                                                                                                                                                                                           |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -333,7 +333,14 @@ list. It has one entry.
 | **Decided**     | 2026-09-02                                                                                                                                                                                                                |
 | **Re-check by** | **2027-03-01**, or the next axe-core upgrade, whichever comes first.                                                                                                                                                      |
 
-**What the markup does.** React Aria's `Meter` renders `role="meter progressbar"`. ARIA 1.2 reads
+**Status 2026-11-09.** `react-aria-components` 1.22.1 emits a single `role="meter"` on this node.
+The live `role` attribute is therefore no longer `meter progressbar`, so `isMeterFallbackRoleArtefact`
+drops nothing. The AA gate is unchanged: `aria-allowed-attr` stays on, and
+`src/components/ui/__tests__/meter.test.tsx` pins the live string. This subsection stays as the
+record of the axe-core defect and of the dormant correction, in case a later React Aria release
+restores the fallback list. The AA claim is not widened.
+
+**What the markup does.** React Aria's `Meter` previously rendered `role="meter progressbar"`. ARIA 1.2 reads
 `role` as a space-separated _list_ of role tokens and requires the agent to use the first one it
 supports, which makes the list the standard way to ship a newer role with an older one behind it.
 `@react-aria/meter` emits it deliberately; its own comment names Chromium bug 944542 and Firefox bug
@@ -341,15 +348,17 @@ supports, which makes the list the standard way to ship a newer role with an old
 October 2021** — so the second token is now vestigial for every engine this product is tested in.
 All four attributes axe names are allowed on `meter`.
 
-**What axe does wrong.** In `axe-core@4.13.0`, `ariaAllowedAttrEvaluate` calls `getRole(vNode)`
-**without** `{ fallback: true }`, and `getExplicitRole` then evaluates
+**What axe does wrong.** In `axe-core@4.13.0` and still in `4.14.0`, `ariaAllowedAttrEvaluate` calls
+`getRole(vNode)` **without** `{ fallback: true }`, and `getExplicitRole` then evaluates
 `const roleList = fallback ? tokenList(roleAttr) : [roleAttr]` — so `"meter progressbar"` is looked
 up as though it were one role name, nothing matches, and the element resolves to _no role at all_.
 A role-less element is allowed only the global attributes, so every value attribute on it is
 flagged. axe owns the token-list splitter; this one check does not ask for it. Reproduced on a
 minimal fixture: 4.13.0 flags `role="meter progressbar"` **and** `role="progressbar meter"`, and
 does not flag `role="meter"` — token order makes no difference, which is the signature of a
-resolution failure rather than a judgement about `meter`.
+resolution failure rather than a judgement about `meter`. 4.14.0 was the next upgrade this entry
+named: `getRole` is unchanged; `this.data` moved from a string array to
+`{ messageKey, values: string[] }`. The correction reads both shapes.
 
 **What a reader actually gets.** Chrome's own accessibility tree, dumped over CDP on this page,
 computes the node as `role: "meter"`, `name: "zł 1,692.11 of zł 10,000.00 used, 17%"`,
@@ -390,13 +399,11 @@ same meter fails the build, and an unrelated role-less element carrying `aria-va
 build, both reported in full.
 
 **What replaces the dropped finding.** `the credit meter on accounts announces as a meter, with its
-whole sentence as the name` in the same spec asserts, positively, that the fallback list is present,
-that every one of them resolves to `meter` and none to `progressbar`, that the accessible name is
-the sentence, and — on Chromium, over CDP — that the browser's own accessibility tree agrees. That
-is a stronger claim than the rule it stands in for, which only ever checked an attribute list.
-`src/components/ui/__tests__/meter.test.tsx` pins the role string the correction is scoped to, so a
-React Aria upgrade that changes it fails in unit tests rather than silently un-scoping the
-correction.
+whole sentence as the name` in the same spec asserts, positively, that the live nodes are
+`role="meter"` (none `progressbar`), that the accessible name is the sentence, and — on Chromium,
+over CDP — that the browser's own accessibility tree agrees. That is a stronger claim than the rule
+it stands in for, which only ever checked an attribute list.
+`src/components/ui/__tests__/meter.test.tsx` pins the live role string.
 
 **How this entry is removed.** When `aria-allowed-attr` passes `{ fallback: true }` to `getRole`,
 delete `isMeterFallbackRoleArtefact` and `withoutKnownAxeDefects` from the spec and delete this

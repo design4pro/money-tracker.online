@@ -75,7 +75,7 @@ import type {
  * call. Nothing stores them; see the repository's rule 2.
  */
 export const listGroups = createServerFn({ method: 'GET' })
-  .inputValidator(listGroupsSchema)
+  .validator(listGroupsSchema)
   .handler(
     async ({ data }): Promise<ReadonlyArray<TransactionGroupSummary>> => {
       const scope = await requireOrg()
@@ -85,7 +85,7 @@ export const listGroups = createServerFn({ method: 'GET' })
 
 /** Creates an empty group. It gains members through {@link addToGroup}. */
 export const createGroup = createServerFn({ method: 'POST' })
-  .inputValidator(createGroupSchema)
+  .validator(createGroupSchema)
   .handler(async ({ data }): Promise<TransactionGroupSummary> => {
     const scope = await requireOrg()
     return createGroupRow(scope, data)
@@ -93,7 +93,7 @@ export const createGroup = createServerFn({ method: 'POST' })
 
 /** Renames a group. */
 export const renameGroup = createServerFn({ method: 'POST' })
-  .inputValidator(renameGroupSchema)
+  .validator(renameGroupSchema)
   .handler(async ({ data }): Promise<TransactionGroupSummary> => {
     const scope = await requireOrg()
     return renameGroupRow(scope, data)
@@ -101,7 +101,7 @@ export const renameGroup = createServerFn({ method: 'POST' })
 
 /** Adds transactions to a group. Ids are deduplicated at parse; re-adding a member is a no-op. */
 export const addToGroup = createServerFn({ method: 'POST' })
-  .inputValidator(addToGroupSchema)
+  .validator(addToGroupSchema)
   .handler(async ({ data }): Promise<TransactionGroupSummary> => {
     const scope = await requireOrg()
     return addToGroupRows(scope, data)
@@ -114,7 +114,7 @@ export const addToGroup = createServerFn({ method: 'POST' })
  * statement, and the caller has to be told rather than left holding an id that no longer resolves.
  */
 export const removeFromGroup = createServerFn({ method: 'POST' })
-  .inputValidator(removeFromGroupSchema)
+  .validator(removeFromGroupSchema)
   .handler(async ({ data }): Promise<RemoveFromGroupResult> => {
     const scope = await requireOrg()
     return removeFromGroupRows(scope, data)
@@ -122,7 +122,7 @@ export const removeFromGroup = createServerFn({ method: 'POST' })
 
 /** Deletes a group. The transactions it held are untouched. */
 export const deleteGroup = createServerFn({ method: 'POST' })
-  .inputValidator(groupIdSchema)
+  .validator(groupIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteGroupRow(scope, data)
@@ -140,7 +140,7 @@ export const listTemplates = createServerFn({ method: 'GET' }).handler(
 
 /** Saves a shape at the end of the order. */
 export const createTemplate = createServerFn({ method: 'POST' })
-  .inputValidator(createTemplateSchema)
+  .validator(createTemplateSchema)
   .handler(async ({ data }): Promise<TransactionTemplateSummary> => {
     const scope = await requireOrg()
     return createTemplateRow(scope, data)
@@ -148,7 +148,7 @@ export const createTemplate = createServerFn({ method: 'POST' })
 
 /** Edits a saved shape. An absent key leaves the column alone; an explicit `null` clears it. */
 export const updateTemplate = createServerFn({ method: 'POST' })
-  .inputValidator(updateTemplateSchema)
+  .validator(updateTemplateSchema)
   .handler(async ({ data }): Promise<TransactionTemplateSummary> => {
     const scope = await requireOrg()
     return updateTemplateRow(scope, data)
@@ -156,7 +156,7 @@ export const updateTemplate = createServerFn({ method: 'POST' })
 
 /** Deletes a saved shape. */
 export const deleteTemplate = createServerFn({ method: 'POST' })
-  .inputValidator(templateIdSchema)
+  .validator(templateIdSchema)
   .handler(async ({ data }): Promise<void> => {
     const scope = await requireOrg()
     await deleteTemplateRow(scope, data)
@@ -170,7 +170,7 @@ export const deleteTemplate = createServerFn({ method: 'POST' })
  * "create from template" write.
  */
 export const applyTemplate = createServerFn({ method: 'GET' })
-  .inputValidator(templateIdSchema)
+  .validator(templateIdSchema)
   .handler(async ({ data }): Promise<TransactionDraft> => {
     const scope = await requireOrg()
     return applyTemplateRow(scope, data)

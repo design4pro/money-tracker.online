@@ -1,8 +1,9 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
 import { Button, Card, CardBody, Link, Skeleton, toast } from '#/components/ui'
-import { failureOf, readFailure } from '#/lib/failure'
+import { failureOf, isUnauthenticatedFailure } from '#/lib/failure'
 import { useTranslate } from '#/lib/i18n'
 import { acceptInvitation, loadInvitation } from '#/server/fns/members'
 
@@ -33,7 +34,21 @@ import { pageHead } from '#/routes/-lib/page-title'
  * state here: a screen that renders "not valid" for any id is an oracle for guessing them.
  */
 
+/** Signed-in account, no workspace. Dynamic import keeps `#/server/auth` out of the client graph. */
+const loadInviteSession = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<boolean> => {
+    const { getSession } = await import('#/server/auth/index')
+    const session = await getSession()
+    return session !== null && !session.user.banned
+  },
+)
+
 export const Route = createFileRoute('/invite/$invitationId')({
+  beforeLoad: async ({ params }) => {
+    if (!(await loadInviteSession())) {
+      throw redirect(signInTarget(params.invitationId))
+    }
+  },
   loader: async ({ params }) => {
     try {
       return {
@@ -44,7 +59,7 @@ export const Route = createFileRoute('/invite/$invitationId')({
     } catch (error) {
       // An unauthenticated visitor is sent to sign in and brought back here, rather than being
       // told the invitation is broken — which it is not.
-      if (isUnauthenticated(error)) {
+      if (isUnauthenticatedFailure(error)) {
         throw redirect(signInTarget(params.invitationId))
       }
       throw error
@@ -63,26 +78,16 @@ export const Route = createFileRoute('/invite/$invitationId')({
 
 /** The sign-in screen, carrying this invitation as the return target (`safeRedirect` contract). */
 function signInTarget(invitationId: string) {
+  const path = `/invite/${invitationId}`
   return {
     to: '/login',
-    search: { redirect: `/invite/${invitationId}` },
+    search: { redirect: path },
+    // Start 1.169: a `to`+`search` redirect thrown from this route's loader after a
+    // same-document cookie clear can stay on `/invite/…` (error component) unless
+    // the Location is absolute and the next load is a fresh document.
+    href: `/login?redirect=${encodeURIComponent(path)}`,
+    reloadDocument: true,
   } as const
-}
-
-/**
- * Whether the loader failed because nobody is signed in.
- *
- * The server's failure middleware replaces the error with one whose name and message are fixed, so
- * the answer is the `unauthenticated` kind of its public envelope (`readFailure`). The error's name
- * stays as a second condition for one release, for a Worker that predates the middleware; the
- * message regex is gone, because the sentence is no longer the server's to vary.
- *
- * A banned account is refused with a 403 by the same user guard, which classifies as `forbidden`:
- * it no longer takes the sign-in redirect, because signing in again cannot help it.
- */
-function isUnauthenticated(error: unknown): boolean {
-  if (readFailure(error)?.kind === 'unauthenticated') return true
-  return error instanceof Error && error.name === 'AuthRequirementError'
 }
 
 /**
@@ -170,7 +175,7 @@ function InvitationRoute() {
               setJoining(false)
               // The session ended between loading this card and pressing the button: sign in and
               // come back, as the loader does, rather than toasting a sentence with no way on.
-              if (readFailure(error)?.kind === 'unauthenticated') {
+              if (isUnauthenticatedFailure(error)) {
                 void router.navigate(signInTarget(params.invitationId))
                 return
               }
