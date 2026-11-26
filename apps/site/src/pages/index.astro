@@ -1,31 +1,23 @@
 ---
 import { env } from "cloudflare:workers";
 import {
-  getEmDashEntry,
-  getRequestContext,
   getSeoMeta,
   getSiteSettings,
-  runWithContext,
 } from "emdash";
 import { createPublicPageContext } from "emdash/page";
 import { EmDashHead, Image } from "emdash/ui";
 import "@fontsource-variable/dm-sans";
 import "@fontsource/instrument-serif";
 import "../styles/home.css";
-import { publishedHome, type Home } from "../home.ts";
+import { publishedHome } from "../home.ts";
+import { homeHeroKey, homeHeroPath } from "../home-hero.ts";
+import { loadPublishedHome } from "../home-query.ts";
 
-const context = getRequestContext();
-const loadHome = () => getEmDashEntry<"landing", Home>("landing", "home");
-// Use the live published revision even during editing or after an unpublish.
-const result = context
-  ? await runWithContext(
-      { ...context, editMode: false, preview: undefined, routeCacheFill: true },
-      loadHome,
-    )
-  : await loadHome();
-
+const result = await loadPublishedHome();
 const { entry } = result;
 const home = publishedHome(result);
+const hero = home?.hero_image;
+const heroAlt = home?.hero_image_alt || hero?.alt || "";
 if (!home) {
   Astro.response.status = 503;
   Astro.response.headers.set("Cache-Control", "no-store");
@@ -102,9 +94,13 @@ const sourceUrl = /^[a-f0-9]{40}$/.test(sourceSha)
               {home.register_label}<span aria-hidden="true">↗</span>
             </a>
           </div>
-          {home.hero_image ? (
+          {hero ? (
             <div class="hero-media">
-              <Image image={home.hero_image} alt={home.hero_image_alt || home.hero_image.alt || ""} loading="eager" />
+              {homeHeroKey(hero) ? (
+                <img src={homeHeroPath} alt={heroAlt} width={hero.width} height={hero.height} loading="eager" />
+              ) : (
+                <Image image={hero} alt={heroAlt} loading="eager" />
+              )}
             </div>
           ) : (
             <div class="hero-art" aria-hidden="true">
