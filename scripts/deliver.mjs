@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { access, endpoint, packages, request, required, sha, cmsBoundary } from './probe.mjs';
-import { smoke } from './smoke.mjs';
+import { canonicalOrigin, signInTarget, smoke } from './smoke.mjs';
 import { release } from './release.mjs';
 import { activeDeployment, deploymentResult, requireCutoverApproval, requireNoPublicRoutes } from './deployments.mjs';
 
@@ -29,10 +29,12 @@ for (const worker of packages) {
 }
 endpoint('app', required('APP_PROTECTED_PATH'));
 endpoint('site', required('CMS_ADMIN_PATH'));
-const signIn = new URL(required('SIGN_IN_URL'));
-if (signIn.origin !== endpoint('app', '/').origin || signIn.username || signIn.password) {
-  throw new Error('Invalid smoke test configuration');
+const appOrigin = canonicalOrigin('APP_ORIGIN');
+const siteOrigin = canonicalOrigin('SITE_ORIGIN');
+if (stage === 'production' && appOrigin !== 'https://app.money-tracker.online') {
+  throw new Error('Production APP_ORIGIN must be https://app.money-tracker.online');
 }
+signInTarget(appOrigin);
 cmsBoundary();
 
 async function verifyMain() {
@@ -63,7 +65,8 @@ function npm(worker, ...args) {
     const env = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
       name !== 'GH_TOKEN' && !name.includes('_ACCESS_CLIENT_')));
     env.SOURCE_SHA = expected;
-    env.APP_ORIGIN = required('APP_URL');
+    env.APP_ORIGIN = appOrigin;
+    if (worker === 'site') env.SITE_URL = siteOrigin;
     const child = spawn('npm', ['--prefix', `apps/${worker}`, ...args], { stdio: 'inherit', env });
     child.once('error', reject);
     child.once('exit', (code, signal) => {

@@ -42,12 +42,14 @@ Set these values separately in each GitHub delivery environment. Store delivery 
 | --- | --- |
 | `CLOUDFLARE_ACCOUNT_ID` | Account that owns this environment's Workers and bindings |
 | `APP_WORKER_NAME`, `SITE_WORKER_NAME`, `FACTORY_WORKER_NAME` | `money-app-staging`, `money-site-staging`, `money-factory-staging`; distinct production names |
-| `APP_URL`, `SITE_URL`, `FACTORY_URL` | HTTPS origins such as `https://app-staging.example.com`; no paths |
-| `D1_DATABASE_ID`, `EMAIL_FROM` | App D1 UUID and verified sender. Delivery supplies `APP_URL` to the app and site as `APP_ORIGIN`. |
+| `APP_ORIGIN` | Canonical app origin for auth, API origin checks, and landing CTAs. Set to `https://app.money-tracker.online` in production. |
+| `SITE_ORIGIN` | Canonical landing origin for SEO. Set to `https://money-tracker.online` in production. |
+| `APP_URL`, `SITE_URL`, `FACTORY_URL` | HTTPS origins allowed for smoke probes. These can be temporary verification hosts. |
+| `D1_DATABASE_ID`, `EMAIL_FROM` | App D1 UUID and verified sender. |
 | `POLAR_MONTHLY_PRODUCT_ID`, `POLAR_YEARLY_PRODUCT_ID` | Distinct product UUIDs supplied by the operator for the target environment. |
 | `SITE_D1_DATABASE_ID`, `SITE_CACHE_KV_ID`, `SITE_SESSION_KV_ID`, `SITE_MEDIA_BUCKET` | Dedicated CMS D1, two KV namespaces, and private R2 bucket. Use separate bindings per environment. |
 | `CF_ACCESS_TEAM_DOMAIN` | Team hostname used for the CMS application. Store `CF_ACCESS_AUDIENCE` as a site Worker secret. |
-| `SIGN_IN_URL` | Full URL on the app origin, for example `https://app-staging.example.com/login` |
+| `SIGN_IN_URL` | Full sign-in URL on `APP_ORIGIN`, for example `https://app-staging.example.com/login` |
 | `APP_PROTECTED_PATH`, `CMS_ADMIN_PATH` | Paths `/billing` and `/_emdash/admin` for the operations under test |
 | `CMS_UNAUTHENTICATED_STATUS` | Optional exact `401` or `403`. Leave unset to allow either or a matching login redirect. |
 | `CMS_LOGIN_URL` | Optional same-origin CMS login URL or path, default `/_emdash/admin/login` |
@@ -62,14 +64,14 @@ The delivery script uses these package commands with each package's locked Wrang
 
 ```sh
 npm run migrate:staging --prefix apps/app
-export SOURCE_SHA="$GITHUB_SHA" APP_ORIGIN="$APP_URL"
+export SOURCE_SHA="$GITHUB_SHA" APP_ORIGIN
 npm run deploy:staging --prefix apps/app -- --name "$APP_WORKER_NAME"
-npm run deploy:staging --prefix apps/site -- --name "$SITE_WORKER_NAME"
+SITE_URL="$SITE_ORIGIN" npm run deploy:staging --prefix apps/site -- --name "$SITE_WORKER_NAME"
 npm run deploy:staging --prefix apps/factory -- --name "$FACTORY_WORKER_NAME" --var "SOURCE_SHA:$GITHUB_SHA"
 node scripts/smoke.mjs "$GITHUB_SHA"
 ```
 
-For the first rollout, use verification endpoints that are separate from the live public routes, for example isolated Workers preview origins with the required access controls. The initial production preflight rejects public routes and custom domains in Wrangler config. Use the standard package config with no route or domain flags in the deploy scripts, and keep route provisioning permissions with the operator. The operator switches the initial public routes separately after successful exact-SHA verification and confirms them before marking cutover complete. Set the routine smoke origins to the public URLs where appropriate and verify the public landing points to the intended sign-in origin. Keep that routing work outside migrations.
+For the first rollout, provision approved verification endpoints that reach the candidate Workers separately from the live public routes. The standard package configs disable workers.dev and preview URLs. The initial production preflight rejects public routes and custom domains in Wrangler config. Use the standard package config with no route or domain flags in the deploy scripts, and keep route provisioning permissions with the operator. Before changing any public route, the operator must confirm that production `APP_ORIGIN`, `SIGN_IN_URL`, and `SITE_ORIGIN` match the intended public destinations and that the successful production smoke for the approved SHA verified them through the allowed probe hosts. Smoke sends a signed-out API request to `APP_URL` with the canonical app origin and checks that it reaches the app's session boundary. It also checks the visible sign-in link and canonical and Open Graph URLs on the landing served by `SITE_URL`. After switching the public routes, verify the public landing and app destinations and their health SHA before marking cutover complete. Set the routine smoke origins to the public URLs where appropriate. Keep that routing work outside migrations.
 
 The production job uses the corresponding `migrate:production` and `deploy:production` scripts. Use the workflow for live delivery. For a fresh CMS database, an authorized editor must publish the seeded Home via normal Access-protected setup before smoke can pass. Staging can start with no previous deployments, and first production cutover can do so with exact-SHA approval. Delivery accepts a confirmed missing Worker or an empty deployment list as an absent baseline. It stops before migration on authorization errors, unknown responses, or split traffic. Delivery records previous IDs or their absence, serializes releases, and verifies active versions and live smoke.
 

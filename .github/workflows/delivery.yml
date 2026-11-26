@@ -87,6 +87,7 @@ jobs:
           CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
           CMS_LOGIN_URL: ${{ vars.CMS_LOGIN_URL }}
           APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
           APP_URL: ${{ vars.APP_URL }}
           D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
@@ -100,6 +101,7 @@ jobs:
           APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
           APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
           SITE_WORKER_NAME: ${{ vars.SITE_WORKER_NAME }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
           SITE_URL: ${{ vars.SITE_URL }}
           SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
           SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
@@ -146,6 +148,7 @@ jobs:
           CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
           CMS_LOGIN_URL: ${{ vars.CMS_LOGIN_URL }}
           APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
           APP_URL: ${{ vars.APP_URL }}
           D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
           EMAIL_FROM: ${{ vars.EMAIL_FROM }}
@@ -159,6 +162,7 @@ jobs:
           APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
           APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
           SITE_WORKER_NAME: ${{ vars.SITE_WORKER_NAME }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
           SITE_URL: ${{ vars.SITE_URL }}
           SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
           SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
