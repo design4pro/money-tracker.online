@@ -129,7 +129,7 @@ before(async () => {
     DB: db,
     APP_ORIGIN: origin,
     EMAIL_FROM: "auth@example.test",
-    BETTER_AUTH_SECRET: "local-FIXTURE-yIU6tkrW4m78e0uBzUa3JqpM",
+    BETTER_AUTH_SECRET: "synthetic-test-auth-secret-not-for-deployment",
     POLAR_ENVIRONMENT: "sandbox",
     POLAR_ACCESS_TOKEN: "fixture-token",
     POLAR_WEBHOOK_SECRET: "fixture-webhook-secret-not-an-actual-secret",
