@@ -194,8 +194,9 @@ export class Github {
     if (!sha(head)) return [];
     const responses = await Promise.all(["workflow_run", "workflow_dispatch", "push"].map(event =>
       this.api(`/actions/workflows/delivery.yml/runs?branch=main&event=${event}&head_sha=${head}&per_page=30`)));
+    // GitHub allows the original attempt and up to 50 reruns.
     return responses.flatMap(response => list(record(response).workflow_runs).map(record)).filter(run =>
-      integer(run.id) && integer(run.run_attempt) && run.head_sha === head &&
+      integer(run.id) && integer(run.run_attempt) && run.run_attempt <= 51 && run.head_sha === head &&
       run.head_branch === "main" && ["workflow_run", "workflow_dispatch", "push"].includes(String(run.event)) &&
       run.path === ".github/workflows/delivery.yml" && String(record(run.repository).id) === this.env.REPO_ID &&
       String(record(run.head_repository).id) === this.env.REPO_ID);

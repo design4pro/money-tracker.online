@@ -42,6 +42,8 @@ let candidateBase = base;
 let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
+let priorAttemptHead = merge;
+let rerunStatus = "completed";
 let failProductionJobs = false;
 let onProductionJobs;
 const weekMs = 7 * 24 * 60 * 60 * 1000;
@@ -182,18 +184,19 @@ async function provider(req) {
         // Thirty newer successful runs fill an unfiltered first page and hide the exact merge.
         ...(implemented && searchParams.get("event") === "workflow_run"
           ? [...Array.from({length: 30}, (_, id) => ({id: id + 10, run_attempt: 1, head_sha: descendant})),
-            {id: 2, run_attempt: 2, head_sha: merge, conclusion: "failure"}]
+            {id: 2, run_attempt: 2, head_sha: merge, status: rerunStatus,
+              conclusion: rerunStatus === "completed" ? "failure" : null}]
           : []),
         ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
         ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
       ].filter(run => run.head_sha === requested ||
         (requested === merge && run.id === 3)) // Model a provider returning an unrelated result.
         .slice(0, Number(searchParams.get("per_page")))
-        .map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
-          conclusion: run.conclusion ?? "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
+        .map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: run.status ?? "completed",
+          conclusion: run.id === 2 ? run.conclusion : "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
     }
     if (path === "/actions/runs/2/attempts/1") {
-      return json({id: 2, run_attempt: 1, head_sha: merge, status: "completed", conclusion: "success"});
+      return json({id: 2, run_attempt: 1, head_sha: priorAttemptHead, status: "completed", conclusion: "success"});
     }
     if (path.startsWith("/actions/runs/")) {
       assert.notEqual(path, "/actions/runs/2/attempts/2/jobs", "a failed attempt is not eligible");
@@ -332,9 +335,14 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   revision = otherHead;
   await tick();
   assert.deepEqual(calls.merges, [otherHead]);
+  // A successful earlier attempt with the wrong head cannot prove this release.
+  priorAttemptHead = descendant;
+  smoke = "success";
   await tick();
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "release");
   assert.deepEqual(calls.closed, []);
+  priorAttemptHead = merge;
+  smoke = "failure";
   mainHead = descendant;
   await tick();
   const superseded = await status();
@@ -379,6 +387,7 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.equal(await (await call("/test/alarm")).json(), retry.due);
   assert.deepEqual(calls.closed, []);
   failProductionJobs = false;
+  rerunStatus = "in_progress";
   assert.equal((await call("/test/idle")).status, 204);
   await tick();
   assert.deepEqual(calls.closed, ["/issues/1"]);
