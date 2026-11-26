@@ -43,6 +43,7 @@ let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
 let failProductionJobs = false;
+let onProductionJobs;
 const weekMs = 7 * 24 * 60 * 60 * 1000;
 const epochFriday = Date.UTC(2020, 0, 3, 9);
 const weekEnd = epochFriday + Math.floor((Date.now() - epochFriday) / weekMs) * weekMs;
@@ -181,8 +182,10 @@ async function provider(req) {
     if (path.startsWith("/actions/runs/")) {
       if (failProductionJobs && path.includes("/runs/2/")) return new Response(null, {status: 503});
       const commit = path.includes("/runs/1/") ? head : path.includes("/runs/3/") ? descendant : merge;
+      const conclusion = commit === merge ? smoke : "success";
+      if (commit === merge) await onProductionJobs?.();
       return json({total_count: 1, jobs: [{name: "deploy-production", head_sha: commit, conclusion: "success",
-        steps: [{name: "Production smoke", conclusion: commit === merge ? smoke : "success"}]}]});
+        steps: [{name: "Production smoke", conclusion}]}]});
     }
     if (path === `/compare/${merge}...${descendant}`) return json({status: "ahead", merge_base_commit: {sha: merge}});
   }
@@ -321,21 +324,45 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   const blocked = superseded.tickets.find(ticket => ticket.issue === 1);
   assert.equal(blocked.phase, "blocked");
   assert.equal(blocked.reason, "release-superseded-without-production-smoke");
+  assert.ok(blocked.productionVerification);
   assert.deepEqual(superseded.slot, []);
   assert.deepEqual(calls.closed, []);
-  smoke = "success";
-  failProductionJobs = true;
-  assert.equal((await github({action: "completed", workflow_run: {
-    head_sha: merge, head_branch: "main", path: ".github/workflows/delivery.yml", conclusion: "success",
-  }}, undefined, undefined, "workflow_run")).status, 202);
+  // An initial check runs without a webhook, then goes idle if there's no proof.
   assert.equal((await call("/test/idle")).status, 204);
-  assert.equal((await call("/test/pump")).status, 204);
+  await tick();
+  assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).productionVerification, undefined);
+  assert.equal(await (await call("/test/alarm")).json(), null);
+  assert.equal((await github({action: "completed", workflow_run: {
+    id: 2, run_attempt: 1, head_sha: merge, head_branch: "main",
+    path: ".github/workflows/delivery.yml", conclusion: "success",
+  }}, undefined, undefined, "workflow_run")).status, 202);
+  const firstSignal = (await status()).tickets.find(ticket => ticket.issue === 1).productionVerification;
+  assert.ok(firstSignal);
+  // A newer success arrives while the first signal's check reads older evidence.
+  onProductionJobs = async () => {
+    onProductionJobs = undefined;
+    smoke = "success";
+    assert.equal((await github({action: "completed", workflow_run: {
+      id: 2, run_attempt: 2, head_sha: merge, head_branch: "main",
+      path: ".github/workflows/delivery.yml", conclusion: "success",
+    }}, undefined, undefined, "workflow_run")).status, 202);
+  };
+  assert.equal((await call("/test/idle")).status, 204);
+  await tick();
+  const signaled = (await status()).tickets.find(ticket => ticket.issue === 1);
+  assert.ok(signaled.productionVerification);
+  assert.notEqual(signaled.productionVerification, firstSignal);
+  assert.notEqual(await (await call("/test/alarm")).json(), null);
+  assert.deepEqual(calls.closed, []);
+  failProductionJobs = true;
+  await tick();
   const retry = (await status()).tickets.find(ticket => ticket.issue === 1);
   assert.equal(retry.phase, "blocked");
   assert.equal(retry.failures, 1);
   assert.equal(await (await call("/test/alarm")).json(), retry.due);
   assert.deepEqual(calls.closed, []);
   failProductionJobs = false;
+  assert.equal((await call("/test/idle")).status, 204);
   await tick();
   assert.deepEqual(calls.closed, ["/issues/1"]);
   assert.equal(await (await call("/test/alarm")).json(), null);

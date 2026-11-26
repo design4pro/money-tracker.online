@@ -82,7 +82,8 @@ export class Factory extends DurableObject<Env> {
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "production") {
         this.sql.exec(`UPDATE ticket SET due=?, state=json_set(state,'$.due',?,'$.productionVerification',?)
-          WHERE phase='blocked' AND json_extract(state,'$.reason')=? AND json_extract(state,'$.merge')=?`,
+          WHERE (phase='release' OR (phase='blocked' AND json_extract(state,'$.reason')=?))
+            AND json_extract(state,'$.merge')=?`,
           now, now, id, SUPERSEDED, event.head);
       } else if (event.kind === "alert") {
         this.queue(`ops:${event.key}`, this.env.OPS_SCHEDULE_ID, "read", {repo: this.env.REPO, code: event.code, head: event.head});
@@ -219,7 +220,7 @@ export class Factory extends DurableObject<Env> {
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
         await this.advance(ticket, fctl, github);
-        if (ticket.productionVerification) {
+        if (ticket.phase === "blocked" && ticket.productionVerification) {
           const current = this.tickets("issue=?", ticket.issue)[0];
           if (current.productionVerification === ticket.productionVerification) {
             this.ticket(current, {productionVerification: undefined});
@@ -399,7 +400,9 @@ export class Factory extends DurableObject<Env> {
       if (!await deployment(github, this.env, pr.merge_commit_sha)) {
         if (ticket.phase !== "blocked" && await github.mainAdvancedPast(pr.merge_commit_sha)) {
           const release = this.tickets("issue=?", ticket.issue)[0];
-          this.block(release, SUPERSEDED, true);
+          // Establish a durable check even if Delivery's webhook preceded this transition.
+          this.block({...release, productionVerification: release.productionVerification ?? crypto.randomUUID()},
+            SUPERSEDED, true);
         }
         return;
       }
