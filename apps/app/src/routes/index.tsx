@@ -61,7 +61,7 @@ function Workspace({ name, returning }: { name: string; returning: boolean }) {
           )}
         </div>
         <div className="flex items-center gap-4 text-sm">
-          {(returning || error) && (
+          {(returning || error || state?.status === "stale") && (
             <Button variant="ghost" onClick={refresh}>
               Check again
             </Button>

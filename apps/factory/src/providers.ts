@@ -183,6 +183,13 @@ export class Github {
     }
   }
 
+  async mainAdvancedPast(commit: string): Promise<boolean> {
+    const main = record(record(await this.api("/git/ref/heads/main")).object).sha;
+    if (!sha(main) || main === commit) return false;
+    const comparison = record(await this.api(`/compare/${commit}...${main}?per_page=1`));
+    return comparison.status === "ahead" && record(comparison.merge_base_commit).sha === commit;
+  }
+
   async productionDeploys(): Promise<Json[]> {
     const responses = await Promise.all(["push", "workflow_dispatch"].map(event =>
       this.api(`/actions/workflows/delivery.yml/runs?branch=main&event=${event}&status=success&per_page=30`)));

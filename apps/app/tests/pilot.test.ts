@@ -14,6 +14,7 @@ import {
   reconcile,
   recheck,
 } from "../src/server/billing"
+import { health } from "../src/server/health"
 import { operations } from "../src/server/ops"
 import { readLedger, writeLedger } from "../src/server/ledger"
 import type { Env, PolarEvent } from "../src/server/env"
@@ -113,9 +114,15 @@ before(async () => {
       .filter(Boolean)
       .map((statement) => db.prepare(statement))
   )
+  assert.equal(
+    (await health({ DB: db })).status,
+    503,
+    "initial schema is unready"
+  )
   for (const migration of [
     "0002_pilot_milestones.sql",
     "0003_pilot_write_safety.sql",
+    "0004_polar_access_refresh.sql",
   ]) {
     const changes = await readFile(
       new URL(`../migrations/${migration}`, import.meta.url),
@@ -129,6 +136,10 @@ before(async () => {
         .map((statement) => db.prepare(statement))
     )
   }
+
+  const ready = await health({ DB: db, SOURCE_SHA: "a".repeat(40) })
+  assert.equal(ready.status, 200, "full schema is ready")
+  assert.deepEqual(await ready.json(), { ok: true, sourceSha: "a".repeat(40) })
 
   env = {
     DB: db,
@@ -837,4 +848,94 @@ test("Polar refresh lag survives retry backoff until an authoritative refresh su
   assert.ok(outage.lagSeconds >= 1500)
   await reconcile(env, alice.id, undefined, async () => Date.now() + 60_000)
   assert.deepEqual(await (await lag()).json(), { lagSeconds: 0 })
+})
+
+test("a stale subscriber beyond the cron batch recovers through authoritative read-through", async (t) => {
+  const db = env.DB
+  const now = Date.now()
+  const stale = now - freshness - 1
+  await reconcile(env, alice.id, undefined, async () => now + 60_000)
+  await db.batch([
+    db
+      .prepare(
+        `WITH RECURSIVE backlog(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM backlog WHERE n<41)
+       INSERT INTO user(id, name, email, emailVerified, createdAt, updatedAt)
+       SELECT 'backlog-'||n, 'Synthetic', 'backlog-'||n||'@example.test', 1, ?, ? FROM backlog`
+      )
+      .bind(stale, stale),
+    db
+      .prepare(
+        `INSERT INTO entitlement(user_id, status, expires_at, checked_at, recheck_at)
+       SELECT id, 'active', ?, ?, ? FROM user WHERE id LIKE 'backlog-%'`
+      )
+      .bind(now + 60_000, stale, stale - 1),
+    db
+      .prepare(
+        "UPDATE entitlement SET checked_at = ?, recheck_at = ? WHERE user_id = ?"
+      )
+      .bind(stale, stale, alice.id),
+  ])
+
+  const lookedUp: string[] = []
+  let failure = false
+  let revoked = false
+  const realFetch = globalThis.fetch
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : input)
+      if (url.hostname !== "sandbox-api.polar.sh") return realFetch(input, init)
+      const encodedId = url.pathname.match(
+        /^\/v1\/customers\/external\/([^/]+)\/state$/
+      )?.[1]
+      assert.ok(encodedId)
+      const id = decodeURIComponent(encodedId)
+      lookedUp.push(id)
+      if (failure) return Response.json({}, { status: 403 })
+      return Response.json({
+        external_id: id,
+        active_subscriptions: revoked
+          ? []
+          : [
+              {
+                product_id: yearly,
+                status: "active",
+                current_period_end: new Date(now + 60_000).toISOString(),
+                ends_at: null,
+              },
+            ],
+      })
+    }
+  )
+
+  await recheck(env)
+  assert.equal(lookedUp.length, 40)
+  assert.ok(!lookedUp.includes(alice.id))
+  assert.equal(access(await getEntitlement(db, alice.id)), "stale")
+  const refreshed = await pilot("status", alice.cookie)
+  assert.equal((await refreshed.json<{ status: string }>()).status, "active")
+  assert.equal(lookedUp.at(-1), alice.id)
+  assert.equal((await pilot("ledger", alice.cookie)).status, 200)
+  assert.equal(lookedUp.length, 41)
+
+  const queue = () =>
+    db
+      .prepare(
+        "UPDATE entitlement SET checked_at = ?, recheck_at = ?, access_refresh_after = 0 WHERE user_id = ?"
+      )
+      .bind(stale, stale, alice.id)
+      .run()
+  await queue()
+  failure = true
+  assert.equal((await pilot("ledger", alice.cookie)).status, 403)
+  assert.equal((await pilot("ledger", alice.cookie)).status, 403)
+  assert.equal(lookedUp.length, 42)
+  await queue()
+  failure = false
+  revoked = true
+  const status = await pilot("status", alice.cookie)
+  assert.equal((await status.json<{ status: string }>()).status, "inactive")
+  assert.equal((await pilot("ledger", alice.cookie)).status, 403)
+  assert.equal(lookedUp.length, 43)
 })

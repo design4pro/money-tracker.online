@@ -11,6 +11,7 @@ import {bearer} from "./signatures";
 
 const WAIT = 60_000;
 const DAY = 24 * 60 * 60_000;
+const SUPERSEDED = "release-superseded-without-production-smoke";
 
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Ticket = {
@@ -72,6 +73,10 @@ export class Factory extends DurableObject<Env> {
         this.sql.exec(`INSERT INTO result VALUES (?, ?, ?, ?) ON CONFLICT(session) DO UPDATE SET
           at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (excluded.issue IS NOT NULL OR result.issue IS NULL)`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
+      } else if (event.kind === "production") {
+        this.sql.exec(`UPDATE ticket SET due=0 WHERE phase='blocked'
+          AND json_extract(state,'$.reason')=? AND json_extract(state,'$.merge')=?`,
+          SUPERSEDED, event.head);
       } else if (event.kind === "alert") {
         this.queue(`ops:${event.key}`, this.env.OPS_SCHEDULE_ID, "read", {repo: this.env.REPO, code: event.code, head: event.head});
         this.audit(`ops:${event.key}`, "alert-accepted");
@@ -151,7 +156,13 @@ export class Factory extends DurableObject<Env> {
     const slot = this.sql.exec<{issue: number}>("SELECT issue FROM slot").toArray()[0];
     const active = slot ? this.tickets("issue=? AND due<=? AND phase!='blocked'", slot.issue, now)[0] :
       this.tickets("phase='ready' AND due<=? ORDER BY issue LIMIT 1", now)[0];
-    for (const ticket of [...due, ...(active ? [active] : [])]) {
+    // Webhook wakeups can deliver late production evidence even after the
+    // superseded ticket released its slot.
+    const superseded = this.tickets(
+      "phase='blocked' AND json_extract(state,'$.reason')=? AND due<=? ORDER BY due,issue LIMIT 1",
+      SUPERSEDED, now,
+    );
+    for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
         await this.advance(ticket, fctl, github);
       } catch {
@@ -293,7 +304,8 @@ export class Factory extends DurableObject<Env> {
         return;
       }
       case "pr":
-      case "release": {
+      case "release":
+      case "blocked": {
         const dispatch = this.dispatches("key=?", ticket.implement ?? "")[0];
         if (!ticket.pr || !dispatch?.session) return this.block(ticket, "implementation-link-missing");
         await this.pr(github, fctl, ticket.pr, ticket, dispatch);
@@ -316,8 +328,15 @@ export class Factory extends DurableObject<Env> {
       }
       const mergedAt = Date.parse(String(pr.merged_at));
       if (!Number.isFinite(mergedAt)) return this.block(ticket, "merge-timestamp");
-      if (ticket.phase !== "release") this.ticket(ticket, {phase: "release", merge: pr.merge_commit_sha, mergedAt, reason: "awaiting-production-smoke"});
-      if (!await deployment(github, this.env, pr.merge_commit_sha)) return;
+      if (ticket.phase === "pr") this.ticket(ticket, {phase: "release", merge: pr.merge_commit_sha, mergedAt, reason: "awaiting-production-smoke"});
+      if (!await deployment(github, this.env, pr.merge_commit_sha)) {
+        if (ticket.phase === "blocked") this.ticket(ticket, {});
+        else if (await github.mainAdvancedPast(pr.merge_commit_sha)) {
+          const release = this.tickets("issue=?", ticket.issue)[0];
+          this.block(release, SUPERSEDED, true);
+        }
+        return;
+      }
       const issue = record(await github.api(`/issues/${ticket.issue}`));
       if (issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
         return this.block(ticket, "release-issue-identity");
@@ -335,10 +354,10 @@ export class Factory extends DurableObject<Env> {
       return;
     }
     if (ticket) this.ticket(ticket, {head: currentHead});
+    if (this.env.MERGE_ENABLED !== "true") return;
     const matches = relation && await gate(github, fctl, this.env, pr, number, session) && await github.hasNoClosingIssues(number);
-    const enabled = this.env.MERGE_ENABLED === "true";
-    await github.setGate(currentHead, `factory-pr-${number}`, matches && enabled);
-    if (!matches || !enabled) return;
+    await github.setGate(currentHead, `factory-pr-${number}`, matches);
+    if (!matches) return;
     const latest = record(await github.api(`/pulls/${number}`));
     if (record(latest.head).sha !== currentHead || latest.state !== "open" || latest.draft !== false ||
         record(latest.base).ref !== "main" || latest.body !== pr.body || !await github.hasNoClosingIssues(number)) {

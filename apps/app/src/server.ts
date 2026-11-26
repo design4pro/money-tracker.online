@@ -1,7 +1,8 @@
 import handler from "@tanstack/react-start/server-entry"
 import { createAuth, verifiedUser } from "./server/auth"
-import { pilotApi, json } from "./server/api"
+import { pilotApi } from "./server/api"
 import { receiveWebhook, reconcile, recheck } from "./server/billing"
+import { health } from "./server/health"
 import { operations } from "./server/ops"
 import type { Env, PolarEvent } from "./server/env"
 
@@ -11,22 +12,7 @@ export default {
     if (pathname === "/ops/polar-lag" || pathname === "/ops/pilot-milestones") {
       return operations(request, env, pathname)
     }
-    if (pathname === "/health" && request.method === "GET") {
-      const sourceSha = env.SOURCE_SHA || null
-      try {
-        const tables = await env.DB.prepare(
-          `
-          SELECT count(*) AS total FROM sqlite_schema
-          WHERE name IN ('user', 'session', 'account', 'verification', 'rateLimit',
-            'ledger_account', 'ledger_category', 'ledger_transaction', 'entitlement', 'polar_event')
-        `
-        ).first<number>("total")
-        const ok = tables === 10
-        return json({ ok, sourceSha }, ok ? 200 : 503)
-      } catch {
-        return json({ ok: false, sourceSha }, 503)
-      }
-    }
+    if (pathname === "/health" && request.method === "GET") return health(env)
     if (pathname === "/api/webhooks/polar") {
       if (request.method !== "POST")
         return new Response(null, { status: 405, headers: { Allow: "POST" } })

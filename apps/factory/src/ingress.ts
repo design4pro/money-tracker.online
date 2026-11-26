@@ -5,6 +5,7 @@ import {bearer, digest, fctlSignature, githubSignature} from "./signatures";
 export type Ingress =
   | {kind: "issue"; issue: number; actor: string}
   | {kind: "finish"; session: string; schedule: string; at: number; result?: Result}
+  | {kind: "production"; head: string}
   | {kind: "alert"; key: string; code: string; head?: string}
   | {kind: "wake"};
 
@@ -95,6 +96,13 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
   // GitHub signs the body but excludes its delivery ID and event name.
   const id = `github:${await digest(body)}`;
   const type = headers.get("x-github-event");
+  if (type === "workflow_run" && payload.action === "completed") {
+    const run = record(payload.workflow_run);
+    if (run.path === ".github/workflows/delivery.yml" && run.head_branch === "main" &&
+        run.conclusion === "success" && sha(run.head_sha)) {
+      return {id, event: {kind: "production", head: run.head_sha}};
+    }
+  }
   if (type === "issues" && payload.action === "opened" && !payload.pull_request && !payload.comment) {
     const issue = record(payload.issue);
     const author = record(issue.user);

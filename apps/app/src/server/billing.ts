@@ -266,6 +266,39 @@ export async function reconcile(
   await db.batch(statements)
 }
 
+export async function refreshStaleEntitlement(
+  env: Env,
+  userId: string,
+  entitlement: Entitlement | null
+) {
+  const now = Date.now()
+  if (
+    entitlement?.status !== "active" ||
+    entitlement.checked_at > now - freshness
+  )
+    return entitlement
+
+  // Rate-limit read-through across Worker instances. Scheduled and queued
+  // refreshes keep their own retry behavior and share reconciliation revisions.
+  const claimed = await env.DB.prepare(
+    `UPDATE entitlement SET access_refresh_after = ?
+     WHERE user_id = ? AND status = 'active' AND checked_at <= ? AND access_refresh_after <= ?
+       AND (refresh_failed_since IS NULL OR recheck_at <= ?)
+     RETURNING user_id`
+  )
+    .bind(now + minute, userId, now - freshness, now, now)
+    .first()
+  if (claimed) {
+    try {
+      await reconcile(env, userId)
+    } catch {
+      // A failed provider check leaves the previous stale state ineligible.
+      console.error("An on-demand Polar refresh failed")
+    }
+  }
+  return getEntitlement(env.DB, userId)
+}
+
 export async function recheck(env: Env) {
   const now = Date.now()
   const due = await env.DB.prepare(

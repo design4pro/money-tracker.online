@@ -51,7 +51,7 @@ Configure vars per environment using the Wrangler configuration or the deploymen
 | `DELIVERY_SMOKE_STEP` or `DELIVERY_SMOKE_JOB` | Set exactly one. Use the exact step name inside `deploy-production`, `Deploy and smoke-test production`, or the exact name of a separate smoke job in the same attempt. Smoke failures must fail delivery. |
 | `HUMAN_REVIEWER_IDS` | Comma-separated trusted human GitHub user IDs, e.g. `81,82`. Empty blocks sensitive and bootstrap PRs. |
 | `BOOTSTRAP_PRS` | Optional, up to three explicit PR numbers, e.g. `12,13`. Each requires an allowlisted human's current-head approval, same-repo main base, `verify` and native fctl review on the same head. No issue is closed from this path. Removing an entry stops polling it. |
-| `MERGE_ENABLED` | Explicitly `true` to enable merge requests. Defaults to `false`. |
+| `MERGE_ENABLED` | Explicitly `true` to publish the merge gate and enable merge requests. Disabled factories leave the check untouched. |
 
 Install secrets through the environment's secret store. Use `FCTL_TOKEN` as a project-scoped expiring Run sessions PAT capped at push, and `FCTL_OPS_TOKEN` as a separate project-scoped Run sessions PAT capped at read. Set `FCTL_WEBHOOK_SECRET` to the Standard Webhooks `whsec_` secret, `GITHUB_WEBHOOK_SECRET` to the dedicated app's signing secret, `GITHUB_APP_PRIVATE_KEY` to the PKCS#8 private key and `OPS_TOKEN` to an independent high-entropy monitor token. Convert an operator-held PKCS#1 key to PKCS#8 before injecting it. For an Access-protected fctl origin, install both `FCTL_ACCESS_CLIENT_ID` and `FCTL_ACCESS_CLIENT_SECRET`. Never put these values in schedule prompts, Wrangler vars, shell history or tracked files. Local tests generate ephemeral fixtures.
 
@@ -76,3 +76,5 @@ The controller serializes claims, stores the fctl run and session, and rechecks 
 The v0.39.0 release CLI and source were checked for schedule flags, run/event shapes, signed envelope, ticket comments and native review. The local Worker suite exercises real SQLite and alarms with mocked providers. Live provider permissions, subscriptions, workflow smoke naming and effective branch rules need to be confirmed in staging.
 
 [fctl 0.39.0 automation](https://github.com/design4pro/fctl/blob/v0.39.0/docs/automation.md) · [Agent access](https://github.com/design4pro/fctl/blob/v0.39.0/docs/agents.md) · [Self-hosted GitHub setup](https://github.com/design4pro/fctl/blob/v0.39.0/docs/self-hosting.md) · [Cloudflare SQLite Durable Objects](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/) · [GitHub merge API](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request)
+
+A release waiting for smoke becomes blocked if protected main has advanced past its merge SHA. It releases the factory slot and leaves the issue open. A later successful Delivery workflow can wake the blocked release for independent verification of exact-SHA production smoke.

@@ -32,7 +32,9 @@ export function useSubscription(returning = false) {
           if (result.status === "active") {
             timer = setTimeout(() => void check(), 60_000)
           } else if (
-            (returning || result.status === "pending") &&
+            (returning ||
+              result.status === "pending" ||
+              result.status === "stale") &&
             ++checks < 32
           ) {
             timer = setTimeout(() => void check(), 10_000)

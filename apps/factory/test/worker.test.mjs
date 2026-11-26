@@ -28,8 +28,9 @@ const env = {
 env.GITHUB_APP_PRIVATE_KEY = generateKeyPairSync("rsa", {modulusLength: 2048}).privateKey.export({type: "pkcs8", format: "pem"});
 
 let mf;
+let workerOptions;
 let serial = 0;
-const calls = {plan: 0, implement: 0, ops: 0, merges: [], closed: [], gates: []};
+const calls = {plan: 0, implement: 0, ops: 0, prReads: 0, merges: [], closed: [], gates: []};
 const runs = {sch_Triage: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
 let native = false;
@@ -38,6 +39,7 @@ let changedHead = false;
 let readPr = 0;
 let revision = head;
 let candidateBase = base;
+let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
 
@@ -110,6 +112,7 @@ async function provider(req) {
         body: `<!-- factory:${stage} v1 -->\nEvidence`});
     }
     if (path === "/pulls/23") {
+      calls.prReads++;
       const next = changedHead && ++readPr === 2 ? otherHead : revision;
       return json({number: 23, state: implemented ? "closed" : "open", merged: implemented,
         merge_commit_sha: implemented ? merge : candidate,
@@ -122,9 +125,10 @@ async function provider(req) {
     if (path === "/pulls/23/merge") {
       calls.merges.push(body.sha);
       implemented = true;
+      mainHead = merge;
       return json({merged: true, sha: merge});
     }
-    if (path === "/git/ref/heads/main") return json({object: {sha: base}});
+    if (path === "/git/ref/heads/main") return json({object: {sha: mainHead}});
     if (path === `/git/commits/${candidate}`) return json({parents: [{sha: candidateBase}, {sha: revision}]});
     if (path === "/check-runs") {
       calls.gates.push(body);
@@ -162,9 +166,12 @@ before(async () => {
       export default worker;
       export class Factory extends Controller {
         async fetch(request) {
-          if (new URL(request.url).pathname === "/test/tick") {
-            this.ctx.storage.sql.exec("UPDATE ticket SET due=0");
-            this.ctx.storage.sql.exec("UPDATE dispatch SET due=0, payload=json_set(payload, '$.due', 0)");
+          const path = new URL(request.url).pathname;
+          if (path === "/test/tick" || path === "/test/pump") {
+            if (path === "/test/tick") {
+              this.ctx.storage.sql.exec("UPDATE ticket SET due=0");
+              this.ctx.storage.sql.exec("UPDATE dispatch SET due=0, payload=json_set(payload, '$.due', 0)");
+            }
             await this.alarm();
             return new Response(null, {status: 204});
           }
@@ -173,8 +180,9 @@ before(async () => {
       }
     `, resolveDir: process.cwd(), loader: "ts",
   }, bundle: true, write: false, format: "esm", external: ["cloudflare:workers"]});
-  mf = new Miniflare({compatibilityDate: "2026-07-30", modules: true, script: bundled.outputFiles[0].text,
-    durableObjects: {FACTORY: {className: "Factory", useSQLite: true}}, bindings: env, outboundService: provider});
+  workerOptions = {compatibilityDate: "2026-07-30", modules: true, script: bundled.outputFiles[0].text,
+    durableObjects: {FACTORY: {className: "Factory", useSQLite: true}}, bindings: env, outboundService: provider};
+  mf = new Miniflare(workerOptions);
 });
 
 after(async () => mf?.dispose());
@@ -183,10 +191,10 @@ const call = (path, init) => mf.dispatchFetch(`https://factory.invalid${path}`, 
 const tick = async () => assert.equal((await call("/test/tick")).status, 204);
 const status = async () => (await call("/ops/status", {headers: {authorization: "Bearer fake-monitor-key"}})).json();
 
-function github(payload, delivery, signature) {
+function github(payload, delivery, signature, event = "issues") {
   const body = JSON.stringify({repository: {full_name: repo, id: 100}, ...payload});
   return call("/webhooks/github", {method: "POST", body,
-    headers: {"x-github-event": "issues", "x-github-delivery": delivery ?? crypto.randomUUID(),
+    headers: {"x-github-event": event, "x-github-delivery": delivery ?? crypto.randomUUID(),
       "x-hub-signature-256": signature ?? `sha256=${createHmac("sha256", env.GITHUB_WEBHOOK_SECRET).update(body).digest("hex")}`}});
 }
 
@@ -255,8 +263,19 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   await tick();
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "release");
   assert.deepEqual(calls.closed, []);
-  smoke = "success";
+  mainHead = descendant;
   await tick();
+  const superseded = await status();
+  const blocked = superseded.tickets.find(ticket => ticket.issue === 1);
+  assert.equal(blocked.phase, "blocked");
+  assert.equal(blocked.reason, "release-superseded-without-production-smoke");
+  assert.deepEqual(superseded.slot, []);
+  assert.deepEqual(calls.closed, []);
+  smoke = "success";
+  assert.equal((await github({action: "completed", workflow_run: {
+    head_sha: merge, head_branch: "main", path: ".github/workflows/delivery.yml", conclusion: "success",
+  }}, undefined, undefined, "workflow_run")).status, 202);
+  assert.equal((await call("/test/pump")).status, 204);
   assert.deepEqual(calls.closed, ["/issues/1"]);
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "closed");
 
@@ -270,4 +289,20 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   await tick();
   await tick();
   assert.equal(calls.ops, 1);
+});
+
+
+test("a disabled factory never writes the required merge gate", async () => {
+  implemented = false;
+  mainHead = base;
+  const gateWrites = calls.gates.length;
+  const prReads = calls.prReads;
+  const instance = new Miniflare({...workerOptions, bindings: {...env, MERGE_ENABLED: "false", BOOTSTRAP_PRS: "23"}});
+  try {
+    assert.equal((await instance.dispatchFetch("https://factory.invalid/test/tick")).status, 204);
+    assert.equal(calls.prReads, prReads + 1);
+    assert.equal(calls.gates.length, gateWrites);
+  } finally {
+    await instance.dispose();
+  }
 });

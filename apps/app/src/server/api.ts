@@ -1,5 +1,12 @@
 import { createAuth, verifiedUser } from "./auth"
-import { access, catalog, checkout, getEntitlement, portal } from "./billing"
+import {
+  access,
+  catalog,
+  checkout,
+  getEntitlement,
+  portal,
+  refreshStaleEntitlement,
+} from "./billing"
 import { readLedger, RequestError, writeLedger } from "./ledger"
 import type { Env } from "./env"
 
@@ -55,7 +62,14 @@ export async function pilotApi(
       return json({ url: await portal(env, user.id) })
     }
 
-    const entitlement = await getEntitlement(db, user.id)
+    let entitlement = await getEntitlement(db, user.id)
+    if (
+      (pathname === "/api/pilot/status" && method === "GET") ||
+      (pathname === "/api/pilot/ledger" &&
+        (method === "GET" || method === "POST"))
+    ) {
+      entitlement = await refreshStaleEntitlement(env, user.id, entitlement)
+    }
     const status = access(entitlement)
 
     if (pathname === "/api/pilot/status" && method === "GET") {
