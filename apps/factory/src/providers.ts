@@ -193,11 +193,10 @@ export class Github {
   async productionDeploys(head: string): Promise<Json[]> {
     if (!sha(head)) return [];
     const responses = await Promise.all(["workflow_run", "workflow_dispatch", "push"].map(event =>
-      this.api(`/actions/workflows/delivery.yml/runs?branch=main&event=${event}&status=success&head_sha=${head}&per_page=30`)));
+      this.api(`/actions/workflows/delivery.yml/runs?branch=main&event=${event}&head_sha=${head}&per_page=30`)));
     return responses.flatMap(response => list(record(response).workflow_runs).map(record)).filter(run =>
       integer(run.id) && integer(run.run_attempt) && run.head_sha === head &&
       run.head_branch === "main" && ["workflow_run", "workflow_dispatch", "push"].includes(String(run.event)) &&
-      run.status === "completed" && run.conclusion === "success" &&
       run.path === ".github/workflows/delivery.yml" && String(record(run.repository).id) === this.env.REPO_ID &&
       String(record(run.head_repository).id) === this.env.REPO_ID);
   }

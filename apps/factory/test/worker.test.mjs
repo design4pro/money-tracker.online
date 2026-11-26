@@ -177,11 +177,12 @@ async function provider(req) {
       assert.equal(path, "/actions/workflows/delivery.yml/runs");
       const requested = searchParams.get("head_sha");
       assert.ok([head, merge].includes(requested), "expected an exact SHA at the provider boundary");
+      assert.equal(searchParams.has("status"), false, "a failed rerun must not hide prior attempts");
       return json({workflow_runs: [
         // Thirty newer successful runs fill an unfiltered first page and hide the exact merge.
         ...(implemented && searchParams.get("event") === "workflow_run"
           ? [...Array.from({length: 30}, (_, id) => ({id: id + 10, run_attempt: 1, head_sha: descendant})),
-            {id: 2, run_attempt: 1, head_sha: merge}]
+            {id: 2, run_attempt: 2, head_sha: merge, conclusion: "failure"}]
           : []),
         ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
         ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
@@ -189,9 +190,13 @@ async function provider(req) {
         (requested === merge && run.id === 3)) // Model a provider returning an unrelated result.
         .slice(0, Number(searchParams.get("per_page")))
         .map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
-          conclusion: "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
+          conclusion: run.conclusion ?? "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
+    }
+    if (path === "/actions/runs/2/attempts/1") {
+      return json({id: 2, run_attempt: 1, head_sha: merge, status: "completed", conclusion: "success"});
     }
     if (path.startsWith("/actions/runs/")) {
+      assert.notEqual(path, "/actions/runs/2/attempts/2/jobs", "a failed attempt is not eligible");
       if (failProductionJobs && path.includes("/runs/2/")) return new Response(null, {status: 503});
       const commit = path.includes("/runs/1/") ? head : path.includes("/runs/3/") ? descendant : merge;
       const conclusion = commit === merge ? smoke : "success";

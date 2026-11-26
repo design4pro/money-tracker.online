@@ -15,8 +15,16 @@ export function issueEvidence(issue: Json): {feature: string; deployed: string} 
 
 export async function deployment(github: Github, env: Env, head: string): Promise<boolean> {
   for (const run of await github.productionDeploys(head)) {
-    if (deployed(await github.api(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`),
-      head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+    const latest = run.run_attempt;
+    if (!integer(latest)) continue;
+    for (let attempt = latest; attempt >= 1; attempt--) {
+      const path = `/actions/runs/${run.id}/attempts/${attempt}`;
+      const evidence = attempt === latest ? run : record(await github.api(path));
+      if (evidence.id !== run.id || evidence.head_sha !== head || evidence.run_attempt !== attempt ||
+          evidence.status !== "completed" || evidence.conclusion !== "success") continue;
+      if (deployed(await github.api(`${path}/jobs?per_page=100`),
+        head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+    }
   }
   return false;
 }
