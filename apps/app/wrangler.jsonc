@@ -1,0 +1,143 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "money-tracker-app-local",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-11-26",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "APP_ORIGIN": "http://localhost:3000",
+    "EMAIL_FROM": "auth@example.invalid",
+    "POLAR_ENVIRONMENT": "sandbox"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "money-tracker-app-local",
+      "database_id": "00000000-0000-4000-8000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "POLAR_EVENTS",
+        "queue": "money-tracker-app-local-polar"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "money-tracker-app-local-polar",
+        "dead_letter_queue": "money-tracker-app-local-polar-dlq",
+        "max_batch_size": 1,
+        "max_concurrency": 1,
+        "max_retries": 8
+      }
+    ]
+  },
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  },
+  "env": {
+    "staging": {
+      "name": "money-tracker-app-staging",
+      "vars": {
+        "APP_ORIGIN": "https://money-tracker-app-staging.example.invalid",
+        "EMAIL_FROM": "auth@money-tracker-app-staging.example.invalid",
+        "POLAR_ENVIRONMENT": "sandbox",
+        "POLAR_MONTHLY_PRODUCT_ID": "",
+        "POLAR_YEARLY_PRODUCT_ID": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "money-tracker-app-staging",
+          "database_id": "00000000-0000-4000-8000-000000000002",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "send_email": [
+        {
+          "name": "EMAIL"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "POLAR_EVENTS",
+            "queue": "money-tracker-app-staging-polar"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "money-tracker-app-staging-polar",
+            "dead_letter_queue": "money-tracker-app-staging-polar-dlq",
+            "max_batch_size": 1,
+            "max_concurrency": 1,
+            "max_retries": 8
+          }
+        ]
+      },
+      "triggers": {
+        "crons": [
+          "*/5 * * * *"
+        ]
+      }
+    },
+    "production": {
+      "name": "money-tracker-app-production",
+      "vars": {
+        "APP_ORIGIN": "https://app.money-tracker.online",
+        "EMAIL_FROM": "auth@money-tracker-app-production.example.invalid",
+        "POLAR_ENVIRONMENT": "production",
+        "POLAR_MONTHLY_PRODUCT_ID": "",
+        "POLAR_YEARLY_PRODUCT_ID": ""
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "money-tracker-app-production",
+          "database_id": "00000000-0000-4000-8000-000000000003",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "send_email": [
+        {
+          "name": "EMAIL"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "POLAR_EVENTS",
+            "queue": "money-tracker-app-production-polar"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "money-tracker-app-production-polar",
+            "dead_letter_queue": "money-tracker-app-production-polar-dlq",
+            "max_batch_size": 1,
+            "max_concurrency": 1,
+            "max_retries": 8
+          }
+        ]
+      },
+      "triggers": {
+        "crons": [
+          "*/5 * * * *"
+        ]
+      }
+    }
+  }
+}

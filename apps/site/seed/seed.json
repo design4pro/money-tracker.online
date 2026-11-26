@@ -1,0 +1,265 @@
+{
+  "$schema": "https://emdashcms.com/seed.schema.json",
+  "version": "1",
+  "meta": {
+    "name": "Money Tracker",
+    "description": "The public Money Tracker homepage"
+  },
+  "settings": {
+    "title": "Money Tracker",
+    "tagline": "Personal finance, made clear"
+  },
+  "collections": [
+    {
+      "slug": "landing",
+      "label": "Landing pages",
+      "labelSingular": "Landing page",
+      "routable": false,
+      "supports": [
+        "drafts",
+        "revisions",
+        "seo"
+      ],
+      "fields": [
+        {
+          "slug": "title",
+          "label": "Entry title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "hero_kicker",
+          "label": "Hero eyebrow",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "hero_title",
+          "label": "Hero headline",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "hero_body",
+          "label": "Hero description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "nav_features",
+          "label": "Navigation label for features",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "nav_plans",
+          "label": "Navigation label for plans",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "nav_faq",
+          "label": "Navigation label for FAQ",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "register_label",
+          "label": "Register button label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "signin_label",
+          "label": "Sign-in link label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "billing_label",
+          "label": "Billing link label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "features_title",
+          "label": "Features heading",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "feature_one_title",
+          "label": "First feature title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "feature_one_body",
+          "label": "First feature description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "feature_two_title",
+          "label": "Second feature title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "feature_two_body",
+          "label": "Second feature description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "feature_three_title",
+          "label": "Third feature title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "feature_three_body",
+          "label": "Third feature description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "plans_title",
+          "label": "Plans heading",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "plans_body",
+          "label": "Plans introduction",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "monthly_title",
+          "label": "Monthly plan label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "monthly_body",
+          "label": "Monthly plan description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "yearly_title",
+          "label": "Yearly plan label",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "yearly_body",
+          "label": "Yearly plan description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "faq_title",
+          "label": "FAQ heading",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "faq_one_question",
+          "label": "First FAQ question",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "faq_one_answer",
+          "label": "First FAQ answer",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "faq_two_question",
+          "label": "Second FAQ question",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "faq_two_answer",
+          "label": "Second FAQ answer",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "faq_three_question",
+          "label": "Third FAQ question",
+          "type": "string",
+          "required": true
+        },
+        {
+          "slug": "faq_three_answer",
+          "label": "Third FAQ answer",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "seo_description",
+          "label": "Default search and sharing description",
+          "type": "text",
+          "required": true
+        },
+        {
+          "slug": "hero_image",
+          "label": "Hero image (optional)",
+          "type": "image"
+        },
+        {
+          "slug": "hero_image_alt",
+          "label": "Hero image alternative text",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "content": {
+    "landing": [
+      {
+        "id": "home",
+        "slug": "home",
+        "status": "published",
+        "data": {
+          "title": "Home",
+          "hero_kicker": "Personal finance, made clear",
+          "hero_title": "Make sense of\nwhere it went.",
+          "hero_body": "Track what comes in and what goes out. Build a clearer picture of your money, one transaction at a time.",
+          "nav_features": "Features",
+          "nav_plans": "Plans",
+          "nav_faq": "FAQ",
+          "register_label": "Create an account",
+          "signin_label": "Sign in",
+          "billing_label": "See current pricing",
+          "features_title": "A place for the everyday numbers.",
+          "feature_one_title": "Log income and expenses",
+          "feature_one_body": "Keep a record of paydays, bills and the little things you buy along the way.",
+          "feature_two_title": "See what adds up",
+          "feature_two_body": "Look at what came in and what went out over time, so you can see the shape of your spending.",
+          "feature_three_title": "Keep your history close",
+          "feature_three_body": "Return to your records when you want to check an amount or remember where your money went.",
+          "plans_title": "Same access. Your choice of billing.",
+          "plans_body": "Monthly and yearly billing give you the same Money Tracker features.",
+          "monthly_title": "Monthly",
+          "monthly_body": "Pay month to month, with full access to the tracker.",
+          "yearly_title": "Yearly",
+          "yearly_body": "Pay once a year, with the same full access.",
+          "faq_title": "A few common questions.",
+          "faq_one_question": "What can I track?",
+          "faq_one_answer": "Record your personal income and expenses so you can see where your money comes from and where it goes.",
+          "faq_two_question": "Do monthly and yearly plans have different features?",
+          "faq_two_answer": "Both billing options include the same access. The billing interval is the difference.",
+          "faq_three_question": "Where can I see prices and manage billing?",
+          "faq_three_answer": "Open Billing in the app for current prices, payment details and subscription management.",
+          "seo_description": "Money Tracker helps you record personal income and expenses and see where your money goes."
+        }
+      }
+    ]
+  }
+}

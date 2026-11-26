@@ -1,0 +1,11 @@
+{
+  "name": "money-tracker-repository-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "money-tracker-site-local",
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-11-26",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "money-tracker-site-local",
+      "database_id": "00000000-0000-4000-8000-000000000001"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "money-tracker-site-local-media"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "00000000000000000000000000000010"
+    },
+    {
+      "binding": "SESSION",
+      "id": "00000000000000000000000000000011"
+    }
+  ],
+  "vars": {
+    "SOURCE_SHA": "local",
+    "APP_ORIGIN": "http://localhost:5173"
+  },
+  "env": {
+    "staging": {
+      "name": "money-tracker-site-staging",
+      "workers_dev": false,
+      "preview_urls": false,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "money-tracker-site-staging",
+          "database_id": "00000000-0000-4000-8000-000000000002"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "money-tracker-site-staging-media"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "CACHE",
+          "id": "00000000000000000000000000000020"
+        },
+        {
+          "binding": "SESSION",
+          "id": "00000000000000000000000000000021"
+        }
+      ],
+      "vars": {
+        "EMDASH_SITE_URL": "https://staging.money-tracker.online",
+        "APP_ORIGIN": "https://app-staging.money-tracker.online"
+      },
+      "triggers": {
+        "crons": [
+          "* * * * *"
+        ]
+      }
+    },
+    "production": {
+      "name": "money-tracker-site-production",
+      "workers_dev": false,
+      "preview_urls": false,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "money-tracker-site-production",
+          "database_id": "00000000-0000-4000-8000-000000000003"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "money-tracker-site-production-media"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "CACHE",
+          "id": "00000000000000000000000000000030"
+        },
+        {
+          "binding": "SESSION",
+          "id": "00000000000000000000000000000031"
+        }
+      ],
+      "vars": {
+        "EMDASH_SITE_URL": "https://money-tracker.online",
+        "APP_ORIGIN": "https://app.money-tracker.online"
+      },
+      "triggers": {
+        "crons": [
+          "* * * * *"
+        ]
+      }
+    }
+  },
+  "assets": {
+    "run_worker_first": [
+      "/_emdash",
+      "/_emdash/*",
+      "/health"
+    ]
+  },
+  "workers_dev": false,
+  "preview_urls": false
+}

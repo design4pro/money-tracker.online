@@ -1,0 +1,175 @@
+name: Delivery
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Full SHA of the verified current main commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pilot-delivery
+  cancel-in-progress: false
+
+jobs:
+  verify-main:
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    steps:
+      - name: Require successful main CI for this exact SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETRY_SHA: ${{ inputs.head }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            test "$RETRY_SHA" = "$GITHUB_SHA"
+          fi
+          for ((attempt = 0; attempt < 35; attempt++)); do
+            test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
+            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$GITHUB_SHA" \
+              --jq '.workflow_runs[0] | select(. != null) | [.id, .run_attempt, .status, .conclusion] | @tsv')
+            if [[ -n "$run" ]]; then
+              read -r id run_attempt status conclusion <<< "$run"
+              if [[ "$status" == completed ]]; then
+                test "$conclusion" = success
+                gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/attempts/$run_attempt/jobs" \
+                  --jq '.jobs[] | select(.name == "verify" and .conclusion == "success") | .head_sha' | grep -Fx "$GITHUB_SHA"
+                exit 0
+              fi
+            fi
+            sleep 20
+          done
+          exit 1
+
+  deploy-staging:
+    name: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    needs: verify-main
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install and verify release tooling
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/contracts.mjs
+          for package in apps/app apps/site apps/factory; do
+            npm ci --prefix "$package"
+          done
+          npm run build --prefix apps/app
+          npm ci --prefix scripts --ignore-scripts
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Deploy and verify staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          SIGN_IN_URL: ${{ vars.SIGN_IN_URL }}
+          APP_PROTECTED_PATH: ${{ vars.APP_PROTECTED_PATH }}
+          CMS_ADMIN_PATH: ${{ vars.CMS_ADMIN_PATH }}
+          CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
+          CMS_LOGIN_URL: ${{ vars.CMS_LOGIN_URL }}
+          APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+          APP_URL: ${{ vars.APP_URL }}
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          POLAR_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_PRODUCT_ID }}
+          POLAR_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_PRODUCT_ID }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ vars.CF_ACCESS_TEAM_DOMAIN }}
+          SITE_D1_DATABASE_ID: ${{ vars.SITE_D1_DATABASE_ID }}
+          SITE_CACHE_KV_ID: ${{ vars.SITE_CACHE_KV_ID }}
+          SITE_SESSION_KV_ID: ${{ vars.SITE_SESSION_KV_ID }}
+          SITE_MEDIA_BUCKET: ${{ vars.SITE_MEDIA_BUCKET }}
+          APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
+          APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
+          SITE_WORKER_NAME: ${{ vars.SITE_WORKER_NAME }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
+          SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
+          FACTORY_WORKER_NAME: ${{ vars.FACTORY_WORKER_NAME }}
+          FACTORY_URL: ${{ vars.FACTORY_URL }}
+          FACTORY_ACCESS_CLIENT_ID: ${{ secrets.FACTORY_ACCESS_CLIENT_ID }}
+          FACTORY_ACCESS_CLIENT_SECRET: ${{ secrets.FACTORY_ACCESS_CLIENT_SECRET }}
+        run: node scripts/deliver.mjs staging
+
+  deploy-production:
+    name: deploy-production
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    needs: deploy-staging
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install and verify release tooling
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/contracts.mjs
+          for package in apps/app apps/site apps/factory; do
+            npm ci --prefix "$package"
+          done
+          npm run build --prefix apps/app
+          npm ci --prefix scripts --ignore-scripts
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Deploy and smoke-test production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          SIGN_IN_URL: ${{ vars.SIGN_IN_URL }}
+          APP_PROTECTED_PATH: ${{ vars.APP_PROTECTED_PATH }}
+          CMS_ADMIN_PATH: ${{ vars.CMS_ADMIN_PATH }}
+          CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
+          CMS_LOGIN_URL: ${{ vars.CMS_LOGIN_URL }}
+          APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+          APP_URL: ${{ vars.APP_URL }}
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+          POLAR_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_PRODUCT_ID }}
+          POLAR_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_PRODUCT_ID }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ vars.CF_ACCESS_TEAM_DOMAIN }}
+          SITE_D1_DATABASE_ID: ${{ vars.SITE_D1_DATABASE_ID }}
+          SITE_CACHE_KV_ID: ${{ vars.SITE_CACHE_KV_ID }}
+          SITE_SESSION_KV_ID: ${{ vars.SITE_SESSION_KV_ID }}
+          SITE_MEDIA_BUCKET: ${{ vars.SITE_MEDIA_BUCKET }}
+          APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
+          APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
+          SITE_WORKER_NAME: ${{ vars.SITE_WORKER_NAME }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
+          SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
+          FACTORY_WORKER_NAME: ${{ vars.FACTORY_WORKER_NAME }}
+          FACTORY_URL: ${{ vars.FACTORY_URL }}
+          FACTORY_ACCESS_CLIENT_ID: ${{ secrets.FACTORY_ACCESS_CLIENT_ID }}
+          FACTORY_ACCESS_CLIENT_SECRET: ${{ secrets.FACTORY_ACCESS_CLIENT_SECRET }}
+          PRODUCTION_CUTOVER_SHA: ${{ vars.PRODUCTION_CUTOVER_SHA }}
+          PRODUCTION_CUTOVER_COMPLETE: ${{ vars.PRODUCTION_CUTOVER_COMPLETE }}
+        run: node scripts/deliver.mjs production

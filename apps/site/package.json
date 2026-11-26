@@ -1,0 +1,43 @@
+{
+  "name": "@money-tracker/site",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node --test",
+    "dev": "astro dev",
+    "check": "astro check && biome lint --error-on-warnings src scripts test astro.config.mjs",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy:staging": "node scripts/deploy.mjs staging",
+    "deploy:production": "node scripts/deploy.mjs production"
+  },
+  "type": "module",
+  "dependencies": {
+    "@astrojs/cloudflare": "14.4.9",
+    "@astrojs/react": "7.1.9",
+    "@emdash-cms/cloudflare": "1.6.0",
+    "@fontsource-variable/dm-sans": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "astro": "7.4.13",
+    "emdash": "1.6.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "@biomejs/biome": "2.6.9",
+    "@cloudflare/workers-types": "5.20261125.1",
+    "@types/node": "26.6.11",
+    "@types/react": "19.3.3",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "wrangler": "4.168.0"
+  },
+  "private": true,
+  "emdash": {
+    "label": "Money Tracker",
+    "seed": "seed/seed.json"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
