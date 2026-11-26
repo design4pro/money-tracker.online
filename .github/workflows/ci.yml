@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Check the candidate against protected-base contracts
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .protected-base
+          persist-credentials: false
+      - name: Run protected-base scenarios
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if [[ -f .protected-base/scripts/contracts.mjs ]]; then
+            node .protected-base/scripts/contracts.mjs "$PWD"
+            npm ci --prefix .protected-base/scripts --ignore-scripts
+            SCENARIO_TARGET="$PWD/scripts" npm test --prefix .protected-base/scripts
+            if [[ -f .protected-base/scripts/browser-fixture.mjs ]]; then
+              ./.protected-base/scripts/node_modules/.bin/playwright install --with-deps chromium
+              node .protected-base/scripts/browser-fixture.mjs
+            fi
+          fi
+      - name: Verify all package contracts
+        run: node scripts/contracts.mjs
+      - name: Install, check, test, and build every package
+        env:
+          PUBLIC_APP_URL: http://127.0.0.1:8787
+          SIGN_IN_URL: http://127.0.0.1:8787/login
+        shell: bash
+        run: |
+          for package in apps/app apps/site apps/factory; do
+            npm ci --prefix "$package"
+            npm run check --prefix "$package"
+            npm test --prefix "$package"
+            npm run build --prefix "$package"
+          done
+      - name: Test repository scripts
+        run: |
+          npm ci --prefix scripts --ignore-scripts
+          npm test --prefix scripts
+          bash -n scripts/ci-smoke.sh
+      - name: Browser smoke against local Workers
+        run: |
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+          node scripts/browser-fixture.mjs
+          bash scripts/ci-smoke.sh

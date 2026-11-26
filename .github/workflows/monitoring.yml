@@ -1,0 +1,45 @@
+name: Monitoring
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-monitoring
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    environment: production-monitoring
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Probe production and report anomalies
+        if: vars.MONITORING_ENABLED == 'true'
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          FACTORY_URL: ${{ vars.FACTORY_URL }}
+          APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
+          APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
+          SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
+          SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
+          FACTORY_ACCESS_CLIENT_ID: ${{ secrets.FACTORY_ACCESS_CLIENT_ID }}
+          FACTORY_ACCESS_CLIENT_SECRET: ${{ secrets.FACTORY_ACCESS_CLIENT_SECRET }}
+          FACTORY_ALERT_TOKEN: ${{ secrets.FACTORY_ALERT_TOKEN }}
+          MONITOR_P95_MS: ${{ vars.MONITOR_P95_MS }}
+          POLAR_LAG_PATH: ${{ vars.POLAR_LAG_PATH }}
+          POLAR_SIGNAL_TOKEN: ${{ secrets.POLAR_SIGNAL_TOKEN }}
+          MONITOR_POLAR_LAG_SECONDS: ${{ vars.MONITOR_POLAR_LAG_SECONDS }}
+        run: node scripts/monitor.mjs
