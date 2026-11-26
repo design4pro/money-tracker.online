@@ -1,9 +1,14 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { access, endpoint, packages, request, required, sha } from './probe.mjs';
+import { access, endpoint, packages, request, required, sha, cmsBoundary } from './probe.mjs';
 import { smoke } from './smoke.mjs';
 import { release } from './release.mjs';
+import { activeDeployment, deploymentResult, requireCutoverApproval, requireNoPublicRoutes } from './deployments.mjs';
+
+import { wranglerConfig } from './contracts.mjs';
 
 const stage = process.argv[2];
 const expected = sha(required('GITHUB_SHA'));
@@ -22,13 +27,10 @@ for (const worker of packages) {
 endpoint('app', required('APP_PROTECTED_PATH'));
 endpoint('site', required('CMS_ADMIN_PATH'));
 const signIn = new URL(required('SIGN_IN_URL'));
-if (signIn.origin !== endpoint('app', '/').origin || signIn.username || signIn.password ||
-    ![401, 403].includes(Number(required('CMS_UNAUTHENTICATED_STATUS')))) {
+if (signIn.origin !== endpoint('app', '/').origin || signIn.username || signIn.password) {
   throw new Error('Invalid smoke test configuration');
 }
-if (stage === 'production' && process.env.PRODUCTION_CUTOVER_APPROVED !== 'true') {
-  throw new Error('Production cutover has not been enabled');
-}
+cmsBoundary();
 
 async function verifyMain() {
   const current = await request(`https://api.github.com/repos/${required('GITHUB_REPOSITORY')}/git/ref/heads/main`, {
@@ -46,19 +48,11 @@ async function cloud(worker, body) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: body && JSON.stringify(body),
   });
-  const data = await response.json();
-  if (!response.ok || data.success !== true) throw new Error(`${worker}: Cloudflare deployment API returned ${response.status}`);
-  return data.result;
+  return deploymentResult(worker, response, !body);
 }
 
 async function previous(worker) {
-  const deployment = (await cloud(worker)).deployments?.[0];
-  const version = deployment?.versions?.[0];
-  if (!deployment?.id || deployment.versions.length !== 1 ||
-      version.percentage !== 100 || !/^[a-f0-9-]{36}$/i.test(version.version_id)) {
-    throw new Error(`${worker}: a single active rollback version is required`);
-  }
-  return { deployment: deployment.id, version: version.version_id };
+  return activeDeployment(worker, await cloud(worker));
 }
 
 function npm(worker, ...args) {
@@ -77,18 +71,34 @@ function npm(worker, ...args) {
 await verifyMain();
 const snapshots = {};
 for (const worker of packages) snapshots[worker] = await previous(worker);
-const summary = Object.entries(snapshots).map(([worker, { deployment, version }]) =>
-  `- ${worker}: deployment \`${deployment}\`, version \`${version}\``).join('\n');
+requireCutoverApproval(
+  stage, snapshots, expected, process.env.PRODUCTION_CUTOVER_SHA, process.env.PRODUCTION_CUTOVER_COMPLETE,
+);
+if (stage === 'production' && process.env.PRODUCTION_CUTOVER_COMPLETE !== 'true') {
+  for (const worker of packages) {
+    const dir = resolve('apps', worker);
+    const config = wranglerConfig(dir);
+    if (!config) throw new Error(`${worker}: missing Wrangler configuration`);
+    const requireFromWorker = createRequire(resolve(dir, 'package.json'));
+    const { unstable_readConfig } = requireFromWorker('wrangler');
+    requireNoPublicRoutes(worker, unstable_readConfig({ config, env: stage }));
+  }
+}
+const summary = Object.entries(snapshots).map(([worker, snapshot]) =>
+  snapshot
+    ? `- ${worker}: deployment \`${snapshot.deployment}\`, version \`${snapshot.version}\``
+    : `- ${worker}: no prior active binary`).join('\n');
 appendFileSync(required('GITHUB_STEP_SUMMARY'), `## Previous ${stage} deployments\n\n${summary}\n`);
 const deployed = {};
 try {
   await release({
     workers: packages,
+    snapshots,
     migrate: () => npm('app', 'run', `migrate:${stage}`),
     async deploy(worker) {
       await npm(worker, 'run', `deploy:${stage}`, '--', '--name', names[worker], '--var', `SOURCE_SHA:${expected}`);
-      deployed[worker] = (await previous(worker)).version;
-      if (deployed[worker] === snapshots[worker].version) throw new Error(`${worker}: no new active Worker version`);
+      deployed[worker] = (await previous(worker))?.version;
+      if (!deployed[worker] || deployed[worker] === snapshots[worker]?.version) throw new Error(`${worker}: no new active Worker version`);
     },
     async verify() {
       for (let attempt = 1; ; attempt++) {
@@ -102,7 +112,7 @@ try {
         }
       }
       for (const worker of packages) {
-        if ((await previous(worker)).version !== deployed[worker]) {
+        if ((await previous(worker))?.version !== deployed[worker]) {
           throw new Error(`${worker}: active version changed during verification`);
         }
       }
@@ -110,8 +120,7 @@ try {
     finish() {
       appendFileSync(required('GITHUB_STEP_SUMMARY'), `\nVerified release \`${expected}\`.\n`);
     },
-    async rollback(worker) {
-      const version = snapshots[worker].version;
+    async rollback(worker, { version }) {
       const current = await previous(worker).catch(() => null);
       if (current?.version !== version) {
         await cloud(worker, {
@@ -119,11 +128,14 @@ try {
           versions: [{ version_id: version, percentage: 100 }],
         });
       }
-      if ((await previous(worker)).version !== version) throw new Error('rollback version is not active');
+      if ((await previous(worker))?.version !== version) throw new Error('rollback version is not active');
       console.log(`${worker}: confirmed rollback to ${version}`);
     },
+    onNoBaseline(worker) {
+      console.error(`${worker}: no prior binary to roll back to; manual recovery may be required`);
+    },
     onRollbackFailure(worker) {
-      console.error(`${worker}: rollback could not be confirmed for ${snapshots[worker].version}; operator action required`);
+      console.error(`${worker}: rollback could not be confirmed for ${snapshots[worker].version}; investigate the active deployment`);
     },
   });
 } catch (error) {

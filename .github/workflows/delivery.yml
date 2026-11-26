@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: '24'
       - name: Install and verify release tooling
+        env:
+          PUBLIC_APP_URL: ${{ vars.APP_URL }}
+          SIGN_IN_URL: ${{ vars.SIGN_IN_URL }}
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
@@ -47,6 +50,7 @@ jobs:
           APP_PROTECTED_PATH: ${{ vars.APP_PROTECTED_PATH }}
           CMS_ADMIN_PATH: ${{ vars.CMS_ADMIN_PATH }}
           CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
+          CMS_LOGIN_URL: ${{ vars.CMS_LOGIN_URL }}
           APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
           APP_URL: ${{ vars.APP_URL }}
           APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
@@ -77,6 +81,9 @@ jobs:
         with:
           node-version: '24'
       - name: Install and verify release tooling
+        env:
+          PUBLIC_APP_URL: ${{ vars.APP_URL }}
+          SIGN_IN_URL: ${{ vars.SIGN_IN_URL }}
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
@@ -96,6 +103,7 @@ jobs:
           APP_PROTECTED_PATH: ${{ vars.APP_PROTECTED_PATH }}
           CMS_ADMIN_PATH: ${{ vars.CMS_ADMIN_PATH }}
           CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
+          CMS_LOGIN_URL: ${{ vars.CMS_LOGIN_URL }}
           APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
           APP_URL: ${{ vars.APP_URL }}
           APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
@@ -108,5 +116,6 @@ jobs:
           FACTORY_URL: ${{ vars.FACTORY_URL }}
           FACTORY_ACCESS_CLIENT_ID: ${{ secrets.FACTORY_ACCESS_CLIENT_ID }}
           FACTORY_ACCESS_CLIENT_SECRET: ${{ secrets.FACTORY_ACCESS_CLIENT_SECRET }}
-          PRODUCTION_CUTOVER_APPROVED: ${{ vars.PRODUCTION_CUTOVER_APPROVED }}
+          PRODUCTION_CUTOVER_SHA: ${{ vars.PRODUCTION_CUTOVER_SHA }}
+          PRODUCTION_CUTOVER_COMPLETE: ${{ vars.PRODUCTION_CUTOVER_COMPLETE }}
         run: node scripts/deliver.mjs production

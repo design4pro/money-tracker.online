@@ -1,6 +1,7 @@
+import { realpathSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
-import { access, endpoint, packages, request, required, sha, verifyBoundary, verifyHealth } from './probe.mjs';
+import { access, endpoint, packages, request, required, sha, cmsBoundary, verifyBoundary, verifyHealth } from './probe.mjs';
 
 export async function smoke(expected, local = false) {
   sha(expected);
@@ -19,11 +20,16 @@ export async function smoke(expected, local = false) {
   }
   const app = endpoint('app', required('APP_PROTECTED_PATH'), local);
   verifyBoundary(await request(app, { headers: access('app') }), app, signIn);
-  const admin = endpoint('site', required('CMS_ADMIN_PATH'), local);
-  const expectedStatus = Number(required('CMS_UNAUTHENTICATED_STATUS'));
-  if (![401, 403].includes(expectedStatus)) throw new Error('CMS status must be 401 or 403');
+  if (local) {
+    for (const url of [signIn, endpoint('app', process.env.APP_REGISTER_PATH || '/register', true)]) {
+      const response = await request(url);
+      if (!response.ok) throw new Error(`Public app route ${url.pathname} returned ${response.status}`);
+    }
+  }
+  const { admin, status, login } = cmsBoundary(local);
   const response = await request(admin, { headers: access('site') });
-  if (response.status !== expectedStatus) throw new Error(`Unexpected CMS status (${response.status})`);
+  if (status === null) verifyBoundary(response, admin, login);
+  else if (response.status !== status) throw new Error(`Unexpected CMS status (${response.status})`);
 
   const browser = await chromium.launch();
   try {
@@ -42,7 +48,7 @@ export async function smoke(expected, local = false) {
   console.log(`Smoke verified all three Workers at ${expected}`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   await smoke(process.argv[2], process.argv.includes('--local')).catch(error => {
     console.error(error.message);
     process.exitCode = 1;

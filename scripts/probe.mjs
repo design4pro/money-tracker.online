@@ -53,3 +53,16 @@ export function verifyBoundary(response, protectedUrl, signInUrl) {
   }
   throw new Error(`Protected route did not enforce the expected auth boundary (${response.status})`);
 }
+
+export function cmsBoundary(local = false) {
+  const admin = endpoint('site', required('CMS_ADMIN_PATH'), local);
+  const statusParam = process.env.CMS_UNAUTHENTICATED_STATUS;
+  const status = statusParam ? Number(statusParam) : null;
+  const login = new URL(process.env.CMS_LOGIN_URL || '/_emdash/admin/login', admin);
+  if ((status !== null && ![401, 403].includes(status)) ||
+      login.origin !== admin.origin || login.pathname === admin.pathname ||
+      login.username || login.password || login.hash) {
+    throw new Error('Invalid CMS auth boundary configuration');
+  }
+  return { admin, status, login };
+}

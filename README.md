@@ -15,7 +15,8 @@ for package in apps/app apps/site apps/factory; do
   npm ci --prefix "$package" &&
   npm run check --prefix "$package" &&
   npm test --prefix "$package" &&
-  npm run build --prefix "$package" || exit 1
+  PUBLIC_APP_URL=http://127.0.0.1:8787 SIGN_IN_URL=http://127.0.0.1:8787/login \
+    npm run build --prefix "$package" || exit 1
 done
 npm ci --prefix scripts --ignore-scripts
 npm test --prefix scripts
@@ -24,13 +25,15 @@ node scripts/browser-fixture.mjs
 GITHUB_SHA="$(git rev-parse HEAD)" bash scripts/ci-smoke.sh
 ```
 
-The local smoke starts staging configurations in Wrangler's local runtime on ports 8787–8789, sets the synthetic `SOURCE_SHA`, `APP_URL` and `SIGN_IN_URL` bindings, and probes all three Workers. The URL defaults in `scripts/ci-smoke.sh` form the local route contract. See the package instructions for required synthetic binding values. Keep local `.dev.vars` files untracked.
+The local smoke runs the built staging configurations on ports 8787–8789. It applies app migrations to a temporary local D1 database using `SMOKE_APP_D1_BINDING` (default `DB`). Set `SMOKE_SITE_D1_BINDING` and `SMOKE_FACTORY_D1_BINDING` if those workspaces have Wrangler D1 migrations. A workspace with a standard `migrations/` directory defaults to `DB`. Dev uses the same temporary state and local-only bindings. The script supplies synthetic `SOURCE_SHA`, app auth, and site URL values. Keep local `.dev.vars` files untracked and use only synthetic values for local verification.
+
+Smoke expects public `/login` and `/register` on the app, protects `/billing`, and inspects `/_emdash/admin` for a 401, a 403, or a redirect to the site's EmDash login. Overrides are `SMOKE_SIGN_IN_PATH`, `SMOKE_APP_REGISTER_PATH`, `SMOKE_APP_PROTECTED_PATH`, `SMOKE_CMS_ADMIN_PATH`, `SMOKE_CMS_LOGIN_URL`, and `SMOKE_CMS_UNAUTHENTICATED_STATUS`. If the site compiles its landing link into the bundle, build with the same local `PUBLIC_APP_URL` and `SIGN_IN_URL`. Use each package's documented synthetic values and D1 migration layout. An EmDash setup redirect fails smoke. For packages that need CMS initialization to reach a login redirect, arrange synthetic local initialization or the package's explicit unauthenticated 401/403 response before smoke.
 
 ## Repository readiness
 
 Before enabling delivery, an operator must configure protected `main` to require reviewed pull requests, strict up-to-date `verify` and `factory/merge-gate` checks, and disable bypass for routine merges. Select the dedicated GitHub App as the expected source of `factory/merge-gate`. Configure the app with the least privileges needed by the factory. Treat edits to workflows, release scripts, and their required-check names as release-control changes requiring operator review. CI runs on the PR merge candidate with read-only permissions and no environment secrets. Where the protected base contains scenarios, CI also runs that copy against the candidate's package contracts and the synthetic rollback, auth and browser cases. Keep the independent factory check authoritative for approving merges.
 
-An operator must create GitHub environments named `staging` and `production`, each restricted to protected `main`. Configure required production reviewers with self-review and administrative bypass disabled. Before approving a production job, confirm the full workflow SHA against the intended revision and the successful staging job's verified-release summary. Approval covers only that job and SHA. The pipeline rejects a stale SHA before starting deployment. Observation and alerting use a separate `production-monitoring` environment restricted to protected `main`.
+An operator must configure GitHub environments named `staging` and `production`, each restricted to protected `main`. Routine releases deploy automatically after approved merge and successful staging. Sensitive changes and first production cutover require explicit operator approval. For first cutover, confirm the exact SHA in the successful staging job's verified-release summary before setting the SHA-scoped approval below. The pipeline rejects a stale SHA before starting deployment. Observation and alerting use a separate `production-monitoring` environment restricted to protected `main`.
 
 ## Delivery readiness
 
@@ -43,12 +46,14 @@ Set these values separately in each GitHub delivery environment. Store delivery 
 | `CLOUDFLARE_ACCOUNT_ID` | Account that owns this environment's Workers and bindings |
 | `APP_WORKER_NAME`, `SITE_WORKER_NAME`, `FACTORY_WORKER_NAME` | `money-app-staging`, `money-site-staging`, `money-factory-staging`; distinct production names |
 | `APP_URL`, `SITE_URL`, `FACTORY_URL` | HTTPS origins such as `https://app-staging.example.com`; no paths |
-| `SIGN_IN_URL` | Full URL on the app origin, for example `https://app-staging.example.com/sign-in` |
-| `APP_PROTECTED_PATH`, `CMS_ADMIN_PATH` | Paths such as `/` and `/admin` for the operations under test |
-| `CMS_UNAUTHENTICATED_STATUS` | Exact `401` or `403` expected from the application |
+| `SIGN_IN_URL` | Full URL on the app origin, for example `https://app-staging.example.com/login` |
+| `APP_PROTECTED_PATH`, `CMS_ADMIN_PATH` | Paths `/billing` and `/_emdash/admin` for the operations under test |
+| `CMS_UNAUTHENTICATED_STATUS` | Optional exact `401` or `403`. Leave unset to allow either or a matching login redirect. |
+| `CMS_LOGIN_URL` | Optional same-origin CMS login URL or path, default `/_emdash/admin/login` |
 | `CLOUDFLARE_API_TOKEN` | Environment secret with scoped Worker deployment and app migration access |
 | `{APP,SITE,FACTORY}_ACCESS_CLIENT_ID` and `{APP,SITE,FACTORY}_ACCESS_CLIENT_SECRET` | Paired environment secrets where a Worker probe crosses a Cloudflare Access policy |
-| `PRODUCTION_CUTOVER_APPROVED` | Leave unset until first-cutover readiness is confirmed, then set to `true` in production. The required environment review still applies to each SHA. |
+| `PRODUCTION_CUTOVER_SHA` | In production, set to the full staged SHA explicitly approved for initial cutover or a later rollout with any missing Worker baseline. |
+| `PRODUCTION_CUTOVER_COMPLETE` | Leave unset through initial verification and route cutover. After the operator confirms both, set to `true` and clear `PRODUCTION_CUTOVER_SHA` for routine releases with existing baselines. |
 
 Before first cutover, inventory the existing Cloudflare Access applications, policies, service tokens, and routes together with the operators. Confirm the site landing remains public, and that smoke can exercise the app and CMS application auth boundaries without a user session. Access service tokens should grant only the edge access needed by probes. Provision staging bindings, verify staged migrations and rollback compatibility, then validate the separate production bindings and actual operator-managed secrets. Leave real payments disabled in default and unconfigured environments. Enabling live Polar credentials or real payments is a separate operator decision. The workflows do not set payment switches or seed live payment credentials.
 
@@ -62,7 +67,11 @@ npm run deploy:staging --prefix apps/factory -- --name "$FACTORY_WORKER_NAME" --
 node scripts/smoke.mjs "$GITHUB_SHA"
 ```
 
-The production job uses the corresponding `migrate:production` and `deploy:production` scripts. Use the workflow for live delivery. Each environment needs an existing known-good deployment at 100% for each Worker before automatic delivery can begin. For brand-new Workers, an operator must establish that baseline in a separately approved bootstrap with staging and production access controls in place. Delivery records previous IDs before migration, fails on split or absent deployments, serializes releases and verifies active versions and live smoke. After a deploy or smoke failure, it attempts to restore every attempted Worker to the captured binary version and verifies the active version. Keep migrations compatible with both versions. A binary rollback never restores the database or reverses other external side effects. If the runner is cancelled or a rollback cannot be confirmed, use the captured version IDs and reconcile the active deployments before retrying.
+For the first rollout, use verification endpoints that are separate from the live public routes, for example isolated Workers preview origins with the required access controls. The initial production preflight rejects public routes and custom domains in Wrangler config. Use the standard package config with no route or domain flags in the deploy scripts, and keep route provisioning permissions with the operator. The operator switches the initial public routes separately after successful exact-SHA verification and confirms them before marking cutover complete. Set the routine smoke origins to the public URLs where appropriate and verify the public landing points to the intended sign-in origin. Keep that routing work outside migrations.
+
+The production job uses the corresponding `migrate:production` and `deploy:production` scripts. Use the workflow for live delivery. Staging can start with no previous deployments, and first production cutover can do so with exact-SHA approval. Delivery accepts a confirmed missing Worker or an empty deployment list as an absent baseline. It stops before migration on authorization errors, unknown responses, or split traffic. Delivery records previous IDs or their absence, serializes releases, and verifies active versions and live smoke.
+
+On failure, delivery attempts to restore and verify captured binaries for Workers that had a prior version. Where no prior binary exists, keep public routes unchanged and recover manually before retrying if the attempted deployment left an unusable Worker. If rollback cannot be confirmed, reconcile the active version against the captured ID before retrying. Keep migrations compatible with old and new Workers. Binary rollback never restores the database.
 
 ## Monitoring readiness
 

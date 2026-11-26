@@ -9,6 +9,81 @@ const target = process.env.SCENARIO_TARGET ? pathToFileURL(`${process.env.SCENAR
 const { verifyBoundary, verifyHealth } = await import(new URL('probe.mjs', target));
 const { release } = await import(new URL('release.mjs', target));
 const { verifyContracts } = await import(new URL('contracts.mjs', target));
+const { activeDeployment, deploymentResult, requireCutoverApproval, requireNoPublicRoutes } = await import(new URL('deployments.mjs', target));
+
+const version = '00000000-0000-4000-8000-000000000001';
+const existing = { deployment: 'deployment-id', version };
+
+test('only an empty deployment list or Cloudflare missing-Worker response permits a missing baseline', async () => {
+  const missingWorker = { success: false, errors: [{ code: 10007 }] };
+  const read = (status, body, allowMissing = true) =>
+    deploymentResult('app', Response.json(body, { status }), allowMissing);
+  assert.equal(activeDeployment('app', await read(404, missingWorker)), null);
+  assert.equal(activeDeployment('app', await read(200, { success: true, result: { deployments: [] } })), null);
+  await assert.rejects(read(404, missingWorker, false), /returned 404/);
+  await assert.rejects(read(404, { success: false, errors: [{ code: 9999 }] }), /returned 404/);
+  await assert.rejects(read(403, missingWorker), /returned 403/);
+  await assert.rejects(read(500, missingWorker), /returned 500/);
+  assert.throws(() => activeDeployment('app', {}), /invalid deployment list/);
+  const deployment = { id: existing.deployment, versions: [{ version_id: version, percentage: 100 }] };
+  assert.deepEqual(activeDeployment('app', { deployments: [deployment] }), existing);
+  deployment.versions.push({ version_id: version, percentage: 0 });
+  assert.throws(() => activeDeployment('app', { deployments: [deployment] }), /single active Worker version/);
+});
+
+test('staging can start empty and production bootstrap requires the exact approved SHA', () => {
+  const expected = 'a'.repeat(40);
+  const empty = { app: null, site: null };
+  const ready = { app: existing, site: existing };
+  requireCutoverApproval('staging', empty, expected);
+  assert.throws(() => requireCutoverApproval('production', empty, expected), /exact SHA/);
+  assert.throws(() => requireCutoverApproval('production', empty, expected, 'b'.repeat(40), 'true'), /exact SHA/);
+  requireCutoverApproval('production', empty, expected, expected);
+  assert.throws(() => requireCutoverApproval('production', ready, expected), /exact SHA/);
+  requireCutoverApproval('production', ready, expected, undefined, 'true');
+});
+
+test('initial production deployment refuses a public route or custom domain', () => {
+  requireNoPublicRoutes('site', { routes: [], workers_dev: true });
+  assert.throws(() => requireNoPublicRoutes('site', { route: 'example.com/*' }), /public routes/);
+  assert.throws(() => requireNoPublicRoutes('site', {
+    routes: [{ pattern: 'example.com', custom_domain: true }],
+  }), /public routes/);
+});
+
+test('a failed mixed bootstrap restores only workers with prior binaries', async () => {
+  const log = [];
+  await assert.rejects(release({
+    workers: ['app', 'site', 'factory'],
+    snapshots: { app: existing, site: null, factory: null },
+    migrate: async () => {},
+    deploy: async () => {},
+    verify: async () => { throw new Error('wrong source SHA'); },
+    finish: () => assert.fail('failed bootstrap cannot finish'),
+    rollback(worker, snapshot) {
+      assert.equal(snapshot, existing);
+      log.push(`rollback ${worker}`);
+    },
+    onNoBaseline: worker => log.push(`no previous version ${worker}`),
+    onRollbackFailure: () => assert.fail('rollback should succeed'),
+  }), /wrong source SHA/);
+  assert.deepEqual(log, ['no previous version factory', 'no previous version site', 'rollback app']);
+});
+
+test('an empty staging rollout can finish once the newly deployed Workers pass smoke', async () => {
+  const log = [];
+  await release({
+    workers: ['app', 'site'],
+    snapshots: { app: null, site: null },
+    migrate: () => log.push('migrate'),
+    deploy: worker => log.push(worker),
+    verify: () => log.push('verify'),
+    finish: () => log.push('finish'),
+    rollback: () => assert.fail('successful bootstrap cannot roll back'),
+    onNoBaseline: () => assert.fail('successful bootstrap needs no recovery'),
+  });
+  assert.deepEqual(log, ['migrate', 'app', 'site', 'verify', 'finish']);
+});
 
 test('package verification fails when a workspace is missing', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pilot-contracts-'));
@@ -57,6 +132,7 @@ for (const [failure, expected] of [
     }
     const result = release({
       workers: ['app', 'site'],
+      snapshots: { app: existing, site: existing },
       migrate: () => record('migrate'),
       deploy: worker => record(`deploy ${worker}`),
       verify: () => record('verify'),

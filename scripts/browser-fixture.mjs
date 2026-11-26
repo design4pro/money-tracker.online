@@ -6,13 +6,15 @@ import { smoke } from './smoke.mjs';
 const expected = 'a'.repeat(40);
 let appSha = expected;
 let landingLink;
+let cmsRedirect = '/_emdash/admin/login?redirect=/_emdash/admin';
 const handlers = {
   app(req, res) {
-    if (req.url === '/private') return res.writeHead(302, { Location: '/sign-in' }).end();
+    if (['/login', '/register'].includes(req.url)) return res.writeHead(200).end();
+    if (req.url === '/billing') return res.writeHead(302, { Location: '/login' }).end();
     return health(res, appSha);
   },
   site(req, res) {
-    if (req.url === '/admin') return res.writeHead(401).end();
+    if (req.url === '/_emdash/admin') return res.writeHead(302, { Location: cmsRedirect }).end();
     if (req.url === '/') {
       return res.writeHead(200, { 'Content-Type': 'text/html' }).end(`<a href="${landingLink}">Sign in</a>`);
     }
@@ -33,12 +35,15 @@ try {
     await once(server, 'listening');
     process.env[`${worker.toUpperCase()}_URL`] = `http://127.0.0.1:${server.address().port}`;
   }
-  process.env.SIGN_IN_URL = landingLink = `${process.env.APP_URL}/sign-in`;
-  process.env.APP_PROTECTED_PATH = '/private';
-  process.env.CMS_ADMIN_PATH = '/admin';
-  process.env.CMS_UNAUTHENTICATED_STATUS = '401';
+  process.env.SIGN_IN_URL = landingLink = `${process.env.APP_URL}/login`;
+  process.env.APP_PROTECTED_PATH = '/billing';
+  process.env.CMS_ADMIN_PATH = '/_emdash/admin';
+  delete process.env.CMS_UNAUTHENTICATED_STATUS;
 
   await smoke(expected, true);
+  cmsRedirect = '/_emdash/admin/setup';
+  await assert.rejects(smoke(expected, true), /auth boundary/);
+  cmsRedirect = '/_emdash/admin/login';
   appSha = 'b'.repeat(40);
   await assert.rejects(smoke(expected, true), /app: Health did not confirm/);
   appSha = expected;

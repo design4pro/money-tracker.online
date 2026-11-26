@@ -1,4 +1,4 @@
-export async function release({ workers, migrate, deploy, verify, finish, rollback, onRollbackFailure }) {
+export async function release({ workers, snapshots, migrate, deploy, verify, finish, rollback, onNoBaseline, onRollbackFailure }) {
   const attempted = [];
   try {
     await migrate();
@@ -10,8 +10,12 @@ export async function release({ workers, migrate, deploy, verify, finish, rollba
     await finish();
   } catch (error) {
     for (const worker of attempted.reverse()) {
+      if (snapshots[worker] === null) {
+        onNoBaseline(worker);
+        continue;
+      }
       try {
-        await rollback(worker);
+        await rollback(worker, snapshots[worker]);
       } catch {
         onRollbackFailure(worker);
       }
