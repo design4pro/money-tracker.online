@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "money-tracker-factory",
+  "send_metrics": false,
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-30",
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["Factory"]}],
+  "env": {
+    "staging": {
+      "name": "money-tracker-factory-staging",
+      "durable_objects": {"bindings": [{"name": "FACTORY", "class_name": "Factory"}]},
+      "vars": {"REPO": "design4pro/money-tracker.online", "MERGE_ENABLED": "false"}
+    },
+    "production": {
+      "name": "money-tracker-factory-production",
+      "durable_objects": {"bindings": [{"name": "FACTORY", "class_name": "Factory"}]},
+      "vars": {"REPO": "design4pro/money-tracker.online", "MERGE_ENABLED": "false"}
+    }
+  }
+}
