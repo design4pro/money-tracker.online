@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -12,6 +12,9 @@ import { wranglerConfig } from './contracts.mjs';
 
 const stage = process.argv[2];
 const expected = sha(required('GITHUB_SHA'));
+if (execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== expected) {
+  throw new Error('Checked-out commit does not match the release SHA');
+}
 if (!['staging', 'production'].includes(stage) || process.env.GITHUB_REF !== 'refs/heads/main') {
   throw new Error('Delivery requires protected main and a supported environment');
 }
@@ -59,6 +62,8 @@ function npm(worker, ...args) {
   return new Promise((resolve, reject) => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
       name !== 'GH_TOKEN' && !name.includes('_ACCESS_CLIENT_')));
+    env.SOURCE_SHA = expected;
+    env.APP_ORIGIN = required('APP_URL');
     const child = spawn('npm', ['--prefix', `apps/${worker}`, ...args], { stdio: 'inherit', env });
     child.once('error', reject);
     child.once('exit', (code, signal) => {
@@ -74,7 +79,8 @@ for (const worker of packages) snapshots[worker] = await previous(worker);
 requireCutoverApproval(
   stage, snapshots, expected, process.env.PRODUCTION_CUTOVER_SHA, process.env.PRODUCTION_CUTOVER_COMPLETE,
 );
-if (stage === 'production' && process.env.PRODUCTION_CUTOVER_COMPLETE !== 'true') {
+if (stage === 'production' && (process.env.PRODUCTION_CUTOVER_COMPLETE !== 'true' ||
+    Object.values(snapshots).includes(null))) {
   for (const worker of packages) {
     const dir = resolve('apps', worker);
     const config = wranglerConfig(dir);
@@ -94,13 +100,20 @@ try {
   await release({
     workers: packages,
     snapshots,
-    migrate: () => npm('app', 'run', `migrate:${stage}`),
+    async migrate() {
+      await verifyMain();
+      await npm('app', 'run', `migrate:${stage}`);
+    },
     async deploy(worker) {
-      await npm(worker, 'run', `deploy:${stage}`, '--', '--name', names[worker], '--var', `SOURCE_SHA:${expected}`);
+      await verifyMain();
+      const args = ['--name', names[worker]];
+      if (worker === 'factory') args.push('--var', `SOURCE_SHA:${expected}`);
+      await npm(worker, 'run', `deploy:${stage}`, '--', ...args);
       deployed[worker] = (await previous(worker))?.version;
       if (!deployed[worker] || deployed[worker] === snapshots[worker]?.version) throw new Error(`${worker}: no new active Worker version`);
     },
     async verify() {
+      await verifyMain();
       for (let attempt = 1; ; attempt++) {
         try {
           await smoke(expected);

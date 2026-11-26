@@ -48,7 +48,7 @@ Configure vars per environment using the Wrangler configuration or the deploymen
 | `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID` | Dedicated merge app and installation IDs, e.g. `55` and `66` |
 | `GITHUB_DISCOVERY_BOT_ID`, `GITHUB_TRIAGE_BOT_ID` | Numeric GitHub bot user IDs for discovery and fctl's ticket comments. They may be the same. |
 | `GITHUB_ACTIONS_APP_ID`, `GITHUB_REVIEW_APP_ID` | Actual Check Run app IDs from GitHub Actions and the native fctl review app |
-| `DELIVERY_SMOKE_STEP` or `DELIVERY_SMOKE_JOB` | Set exactly one. Use the exact step name inside `deploy-production`, e.g. `Production smoke`, or the exact name of a separate smoke job in the same attempt. Smoke failures must fail delivery. |
+| `DELIVERY_SMOKE_STEP` or `DELIVERY_SMOKE_JOB` | Set exactly one. Use the exact step name inside `deploy-production`, `Deploy and smoke-test production`, or the exact name of a separate smoke job in the same attempt. Smoke failures must fail delivery. |
 | `HUMAN_REVIEWER_IDS` | Comma-separated trusted human GitHub user IDs, e.g. `81,82`. Empty blocks sensitive and bootstrap PRs. |
 | `BOOTSTRAP_PRS` | Optional, up to three explicit PR numbers, e.g. `12,13`. Each requires an allowlisted human's current-head approval, same-repo main base, `verify` and native fctl review on the same head. No issue is closed from this path. Removing an entry stops polling it. |
 | `MERGE_ENABLED` | Explicitly `true` to enable merge requests. Defaults to `false`. |

@@ -130,6 +130,20 @@ export class Github {
       candidates[0].status === "completed" && candidates[0].conclusion === "success";
   }
 
+  async verifyPullRequest(number: number, head: string, merge: unknown, base: unknown): Promise<boolean> {
+    if (!sha(base) || record(record(await this.api("/git/ref/heads/main")).object).sha !== base) return false;
+    if (sha(merge) && await this.verifyCheck(merge)) {
+      const parents = list(record(await this.api(`/git/commits/${merge}`)).parents).map(parent => record(parent).sha);
+      return parents.length === 2 && parents[0] === base && parents[1] === head;
+    }
+    // GitHub can associate the verify check with the PR head even when CI checked out the merge ref.
+    if (!await this.verifyCheck(head)) return false;
+    const runs = record(await this.api(`/actions/workflows/ci.yml/runs?event=pull_request&head_sha=${head}&per_page=100`));
+    return list(runs.workflow_runs).map(record).some(run => run.head_sha === head &&
+      run.status === "completed" && run.conclusion === "success" &&
+      list(run.pull_requests).map(record).some(pr => pr.number === number && record(pr.head).sha === head && record(pr.base).sha === base));
+  }
+
   async fctlReviewCheck(head: string): Promise<boolean> {
     const checks = record(await this.api(`/commits/${head}/check-runs?check_name=fctl%20review&filter=latest&per_page=100`));
     const candidates = list(checks.check_runs).map(record).filter(check => check.name === "fctl review" &&
@@ -170,9 +184,12 @@ export class Github {
   }
 
   async productionDeploys(): Promise<Json[]> {
-    const response = record(await this.api("/actions/workflows/delivery.yml/runs?branch=main&event=push&status=success&per_page=30"));
-    return list(response.workflow_runs).map(record).filter(run => integer(run.id) && integer(run.run_attempt) && sha(run.head_sha) &&
-      run.head_branch === "main" && run.event === "push" && run.status === "completed" && run.conclusion === "success" &&
+    const responses = await Promise.all(["push", "workflow_dispatch"].map(event =>
+      this.api(`/actions/workflows/delivery.yml/runs?branch=main&event=${event}&status=success&per_page=30`)));
+    return responses.flatMap(response => list(record(response).workflow_runs).map(record)).filter(run =>
+      integer(run.id) && integer(run.run_attempt) && sha(run.head_sha) &&
+      run.head_branch === "main" && ["push", "workflow_dispatch"].includes(String(run.event)) &&
+      run.status === "completed" && run.conclusion === "success" &&
       run.path === ".github/workflows/delivery.yml" && String(record(run.repository).id) === this.env.REPO_ID &&
       String(record(run.head_repository).id) === this.env.REPO_ID);
   }

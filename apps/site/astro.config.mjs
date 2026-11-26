@@ -4,16 +4,23 @@ import { access, d1, kvCache, r2 } from "@emdash-cms/cloudflare";
 import { defineConfig } from "astro/config";
 import emdash from "emdash/astro";
 
+const dev = process.argv.includes("dev");
+const localState = dev && process.env.SITE_LOCAL_STATE;
+
 export default defineConfig({
   output: "server",
-  adapter: cloudflare({ imageService: "passthrough", remoteBindings: false }),
+  adapter: cloudflare({
+    imageService: "passthrough",
+    remoteBindings: false,
+    ...(localState ? { persistState: { path: localState } } : {}),
+  }),
   integrations: [
     react(),
     emdash({
       database: d1({ binding: "DB" }),
       storage: r2({ binding: "MEDIA" }),
       objectCache: kvCache({ binding: "CACHE" }),
-      auth: process.argv.includes("dev")
+      auth: dev
         ? undefined
         : access({
             teamDomain:

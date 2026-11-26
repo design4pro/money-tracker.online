@@ -1,3 +1,4 @@
+import { operations } from "../src/server/ops"
 import assert from "node:assert/strict"
 import { createHmac } from "node:crypto"
 import { readFile } from "node:fs/promises"
@@ -112,6 +113,18 @@ before(async () => {
       .filter(Boolean)
       .map((statement) => db.prepare(statement))
   )
+  const milestones = await readFile(
+    new URL("../migrations/0002_pilot_milestones.sql", import.meta.url),
+    "utf8"
+  )
+  await db.batch(
+    milestones
+      .trim()
+      .split(/;\s*(?=ALTER TABLE|CREATE TRIGGER|$)/)
+      .filter(Boolean)
+      .map((statement) => db.prepare(statement))
+  )
+
   env = {
     DB: db,
     APP_ORIGIN: origin,
@@ -607,4 +620,79 @@ test("scheduled recheck activates pending access and revokes stale provider stat
   assert.deepEqual(new Set(requested), new Set([alice.id, bob.id]))
   assert.equal(access(await getEntitlement(env.DB, alice.id)), "inactive")
   assert.equal(access(await getEntitlement(env.DB, bob.id)), "active")
+})
+
+test("operations report aggregate milestones and refresh lag without exposing user data", async () => {
+  const db = env.DB
+  const signup = await db
+    .prepare("SELECT count(*) AS total FROM user")
+    .first<number>("total")
+  const firstPaid = await db
+    .prepare("SELECT first_paid_at FROM user WHERE id = ?")
+    .bind(alice.id)
+    .first<number>("first_paid_at")
+  assert.ok(firstPaid && firstPaid > 0)
+  const firstTransaction = await db
+    .prepare("SELECT first_transaction_at FROM user WHERE id = ?")
+    .bind(alice.id)
+    .first<number>("first_transaction_at")
+  assert.ok(firstTransaction && firstTransaction >= firstPaid)
+
+  await reconcile(
+    env,
+    alice.id,
+    "milestone-expired",
+    async () => Date.now() - 1
+  )
+  await reconcile(env, alice.id, "milestone-expired", () =>
+    assert.fail("replay queried Polar")
+  )
+  await reconcile(
+    env,
+    alice.id,
+    "milestone-renewed",
+    async () => Date.now() + 60_000
+  )
+  assert.equal(
+    await db
+      .prepare("SELECT first_paid_at FROM user WHERE id = ?")
+      .bind(alice.id)
+      .first<number>("first_paid_at"),
+    firstPaid
+  )
+
+  const opsEnv = { ...env, POLAR_SIGNAL_TOKEN: "synthetic-signal-token" }
+  const get = (path: string, token?: string) =>
+    operations(
+      new Request(`https://app.invalid${path}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+      opsEnv,
+      path
+    )
+  const path = "/ops/pilot-milestones"
+  assert.equal((await get(path)).status, 401)
+  assert.equal((await get(path, "wrong")).status, 401)
+  const response = await get(path, opsEnv.POLAR_SIGNAL_TOKEN)
+  assert.equal(response.headers.get("Cache-Control"), "no-store")
+  const counts: Record<string, number> = await response.json()
+  assert.deepEqual(Object.keys(counts).sort(), [
+    "firstPaid",
+    "firstTransaction",
+    "signUps",
+  ])
+  assert.equal(counts.signUps, signup)
+  assert.ok(
+    counts.firstPaid >= counts.firstTransaction && counts.firstTransaction >= 1
+  )
+
+  const lag = "/ops/polar-lag"
+  assert.equal((await get(lag)).status, 401)
+  await db
+    .prepare("UPDATE entitlement SET recheck_at = ? WHERE user_id = ?")
+    .bind(Date.now() - 90_000, alice.id)
+    .run()
+  assert.deepEqual(await (await get(lag, opsEnv.POLAR_SIGNAL_TOKEN)).json(), {
+    lagSeconds: 90,
+  })
 })

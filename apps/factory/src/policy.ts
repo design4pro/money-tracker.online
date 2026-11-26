@@ -39,7 +39,7 @@ export async function gate(
   if (!sha(head) || pr.state !== "open" || pr.draft !== false || record(pr.base).ref !== "main" ||
       String(record(record(pr.base).repo).id) !== env.REPO_ID || String(record(record(pr.head).repo).id) !== env.REPO_ID ||
       pr.mergeable !== true) return false;
-  if (!await github.verifyCheck(head) || !await github.fctlReviewCheck(head)) return false;
+  if (!await github.verifyPullRequest(number, head, pr.merge_commit_sha, record(pr.base).sha) || !await github.fctlReviewCheck(head)) return false;
   const review = await fctl.currentReview(number, head);
   if (review.state !== "passed" || review.findings !== 0 || review.still_open !== 0 || !identifierForReview(review)) return false;
 

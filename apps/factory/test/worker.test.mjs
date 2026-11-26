@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import {createHmac, generateKeyPairSync} from "node:crypto";
 import {after, before, test} from "node:test";
 import {build} from "esbuild";
+import {sendAlert} from "../../../scripts/monitor.mjs";
 import {Miniflare} from "miniflare";
 
 const repo = "design4pro/money-tracker.online";
 const head = "a".repeat(40);
 const otherHead = "b".repeat(40);
 const merge = "c".repeat(40);
+const base = "d".repeat(40);
+const candidate = "e".repeat(40);
 const upstream = "2aae986ff5ad1da1dd8d967498b3b32d6ded413d";
 const key = Buffer.from("synthetic webhook key for replay tests");
 const discovery = {type: "Bot", id: 33, login: "factory-test[bot]"};
@@ -33,6 +36,7 @@ let implemented = false;
 let changedHead = false;
 let readPr = 0;
 let revision = head;
+let candidateBase = base;
 let conclusion = "neutral";
 let smoke = "failure";
 
@@ -107,8 +111,9 @@ async function provider(req) {
     if (path === "/pulls/23") {
       const next = changedHead && ++readPr === 2 ? otherHead : revision;
       return json({number: 23, state: implemented ? "closed" : "open", merged: implemented,
-        ...(implemented ? {merge_commit_sha: merge, merged_at: new Date().toISOString()} : {}),
-        draft: false, mergeable: true, base: {ref: "main", repo: {id: 100}},
+        merge_commit_sha: implemented ? merge : candidate,
+        ...(implemented ? {merged_at: new Date().toISOString()} : {}),
+        draft: false, mergeable: true, base: {ref: "main", sha: base, repo: {id: 100}},
         head: {sha: next, ref: "codex/pilot", repo: {id: 100}}, changed_files: 1,
         body: "<!-- factory:implementation v1 issue=1 session=ses_Implement -->"});
     }
@@ -118,6 +123,8 @@ async function provider(req) {
       implemented = true;
       return json({merged: true, sha: merge});
     }
+    if (path === "/git/ref/heads/main") return json({object: {sha: base}});
+    if (path === `/git/commits/${candidate}`) return json({parents: [{sha: candidateBase}, {sha: revision}]});
     if (path === "/check-runs") {
       calls.gates.push(body);
       return json({id: calls.gates.length});
@@ -126,14 +133,15 @@ async function provider(req) {
       const sha = path.split("/")[2];
       const name = searchParams.get("check_name");
       const projected = {
-        verify: [{name, head_sha: sha, app: {id: 77, slug: "github-actions"}, status: "completed", conclusion: "success"}],
+        verify: sha === candidate ? [{name, head_sha: sha, app: {id: 77, slug: "github-actions"}, status: "completed", conclusion: "success"}] : [],
         "fctl review": [{name, head_sha: sha, app: {id: 88}, status: "completed", conclusion}],
       }[name] ?? [];
       return json({total_count: projected.length, check_runs: projected});
     }
     if (path.startsWith("/actions/workflows/")) return json({workflow_runs: [
-      ...(implemented ? [{id: 2, run_attempt: 1, head_sha: merge}] : []), {id: 1, run_attempt: 1, head_sha: head},
-    ].map(run => ({...run, head_branch: "main", event: "push", status: "completed",
+      ...(implemented && searchParams.get("event") === "workflow_dispatch" ? [{id: 2, run_attempt: 1, head_sha: merge}] : []),
+      ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
+    ].map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
       conclusion: "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
     if (path.startsWith("/actions/runs/")) {
       const prior = path.includes("/runs/1/");
@@ -231,6 +239,10 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.equal(calls.gates.at(-1).conclusion, "failure");
 
   conclusion = "success";
+  candidateBase = merge;
+  await tick();
+  assert.equal(calls.merges.length, 0);
+  candidateBase = base;
   changedHead = true;
   await tick();
   assert.equal(calls.merges.length, 0);
@@ -246,10 +258,13 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.deepEqual(calls.closed, ["/issues/1"]);
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "closed");
 
-  const alert = {method: "POST", body: JSON.stringify({key: "monitor-1", code: "smoke-failed", head: merge})};
-  assert.equal((await call("/ops/alert", alert)).status, 401);
-  alert.headers = {authorization: "Bearer fake-monitor-key"};
-  await Promise.all([call("/ops/alert", alert), call("/ops/alert", alert)]);
+  const url = new URL("https://factory.invalid/ops/alert");
+  const send = (url, init) => call(url.pathname, init);
+  await assert.rejects(sendAlert(url, {}, "monitor-1", "availability", send), /401/);
+  const headers = {Authorization: "Bearer fake-monitor-key"};
+  await assert.rejects(sendAlert(url, headers, "monitor-1", "invalid", send), /400/);
+  const alert = () => sendAlert(url, headers, "monitor-1", "availability", send);
+  await Promise.all([alert(), alert()]);
   await tick();
   await tick();
   assert.equal(calls.ops, 1);

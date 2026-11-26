@@ -43,9 +43,6 @@ jobs:
       - name: Verify all package contracts
         run: node scripts/contracts.mjs
       - name: Install, check, test, and build every package
-        env:
-          PUBLIC_APP_URL: http://127.0.0.1:8787
-          SIGN_IN_URL: http://127.0.0.1:8787/login
         shell: bash
         run: |
           for package in apps/app apps/site apps/factory; do

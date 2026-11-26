@@ -68,6 +68,7 @@ if (action === "deploy") {
   config = {
     ...config,
     vars,
+    keep_vars: true,
     main: built.main,
     assets: built.assets,
     rules: built.rules,

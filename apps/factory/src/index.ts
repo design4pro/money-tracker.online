@@ -24,7 +24,7 @@ type Finish = Extract<Ingress, {kind: "finish"}>;
 export default {
   fetch(request, env) {
     const path = new URL(request.url).pathname;
-    if (path === "/health" && request.method === "GET") return Response.json({ok: true});
+    if (path === "/health" && request.method === "GET") return Response.json({ok: true, sourceSha: env.SOURCE_SHA ?? null}, {headers: {"Cache-Control": "no-store"}});
     return env.FACTORY.get(env.FACTORY.idFromName("pilot")).fetch(request);
   },
 } satisfies ExportedHandler<Env>;

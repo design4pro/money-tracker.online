@@ -25,9 +25,10 @@ export interface Env {
   GITHUB_REVIEW_APP_ID: string;
   HUMAN_REVIEWER_IDS?: string;
   BOOTSTRAP_PRS?: string;
+  SOURCE_SHA?: string;
   DELIVERY_SMOKE_STEP?: string;
   DELIVERY_SMOKE_JOB?: string;
-  MERGE_ENABLED: string;
+  MERGE_ENABLED?: string;
   OPS_TOKEN: string;
 }
 
