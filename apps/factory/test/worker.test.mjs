@@ -43,7 +43,7 @@ let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
 let priorAttemptHead = merge;
-let rerunStatus = "completed";
+let manualProof = false;
 const deliveryPages = [];
 let failProductionJobs = false;
 let onProductionJobs;
@@ -170,50 +170,56 @@ async function provider(req) {
     if (path.endsWith("/check-runs")) {
       const sha = path.split("/")[2];
       const name = searchParams.get("check_name");
+      if (name === "deploy-production") {
+        assert.ok([head, merge].includes(sha), "expected an exact SHA at the provider boundary");
+        assert.equal(searchParams.get("filter"), "all");
+        assert.equal(searchParams.get("status"), "completed");
+        assert.equal(searchParams.get("per_page"), "100");
+        const page = Number(searchParams.get("page"));
+        assert.ok(page >= 1 && page <= 10);
+        if (sha === merge && !manualProof) deliveryPages.push(page);
+        const check = (run, job, conclusion = "success", commit = sha) => ({
+          name, head_sha: commit, status: "completed", conclusion, app: {id: 77, slug: "github-actions"},
+          details_url: `https://github.com/${repo}/actions/runs/${run}/job/${job}`,
+        });
+        const checks = sha === head ? [check(1, 101)] : manualProof
+          ? [
+            ...Array.from({length: 50}, (_, i) => check(2, 500 + i, "failure")),
+            ...Array.from({length: 5}, (_, i) => check(10 + i, 1000 + i)),
+            check(4, 404),
+          ]
+          : [
+            ...Array.from({length: 100}, (_, i) => check(i + 100, i + 500, "failure")),
+            check(3, 303, "success", descendant), check(2, 202),
+          ];
+        return json({total_count: checks.length, check_runs: checks.slice((page - 1) * 100, page * 100)});
+      }
       const projected = {
         verify: sha === candidate ? [{name, head_sha: sha, app: {id: 77, slug: "github-actions"}, status: "completed", conclusion: "success"}] : [],
         "fctl review": [{name, head_sha: sha, app: {id: 88}, status: "completed", conclusion}],
       }[name] ?? [];
       return json({total_count: projected.length, check_runs: projected});
     }
-    if (path.startsWith("/actions/workflows/")) {
-      assert.equal(path, "/actions/workflows/delivery.yml/runs");
-      const requested = searchParams.get("head_sha");
-      assert.ok([head, merge].includes(requested), "expected an exact SHA at the provider boundary");
-      assert.equal(searchParams.has("status"), false, "a failed rerun must not hide prior attempts");
-      const perPage = Number(searchParams.get("per_page"));
-      const page = Number(searchParams.get("page"));
-      assert.equal(perPage, 100);
-      assert.ok(page >= 1 && page <= 10);
-      if (requested === merge && searchParams.get("event") === "workflow_run") deliveryPages.push(page);
-      return json({workflow_runs: [
-        // Thirty newer successful runs fill an unfiltered first page and hide the exact merge.
-        ...(implemented && searchParams.get("event") === "workflow_run"
-          ? [...Array.from({length: 30}, (_, id) => ({id: id + 10, run_attempt: 1, head_sha: descendant})),
-            // Newer failed runs for the same SHA fill the first filtered page.
-            ...Array.from({length: 100}, (_, id) => ({
-              id: id + 100, run_attempt: 1, head_sha: merge, conclusion: "failure",
-            })),
-            {id: 2, run_attempt: 2, head_sha: merge, status: rerunStatus,
-              conclusion: rerunStatus === "completed" ? "failure" : null}]
-          : []),
-        ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
-        ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
-      ].filter(run => run.head_sha === requested ||
-        (requested === merge && run.id === 3)) // Model a provider returning an unrelated result.
-        .slice((page - 1) * perPage, page * perPage)
-        .map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: run.status ?? "completed",
-          conclusion: Object.hasOwn(run, "conclusion") ? run.conclusion : "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
+    if (path.startsWith("/actions/jobs/")) {
+      const id = Number(path.split("/").at(-1));
+      assert.ok([101, 202, 404, 1000, 1001, 1002, 1003, 1004].includes(id), "only successful candidates may be loaded");
+      const run = id >= 1000 ? id - 990 : id / 101;
+      return json({id, run_id: run, run_attempt: 1, name: "deploy-production", head_branch: "main",
+        head_sha: run === 1 ? head : merge, status: "completed", conclusion: "success"});
     }
-    if (path === "/actions/runs/2/attempts/1") {
-      return json({id: 2, run_attempt: 1, head_sha: priorAttemptHead, status: "completed", conclusion: "success"});
+    if (/^\/actions\/runs\/\d+\/attempts\/1$/.test(path)) {
+      const id = Number(path.split("/")[3]);
+      return json({id, run_attempt: 1, head_sha: id === 1 ? head : id === 2 ? priorAttemptHead : merge,
+        status: "completed", conclusion: "success", head_branch: "main", event: id === 1 ? "push" : id === 4 ? "workflow_dispatch" : "workflow_run",
+        path: id < 10 ? ".github/workflows/delivery.yml" : ".github/workflows/other.yml",
+        repository: {id: 100}, head_repository: {id: 100}});
     }
     if (path.startsWith("/actions/runs/")) {
-      assert.notEqual(path, "/actions/runs/2/attempts/2/jobs", "a failed attempt is not eligible");
+      assert.match(path, /^\/actions\/runs\/(1|2|4)\/attempts\/1\/jobs$/);
       if (failProductionJobs && path.includes("/runs/2/")) return new Response(null, {status: 503});
-      const commit = path.includes("/runs/1/") ? head : path.includes("/runs/3/") ? descendant : merge;
-      const conclusion = commit === merge ? smoke : "success";
-      if (commit === merge) await onProductionJobs?.();
+      const commit = path.includes("/runs/1/") ? head : merge;
+      const conclusion = path.includes("/runs/2/") ? smoke : "success";
+      if (path.includes("/runs/2/")) await onProductionJobs?.();
       return json({total_count: 1, jobs: [{name: "deploy-production", head_sha: commit, conclusion: "success",
         steps: [{name: "Production smoke", conclusion}]}]});
     }
@@ -226,10 +232,17 @@ before(async () => {
   const bundled = await build({stdin: {
     contents: `
       import worker, {Factory as Controller} from "./src/index.ts";
+      import {deployment} from "./src/policy.ts";
+      import {Github} from "./src/providers.ts";
       export default {
         ...worker,
         async fetch(request, env, ctx) {
           const url = new URL(request.url);
+          if (url.pathname === "/test/deployment") {
+            const search = await request.json();
+            const verified = await deployment(new Github(env), env, search);
+            return Response.json({verified, search});
+          }
           if (url.pathname === "/test/weekly") {
             const tasks = [];
             worker.scheduled({cron: url.searchParams.get("cron") ?? "0 9 * * 5",
@@ -397,7 +410,6 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.equal(await (await call("/test/alarm")).json(), retry.due);
   assert.deepEqual(calls.closed, []);
   failProductionJobs = false;
-  rerunStatus = "in_progress";
   assert.equal((await call("/test/idle")).status, 204);
   await tick();
   assert.deepEqual(calls.closed, ["/issues/1"]);
@@ -505,5 +517,28 @@ test("weekly digest stops at the sampled entry limit", async () => {
     assert.equal(report.sampleLimited, true);
   } finally {
     await instance.dispose();
+  }
+});
+
+
+test("failed automatic attempts cannot starve successful manual proof or exhaust a lookup", async () => {
+  manualProof = true;
+  try {
+    let search = {head: merge, page: 1};
+    let verified;
+    for (let pump = 0; pump < 4 && verified === undefined; pump++) {
+      const before = calls.githubRequests;
+      const response = await call("/test/deployment", {method: "POST", body: JSON.stringify(search)});
+      assert.equal(response.status, 200);
+      ({search, verified} = await response.json());
+      assert.ok(calls.githubRequests - before <= 8, "seven evidence requests plus installation authentication");
+      if (pump === 0) {
+        assert.equal(verified, undefined);
+        assert.equal(search.remaining[0].run, 12, "resume at the first unchecked candidate");
+      }
+    }
+    assert.equal(verified, true);
+  } finally {
+    manualProof = false;
   }
 });

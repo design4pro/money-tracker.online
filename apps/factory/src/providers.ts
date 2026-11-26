@@ -190,28 +190,35 @@ export class Github {
     return comparison.status === "ahead" && record(comparison.merge_base_commit).sha === commit;
   }
 
-  async *productionDeploys(head: string): AsyncGenerator<Json> {
-    if (!sha(head)) return;
-    const events = ["workflow_run", "workflow_dispatch", "push"];
-    for (const event of events) {
-      // Filtered workflow-run searches expose at most 1,000 runs per query.
-      for (let page = 1; page <= 10; page++) {
-        const response = record(await this.api(
-          `/actions/workflows/delivery.yml/runs?branch=main&event=${event}&head_sha=${head}&per_page=100&page=${page}`));
-        if (!Array.isArray(response.workflow_runs) || response.workflow_runs.length > 100) {
-          throw new Error("Invalid Delivery runs page");
-        }
-        for (const value of response.workflow_runs) {
-          const run = record(value);
-          // GitHub allows the original attempt and up to 50 reruns.
-          if (integer(run.id) && integer(run.run_attempt) && run.run_attempt <= 51 && run.head_sha === head &&
-              run.head_branch === "main" && run.event === event && run.path === ".github/workflows/delivery.yml" &&
-              String(record(run.repository).id) === this.env.REPO_ID &&
-              String(record(run.head_repository).id) === this.env.REPO_ID) yield run;
-        }
-        if (response.workflow_runs.length < 100) break;
-      }
+  async productionChecks(head: string, page: number) {
+    const response = record(await this.api(
+      `/commits/${head}/check-runs?check_name=deploy-production&filter=all&status=completed&per_page=100&page=${page}`));
+    if (!Array.isArray(response.check_runs) || response.check_runs.length > 100) {
+      throw new Error("Invalid production check page");
     }
+    const candidates = response.check_runs.map(record).flatMap(check => {
+      if (check.name !== "deploy-production" || check.head_sha !== head || check.status !== "completed" ||
+          check.conclusion !== "success" || record(check.app).slug !== "github-actions" ||
+          String(record(check.app).id) !== this.env.GITHUB_ACTIONS_APP_ID || typeof check.details_url !== "string") return [];
+      const url = URL.parse(check.details_url);
+      if (url?.origin !== "https://github.com" || url.username || url.password || url.search || url.hash) return [];
+      const prefix = `/${this.env.REPO}/actions/runs/`;
+      if (!url.pathname.startsWith(prefix)) return [];
+      const match = /^(\d+)\/job\/(\d+)$/.exec(url.pathname.slice(prefix.length));
+      const run = Number(match?.[1]);
+      const job = Number(match?.[2]);
+      return integer(run) && integer(job) ? [{run, job}] : [];
+    });
+    return {candidates, exhausted: response.check_runs.length < 100};
+  }
+
+  async productionAttempt(run: number, attempt: number, head: string): Promise<boolean> {
+    const evidence = record(await this.api(`/actions/runs/${run}/attempts/${attempt}`));
+    return evidence.id === run && evidence.run_attempt === attempt && evidence.head_sha === head &&
+      evidence.status === "completed" && evidence.conclusion === "success" && evidence.head_branch === "main" &&
+      ["workflow_run", "workflow_dispatch", "push"].includes(String(evidence.event)) &&
+      evidence.path === ".github/workflows/delivery.yml" && String(record(evidence.repository).id) === this.env.REPO_ID &&
+      String(record(evidence.head_repository).id) === this.env.REPO_ID;
   }
 }
 

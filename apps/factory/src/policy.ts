@@ -13,18 +13,52 @@ export function issueEvidence(issue: Json): {feature: string; deployed: string} 
   }
 }
 
-export async function deployment(github: Github, env: Env, head: string): Promise<boolean> {
-  for await (const run of github.productionDeploys(head)) {
-    const latest = run.run_attempt;
-    if (!integer(latest)) continue;
-    for (let attempt = latest; attempt >= 1; attempt--) {
-      const path = `/actions/runs/${run.id}/attempts/${attempt}`;
-      const evidence = attempt === latest ? run : record(await github.api(path));
-      if (evidence.id !== run.id || evidence.head_sha !== head || evidence.run_attempt !== attempt ||
-          evidence.status !== "completed" || evidence.conclusion !== "success") continue;
-      if (deployed(await github.api(`${path}/jobs?per_page=100`),
-        head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+export interface DeploymentSearch {
+  head: string;
+  page: number;
+  remaining?: {run: number; job: number}[];
+  exhausted?: boolean;
+}
+
+export async function deployment(github: Github, env: Env, search: DeploymentSearch): Promise<boolean | undefined> {
+  const {head} = search;
+  if (!sha(head) || !!env.DELIVERY_SMOKE_STEP === !!env.DELIVERY_SMOKE_JOB) return false;
+
+  // A pump can check triage, the active release and a superseded release.
+  // Allow at most seven evidence requests per ticket and persist its cursor.
+  let budget = 7;
+  while (search.page <= 10) {
+    if (!search.remaining) {
+      if (!budget) return;
+      budget--;
+      const {candidates, exhausted} = await github.productionChecks(head, search.page);
+      search.remaining = candidates;
+      search.exhausted = exhausted;
     }
+    const candidate = search.remaining[0];
+    if (!candidate) {
+      if (search.exhausted) return false;
+      search.page++;
+      search.remaining = undefined;
+      continue;
+    }
+    if (budget < 3) return;
+    const {run, job: id} = candidate;
+    budget--;
+    const job = record(await github.api(`/actions/jobs/${id}`));
+    const attempt = job.run_attempt;
+    // GitHub permits 50 reruns in addition to the original attempt.
+    if (job.id === id && job.run_id === run && job.name === "deploy-production" && job.head_sha === head &&
+        job.head_branch === "main" && job.status === "completed" && job.conclusion === "success" &&
+        integer(attempt) && attempt <= 51) {
+      budget--;
+      if (await github.productionAttempt(run, attempt, head)) {
+        budget--;
+        if (deployed(await github.api(`/actions/runs/${run}/attempts/${attempt}/jobs?per_page=100`),
+          head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+      }
+    }
+    search.remaining.shift();
   }
   return false;
 }

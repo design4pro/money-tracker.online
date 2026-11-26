@@ -6,6 +6,7 @@ import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
 import type {Ingress} from "./ingress";
 import {deployment, gate, issueEvidence, linked} from "./policy";
+import type {DeploymentSearch} from "./policy";
 import {Fctl, Github, ProviderError} from "./providers";
 import {activeRetroSchedule, RETRO_CRON, RETRO_OBJECT, weeklyEnd, weeklyReport} from "./retro";
 import {bearer} from "./signatures";
@@ -20,7 +21,7 @@ type Ticket = {
   issue: number; actor: string; phase: Phase; created: number; due: number; failures: number;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
-  pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string;
+  pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch;
 };
 type Finish = Extract<Ingress, {kind: "finish"}>;
 
@@ -81,7 +82,7 @@ export class Factory extends DurableObject<Env> {
           at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (excluded.issue IS NOT NULL OR result.issue IS NULL)`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "production") {
-        this.sql.exec(`UPDATE ticket SET due=?, state=json_set(state,'$.due',?,'$.productionVerification',?)
+        this.sql.exec(`UPDATE ticket SET due=?, state=json_set(json_remove(state,'$.productionHistory'),'$.due',?,'$.productionVerification',?)
           WHERE (phase='release' OR (phase='blocked' AND json_extract(state,'$.reason')=?))
             AND json_extract(state,'$.merge')=?`,
           now, now, id, SUPERSEDED, event.head);
@@ -219,8 +220,8 @@ export class Factory extends DurableObject<Env> {
     );
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
-        await this.advance(ticket, fctl, github);
-        if (ticket.phase === "blocked" && ticket.productionVerification) {
+        const result = await this.advance(ticket, fctl, github);
+        if (result !== "pending" && ticket.phase === "blocked" && ticket.productionVerification) {
           const current = this.tickets("issue=?", ticket.issue)[0];
           if (current.productionVerification === ticket.productionVerification) {
             this.ticket(current, {productionVerification: undefined});
@@ -290,6 +291,25 @@ export class Factory extends DurableObject<Env> {
       typeof comment.body === "string" && comment.body.startsWith(`<!-- factory:${result.stage} v1 -->`);
   }
 
+  private async verifyDeployment(ticket: Ticket, github: Github, head: string) {
+    const history = ticket.productionHistory?.head === head ? ticket.productionHistory : {head, page: 1};
+    let verified: boolean | undefined;
+    try {
+      verified = await deployment(github, this.env, history);
+      return verified;
+    } finally {
+      const current = this.tickets("issue=?", ticket.issue)[0];
+      if (current.productionVerification === ticket.productionVerification) {
+        if (verified !== false) {
+          this.sql.exec("UPDATE ticket SET state=json_set(state,'$.productionHistory',json(?)) WHERE issue=?",
+            JSON.stringify(history), ticket.issue);
+        } else {
+          this.sql.exec("UPDATE ticket SET state=json_remove(state,'$.productionHistory') WHERE issue=?", ticket.issue);
+        }
+      }
+    }
+  }
+
   private async triage(ticket: Ticket, fctl: Fctl, github: Github) {
     if (Date.now() - ticket.created > DAY) return this.block(ticket, "native-triage-timeout");
     const {env} = this;
@@ -311,8 +331,10 @@ export class Factory extends DurableObject<Env> {
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, result)) return this.block(ticket, "triage-result");
-    if (!await deployment(github, env, evidence.deployed)) return this.block(ticket, "parity-deployment-evidence");
-    this.ticket(ticket, {phase: "ready", ...evidence, triageRun: String(run.id), triageSession: sessionId,
+    const verified = await this.verifyDeployment(ticket, github, evidence.deployed);
+    if (verified === undefined) return;
+    if (!verified) return this.block({...ticket, productionHistory: undefined}, "parity-deployment-evidence");
+    this.ticket(ticket, {phase: "ready", ...evidence, productionHistory: undefined, triageRun: String(run.id), triageSession: sessionId,
       triageComment: result.comment, due: Date.now()});
   }
 
@@ -376,7 +398,7 @@ export class Factory extends DurableObject<Env> {
       case "blocked": {
         const dispatch = this.dispatches("key=?", ticket.implement ?? "")[0];
         if (!ticket.pr || !dispatch?.session) return this.block(ticket, "implementation-link-missing");
-        await this.pr(github, fctl, ticket.pr, ticket, dispatch);
+        return this.pr(github, fctl, ticket.pr, ticket, dispatch);
       }
     }
   }
@@ -397,12 +419,18 @@ export class Factory extends DurableObject<Env> {
       const mergedAt = Date.parse(String(pr.merged_at));
       if (!Number.isFinite(mergedAt)) return this.block(ticket, "merge-timestamp");
       if (ticket.phase === "pr") this.ticket(ticket, {phase: "release", merge: pr.merge_commit_sha, mergedAt, reason: "awaiting-production-smoke"});
-      if (!await deployment(github, this.env, pr.merge_commit_sha)) {
+      const verified = await this.verifyDeployment(ticket, github, pr.merge_commit_sha);
+      if (!verified) {
         if (ticket.phase !== "blocked" && await github.mainAdvancedPast(pr.merge_commit_sha)) {
           const release = this.tickets("issue=?", ticket.issue)[0];
           // Establish a durable check even if Delivery's webhook preceded this transition.
           this.block({...release, productionVerification: release.productionVerification ?? crypto.randomUUID()},
             SUPERSEDED, true);
+        }
+        if (verified === undefined) {
+          const current = this.tickets("issue=?", ticket.issue)[0];
+          if (current.productionVerification === ticket.productionVerification) this.ticket(current, {});
+          return "pending" as const;
         }
         return;
       }
@@ -412,7 +440,7 @@ export class Factory extends DurableObject<Env> {
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});
       this.ctx.storage.transactionSync(() => {
-        this.ticket(ticket, {phase: "closed", merge: pr.merge_commit_sha as string, mergedAt, productionVerification: undefined});
+        this.ticket(ticket, {phase: "closed", merge: pr.merge_commit_sha as string, mergedAt, productionVerification: undefined, productionHistory: undefined});
         this.sql.exec("DELETE FROM slot WHERE issue=?", ticket.issue);
       });
       return;
