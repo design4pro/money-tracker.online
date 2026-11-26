@@ -1,5 +1,7 @@
+import type {Factory} from "./index";
+
 export interface Env {
-  FACTORY: DurableObjectNamespace;
+  FACTORY: DurableObjectNamespace<Factory>;
   REPO: string;
   REPO_ID: string;
   FCTL_SERVER: string;
@@ -15,6 +17,8 @@ export interface Env {
   PLAN_SCHEDULE_ID: string;
   IMPLEMENT_SCHEDULE_ID: string;
   OPS_SCHEDULE_ID: string;
+  RETRO_SCHEDULE_ID?: string;
+  RETRO_ENABLED?: string;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_APP_ID: string;
   GITHUB_INSTALLATION_ID: string;

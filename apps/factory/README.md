@@ -30,7 +30,7 @@ The build is a Wrangler dry run. Operators deploy with `npm run deploy:staging` 
 
 3. Configure the Worker variables and staged credentials below. Create a project-scoped fctl webhook for `POST /webhooks/fctl` with `session.finished,session.failed,session.stopped,session.question`, filtered to schedules. The unsigned fctl URL challenge only echoes the challenge. Install the generated secret before testing deliveries. The instance's native triage webhook and this Worker webhook are distinct. Confirm fctl's native `issue_opened` reports a started run and the expected bot identities/comment URLs in staging. Verify that the required CI check and native review appear on the SHA the controller will check.
 
-4. Confirm the staging workflow, policy and staging bindings, then enable the schedules explicitly. A first run always leaves newly created schedules paused, even with this flag. Turn on `MERGE_ENABLED` only after confirming the required app-bound checks and branch rules. With the gate disabled the controller can still dispatch sessions and record gate failures.
+4. Confirm the staging workflow, policy and staging bindings, then enable the schedules explicitly. A first run always leaves newly created schedules paused, even with this flag. Turn on `MERGE_ENABLED` only after confirming the required app-bound checks and branch rules. With the gate disabled the controller can still dispatch sessions.
 
    ```sh
    FACTORY_PROJECT_ID=prj_EXAMPLE npm run schedules -- --enable
@@ -45,6 +45,7 @@ Configure vars per environment using the Wrangler configuration or the deploymen
 | `REPO`, `REPO_ID` | `design4pro/money-tracker.online` and the real numeric GitHub repository ID, e.g. `100` |
 | `FCTL_SERVER`, `FCTL_WORKSPACE_ID`, `FCTL_PROJECT_ID`, `FCTL_ACCOUNT_ID` | HTTPS origin only, e.g. `https://fctl.example.invalid`, and IDs like `wsp_EXAMPLE`, `prj_EXAMPLE`, `usr_EXAMPLE`. The user ID owns both Worker PATs. |
 | `TRIAGE_SCHEDULE_ID`, `PLAN_SCHEDULE_ID`, `IMPLEMENT_SCHEDULE_ID`, `OPS_SCHEDULE_ID` | Exact IDs from the reconciler, e.g. `sch_EXAMPLE` |
+| `RETRO_SCHEDULE_ID`, `RETRO_ENABLED` | Use the reconciler’s read-only when-asked Retro ID. Set `RETRO_ENABLED=true` in production only after verifying the schedule and project-scoped operations token. |
 | `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID` | Dedicated merge app and installation IDs, e.g. `55` and `66` |
 | `GITHUB_DISCOVERY_BOT_ID`, `GITHUB_TRIAGE_BOT_ID` | Numeric GitHub bot user IDs for discovery and fctl's ticket comments. They may be the same. |
 | `GITHUB_ACTIONS_APP_ID`, `GITHUB_REVIEW_APP_ID` | Actual Check Run app IDs from GitHub Actions and the native fctl review app |
@@ -67,11 +68,15 @@ Monitor requests use `Authorization: Bearer …` and a stable deduplication key.
 | Implement | When asked, push | Controller-supplied issue, feature, deployment SHA and plan comment ID. The signed `implemented` result names a same-repo PR on the dispatched session branch with the exact issue/session marker. |
 | Review | Native Codex review, three rounds of findings passed back | fctl's latest review state is `passed`, zero new/open findings and a successful native check for the exact PR head. Neutral fails. |
 | Ops | When asked, read | Allowlisted monitor code and optional SHA |
-| Retro | Friday 10:00 Europe/Warsaw, read | One proposed improvement with a metric and a reproducible evaluation |
+| Retro | When asked, read. Production Worker Cron requests it Friday 09:00 UTC. | Bounded digest of retrospective outcomes and technical topics, then one improvement with a metric and reproducible evaluation |
 
 The versioned files in `profiles/v1` define the result lines. Triage, Plan and Implement put the compact v1 JSON at the very start of the final reply so it appears in signed `session.finished.data.message`. Status labels, issue prose and arbitrary comments confer no authority. Dedicated app path approval is conservative. Only UI component/style paths, dedicated locale JSON and Markdown under `docs/` qualify as routine, with sensitive names excluded. Everything outside that subset requires exact-head human approval.
 
 The controller serializes claims, stores the fctl run and session, and rechecks GitHub on alarms. After an uncertain POST it reconciles run and initial session context via a generated invocation UUID. Because fctl starts the session before recording its run, an empty run history cannot establish that the POST failed. An unresolved implementation blocks the slot for operator investigation. A positively identified schedule-rate-limit response is retried with backoff. Operators can inspect `/ops/status`, the fctl schedule's runs and the exact sessions. No automatic override or slot reset is exposed. A matched merged PR holds the slot until a successful delivery attempt on `main` includes its actual merge commit and the configured smoke step or job succeeds.
+
+The production Worker has a Friday 09:00 UTC Cron that stays inactive until explicitly configured. Use the reconciler on the existing paused RETRO schedule to switch it from native Cron to when-asked while retaining its ID. The parity schedule keeps its native Monday trigger. Leave fctl credentials out of all agent sandboxes. The Worker reuses its scoped `FCTL_OPS_TOKEN` to read the project's retrospective pages and start the verified read-only Retro schedule from a separate Durable Object that makes no GitHub requests.
+
+The weekly key uses the scheduled window end rather than delivery time. The Worker examines up to three pages of 20 reports and forwards up to 24 outcomes recorded in the preceding seven days, with up to three allowlisted technical insights per entry. It drops raw prose and identifying data, reports when the sample is capped, and does not retain unredacted results in the Durable Object. Repeated triggers reuse the same weekly dispatch. The read-only profile posts its proposal in its session.
 
 The v0.39.0 release CLI and source were checked for schedule flags, run/event shapes, signed envelope, ticket comments and native review. The local Worker suite exercises real SQLite and alarms with mocked providers. Live provider permissions, subscriptions, workflow smoke naming and effective branch rules need to be confirmed in staging.
 

@@ -6,6 +6,7 @@ import type {Fctl} from "./providers";
 export type Dispatch = {
   key: string; schedule: string; context: string; access: "triage" | "push" | "read";
   state: "queued" | "posting" | "started" | "blocked"; attempts: number; due: number;
+  reportAt?: number;
   since?: number; run?: string; session?: string; reason?: string;
 };
 

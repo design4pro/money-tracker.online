@@ -28,7 +28,7 @@ const profiles = [
   {key: "PLAN", access: "triage"},
   {key: "IMPLEMENT", access: "push"},
   {key: "OPS", access: "read"},
-  {key: "RETRO", access: "read", cron: "0 10 * * 5"},
+  {key: "RETRO", access: "read"},
 ];
 const schedules = (...args) => call(["schedules", ...args, "-p", project, "--json"]);
 const current = schedules("list");
@@ -56,7 +56,7 @@ for (const profile of profiles) {
     String(schedule.event.repos) === repo && String(schedule.event.labels) === "factory:parity" &&
     !schedule.event.branches?.length && schedule.event.max_per_hour === 3 && schedule.event.max_per_day === 10;
   const drift = schedule && (schedule.prompt?.trim() !== prompt || schedule.agent_kind !== "codex" || schedule.base_branch !== "main" ||
-    schedule.github_access !== profile.access || schedule.timezone !== "Europe/Warsaw" || schedule.cron !== profile.cron ||
+    schedule.github_access !== profile.access || schedule.timezone !== "Europe/Warsaw" || (schedule.cron ?? undefined) !== profile.cron ||
     schedule.at || (profile.event ? !expectedEvent : schedule.event));
   if (drift && schedule.enabled) throw new Error(`Pause ${name} before reconciling its drift.`);
   const result = schedule ? drift ? schedules("edit", schedule.id, ...flags) : schedule :

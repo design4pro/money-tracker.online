@@ -7,6 +7,7 @@ import {ingress} from "./ingress";
 import type {Ingress} from "./ingress";
 import {deployment, gate, issueEvidence, linked} from "./policy";
 import {Fctl, Github, ProviderError} from "./providers";
+import {activeRetroSchedule, RETRO_CRON, RETRO_OBJECT, weeklyEnd, weeklyReport} from "./retro";
 import {bearer} from "./signatures";
 
 const WAIT = 60_000;
@@ -27,6 +28,11 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === "/health" && request.method === "GET") return Response.json({ok: true, sourceSha: env.SOURCE_SHA ?? null}, {headers: {"Cache-Control": "no-store"}});
     return env.FACTORY.get(env.FACTORY.idFromName("pilot")).fetch(request);
+  },
+  scheduled(controller, env, ctx) {
+    if (controller.cron === RETRO_CRON && activeRetroSchedule(env)) {
+      ctx.waitUntil(env.FACTORY.getByName(RETRO_OBJECT).queueWeeklyRetro(controller.scheduledTime));
+    }
   },
 } satisfies ExportedHandler<Env>;
 
@@ -85,13 +91,29 @@ export class Factory extends DurableObject<Env> {
     return new Response(null, {status: 202});
   }
 
+  private isRetroObject(): boolean {
+    return this.ctx.id.equals(this.env.FACTORY.idFromName(RETRO_OBJECT));
+  }
+
+  async queueWeeklyRetro(scheduledTime: number): Promise<void> {
+    const schedule = activeRetroSchedule(this.env);
+    if (!schedule || !this.isRetroObject() || !Number.isSafeInteger(scheduledTime)) return;
+    const end = weeklyEnd(scheduledTime);
+    if (end > weeklyEnd(Date.now())) return;
+    const key = `retro:${new Date(end).toISOString().slice(0, 10)}`;
+    if (this.dispatches("key=?", key).length) return;
+    if (await this.ctx.storage.getAlarm() === null) await this.ctx.storage.setAlarm(Date.now() + 100);
+    this.queue(key, schedule, "read", {kind: "weekly-retrospective"}, end);
+  }
+
   async alarm(): Promise<void> {
     if (this.running) return;
     this.running = true;
     try {
       // A watchdog also covers eviction or interruption during an external request.
       await this.ctx.storage.setAlarm(Date.now() + 120_000);
-      await this.pump();
+      if (this.isRetroObject()) await this.pumpRetro();
+      else await this.pump();
     } finally {
       this.running = false;
     }
@@ -128,11 +150,11 @@ export class Factory extends DurableObject<Env> {
       dispatch.key, dispatch.state, dispatch.due, JSON.stringify(dispatch));
   }
 
-  private queue(key: string, schedule: string, access: Dispatch["access"], context: Record<string, unknown>) {
+  private queue(key: string, schedule: string, access: Dispatch["access"], context: Record<string, unknown>, reportAt?: number) {
     if (this.dispatches("key=?", key).length) return;
     this.saveDispatch({
       key, schedule, access, context: JSON.stringify({v: 1, invocation: crypto.randomUUID(), ...context}),
-      state: "queued", attempts: 0, due: Date.now(),
+      state: "queued", attempts: 0, due: Date.now(), reportAt,
     });
   }
 
@@ -146,6 +168,37 @@ export class Factory extends DurableObject<Env> {
     const row = this.sql.exec<{state: string}>("SELECT state FROM result WHERE session=?", session).toArray()[0];
     const finish = row ? JSON.parse(row.state) as Finish : undefined;
     return finish?.schedule === schedule ? finish : undefined;
+  }
+
+  private async pumpRetro() {
+    if (!activeRetroSchedule(this.env)) return this.ctx.storage.deleteAlarm();
+    const pending = "state IN ('queued','posting')";
+    let dispatch = this.dispatches(`${pending} AND due<=? ORDER BY due,key LIMIT 1`, Date.now())[0];
+    if (dispatch) {
+      const fctl = new Fctl(this.env);
+      try {
+        const at = dispatch.reportAt;
+        if (dispatch.state === "queued" && (at === undefined || at < weeklyEnd(Date.now()))) {
+          this.saveDispatch({...dispatch, state: "blocked", reason: "retro-window-expired"});
+          this.audit(dispatch.key, "retro-window-expired");
+        } else {
+          const context = record(JSON.parse(dispatch.context));
+          if (at !== undefined && dispatch.state === "queued" && !context.report) {
+            const report = await weeklyReport(fctl, this.env.FCTL_PROJECT_ID, at);
+            dispatch = {...dispatch, context: JSON.stringify({...context, report})};
+            this.saveDispatch(dispatch);
+          }
+          await this.dispatch(fctl, dispatch);
+        }
+      } catch {
+        const current = this.dispatches("key=?", dispatch.key)[0];
+        this.saveDispatch({...current, due: Date.now() + 300_000});
+        this.audit(current.key, "retro-provider-retry");
+      }
+    }
+    const next = this.dispatches(`${pending} ORDER BY due,key LIMIT 1`)[0];
+    if (next) await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, next.due));
+    else await this.ctx.storage.deleteAlarm();
   }
 
   private async pump() {
