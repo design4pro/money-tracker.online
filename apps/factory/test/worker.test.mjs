@@ -44,6 +44,7 @@ let conclusion = "neutral";
 let smoke = "failure";
 let priorAttemptHead = merge;
 let manualProof = false;
+let missingJobLookups = 0;
 const deliveryPages = [];
 let failProductionJobs = false;
 let onProductionJobs;
@@ -203,6 +204,10 @@ async function provider(req) {
     if (path.startsWith("/actions/jobs/")) {
       const id = Number(path.split("/").at(-1));
       assert.ok([101, 202, 404, 1000, 1001, 1002, 1003, 1004].includes(id), "only successful candidates may be loaded");
+      if (id === 1000) {
+        missingJobLookups++;
+        return new Response(null, {status: 404});
+      }
       const run = id >= 1000 ? id - 990 : id / 101;
       return json({id, run_id: run, run_attempt: 1, name: "deploy-production", head_branch: "main",
         head_sha: run === 1 ? head : merge, status: "completed", conclusion: "success"});
@@ -521,7 +526,7 @@ test("weekly digest stops at the sampled entry limit", async () => {
 });
 
 
-test("failed automatic attempts cannot starve successful manual proof or exhaust a lookup", async () => {
+test("missing jobs and failed automatic attempts cannot starve successful manual proof", async () => {
   manualProof = true;
   try {
     let search = {head: merge, page: 1};
@@ -534,10 +539,11 @@ test("failed automatic attempts cannot starve successful manual proof or exhaust
       assert.ok(calls.githubRequests - before <= 8, "seven evidence requests plus installation authentication");
       if (pump === 0) {
         assert.equal(verified, undefined);
-        assert.equal(search.remaining[0].run, 12, "resume at the first unchecked candidate");
+        assert.equal(search.remaining[0].run, 13, "resume past the missing and rejected candidates");
       }
     }
     assert.equal(verified, true);
+    assert.equal(missingJobLookups, 1);
   } finally {
     manualProof = false;
   }

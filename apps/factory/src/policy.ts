@@ -1,5 +1,6 @@
 import {approval, deployed, fctlRepo, integer, list, record, reviewPassed, routineFile, sha} from "./contracts";
 import type {Env, Json} from "./contracts";
+import {ProviderError} from "./providers";
 import type {Fctl, Github} from "./providers";
 
 export const UPSTREAM_SHA = "2aae986ff5ad1da1dd8d967498b3b32d6ded413d";
@@ -44,19 +45,25 @@ export async function deployment(github: Github, env: Env, search: DeploymentSea
     }
     if (budget < 3) return;
     const {run, job: id} = candidate;
-    budget--;
-    const job = record(await github.api(`/actions/jobs/${id}`));
-    const attempt = job.run_attempt;
-    // GitHub permits 50 reruns in addition to the original attempt.
-    if (job.id === id && job.run_id === run && job.name === "deploy-production" && job.head_sha === head &&
-        job.head_branch === "main" && job.status === "completed" && job.conclusion === "success" &&
-        integer(attempt) && attempt <= 51) {
+    // Authentication errors are shared across candidates, even if GitHub returns 404.
+    await github.appToken();
+    try {
       budget--;
-      if (await github.productionAttempt(run, attempt, head)) {
+      const job = record(await github.api(`/actions/jobs/${id}`));
+      const attempt = job.run_attempt;
+      // GitHub permits 50 reruns in addition to the original attempt.
+      if (job.id === id && job.run_id === run && job.name === "deploy-production" && job.head_sha === head &&
+          job.head_branch === "main" && job.status === "completed" && job.conclusion === "success" &&
+          integer(attempt) && attempt <= 51) {
         budget--;
-        if (deployed(await github.api(`/actions/runs/${run}/attempts/${attempt}/jobs?per_page=100`),
-          head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+        if (await github.productionAttempt(run, attempt, head)) {
+          budget--;
+          if (deployed(await github.api(`/actions/runs/${run}/attempts/${attempt}/jobs?per_page=100`),
+            head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+        }
       }
+    } catch (error) {
+      if (!(error instanceof ProviderError) || error.status !== 404) throw error;
     }
     search.remaining.shift();
   }
