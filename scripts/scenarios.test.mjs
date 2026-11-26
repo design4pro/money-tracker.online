@@ -148,3 +148,60 @@ for (const [failure, expected] of [
     assert.deepEqual(log, expected);
   });
 }
+
+test('delivery smoke verifies canonical destinations through distinct probe origins', async t => {
+  const { canonicalOrigin, signInTarget, verifyAppBoundary, verifyAppOrigin, verifyLanding } =
+    await import(new URL('smoke.mjs', target));
+  const canonicalApp = 'https://app.invalid';
+  const canonicalSite = 'https://site.invalid';
+  const appProbe = 'https://app-preview.invalid';
+  const siteProbe = 'https://site-preview.invalid';
+  const originalEnv = process.env;
+  process.env = {
+    ...originalEnv,
+    APP_ORIGIN: canonicalApp,
+    APP_URL: appProbe,
+    SIGN_IN_URL: `${canonicalApp}/login`,
+    APP_ACCESS_CLIENT_ID: 'synthetic-client',
+    APP_ACCESS_CLIENT_SECRET: 'synthetic-secret',
+  };
+  t.after(() => { process.env = originalEnv; });
+
+  const origin = canonicalOrigin('APP_ORIGIN');
+  const signIn = signInTarget(origin);
+  const billing = new URL('/billing', appProbe);
+  const redirect = location => new Response(null, { status: 302, headers: { location } });
+  verifyAppBoundary(redirect('/login?next=/billing'), billing, signIn);
+  verifyAppBoundary(redirect(signIn.href), billing, signIn);
+  assert.throws(() => verifyAppBoundary(redirect(`${appProbe}/login`), billing, signIn), /auth boundary/);
+  assert.throws(() => verifyAppBoundary(redirect('//app-preview.invalid/login'), billing, signIn), /auth boundary/);
+
+  let deployedOrigin = canonicalApp;
+  const fetch = t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url.href, `${appProbe}/api/pilot/ledger`);
+    assert.equal(options.redirect, 'manual');
+    assert.equal(options.method, 'POST');
+    assert.equal(options.headers.Origin, canonicalApp);
+    assert.equal(options.headers['CF-Access-Client-Id'], 'synthetic-client');
+    assert.equal(options.headers['CF-Access-Client-Secret'], 'synthetic-secret');
+    return deployedOrigin === options.headers.Origin
+      ? Response.json({ message: 'Sign in with a verified email to continue.' }, { status: 401 })
+      : Response.json({ message: 'Invalid request origin.' }, { status: 403 });
+  });
+  await verifyAppOrigin(origin);
+  deployedOrigin = appProbe;
+  await assert.rejects(verifyAppOrigin(origin), /canonical request origin/);
+  assert.equal(fetch.mock.callCount(), 2);
+
+  const seo = { canonical: [`${canonicalSite}/`], openGraph: [`${canonicalSite}/`] };
+  verifyLanding([signIn.href], seo, signIn, canonicalSite);
+  assert.throws(() => verifyLanding([`${appProbe}/login`], seo, signIn, canonicalSite), /no visible link/);
+  assert.throws(() => verifyLanding([signIn.href], {
+    ...seo, canonical: [`${siteProbe}/`],
+  }, signIn, canonicalSite), /SEO canonical/);
+  assert.throws(() => verifyLanding([signIn.href], {
+    ...seo, openGraph: [`${siteProbe}/`],
+  }, signIn, canonicalSite), /Open Graph URL/);
+  process.env.SIGN_IN_URL = `${appProbe}/login`;
+  assert.throws(() => signInTarget(origin), /canonical app origin/);
+});
