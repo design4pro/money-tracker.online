@@ -174,7 +174,7 @@ async function provider(req) {
       return json({total_count: projected.length, check_runs: projected});
     }
     if (path.startsWith("/actions/workflows/")) return json({workflow_runs: [
-      ...(implemented && searchParams.get("event") === "workflow_dispatch" ? [{id: 2, run_attempt: 1, head_sha: merge}] : []),
+      ...(implemented && searchParams.get("event") === "workflow_run" ? [{id: 2, run_attempt: 1, head_sha: merge}] : []),
       ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
       ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
     ].map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",

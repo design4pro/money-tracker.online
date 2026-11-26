@@ -1,8 +1,10 @@
 name: Delivery
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       head:
@@ -15,40 +17,53 @@ permissions:
   actions: read
 
 concurrency:
-  group: pilot-delivery
+  group: >-
+    ${{ github.ref == 'refs/heads/main' && github.ref_protected &&
+        ((github.event_name == 'workflow_dispatch' && inputs.head == github.sha) ||
+         (github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+          github.event.workflow_run.head_sha == github.sha)) &&
+        'pilot-delivery' || format('pilot-delivery-ignored-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
   verify-main:
-    if: github.ref == 'refs/heads/main' && github.ref_protected
+    if: >-
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+        github.event.workflow_run.head_sha == github.sha))
     runs-on: ubuntu-24.04
-    timeout-minutes: 13
+    timeout-minutes: 5
     steps:
       - name: Require successful main CI for this exact SHA
         env:
           GH_TOKEN: ${{ github.token }}
           RETRY_SHA: ${{ inputs.head }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
         shell: bash
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
+          if [[ "$GITHUB_EVENT_NAME" == workflow_run ]]; then
+            id="$CI_RUN_ID"
+            run_attempt="$CI_RUN_ATTEMPT"
+          else
             test "$RETRY_SHA" = "$GITHUB_SHA"
-          fi
-          for ((attempt = 0; attempt < 35; attempt++)); do
-            test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
             run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$GITHUB_SHA" \
-              --jq '.workflow_runs[0] | select(. != null) | [.id, .run_attempt, .status, .conclusion] | @tsv')
-            if [[ -n "$run" ]]; then
-              read -r id run_attempt status conclusion <<< "$run"
-              if [[ "$status" == completed ]]; then
-                test "$conclusion" = success
-                gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/attempts/$run_attempt/jobs" \
-                  --jq '.jobs[] | select(.name == "verify" and .conclusion == "success") | .head_sha' | grep -Fx "$GITHUB_SHA"
-                exit 0
-              fi
-            fi
-            sleep 20
-          done
-          exit 1
+              --jq '.workflow_runs[0] | select(.status == "completed" and .conclusion == "success") | [.id, .run_attempt] | @tsv')
+            read -r id run_attempt <<< "$run"
+          fi
+          [[ "$id" =~ ^[0-9]+$ && "$run_attempt" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/attempts/$run_attempt/jobs" \
+            --jq '.jobs[] | select(.name == "verify" and .conclusion == "success") | .head_sha' | grep -Fx "$GITHUB_SHA"
 
   deploy-staging:
     name: deploy-staging

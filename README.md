@@ -34,7 +34,7 @@ An operator must configure GitHub environments named `staging` and `production`,
 
 ## Delivery readiness
 
-The protected-main workflow deploys staging first, then production from the same commit after successful push CI for that SHA. The factory may advance or close a release issue only after the exact SHA's `deploy-production` job and its exact `Deploy and smoke-test production` step succeed. A skipped, cancelled, or failed job is insufficient. An operator can dispatch Delivery from `main` with its full current SHA as the `head` input after resolving a failure. The retry requires successful push CI for that SHA.
+Delivery starts when push CI on protected main succeeds and its exact SHA still matches the tip. It deploys staging first and then production from that same commit. The factory may advance or close a release issue only after the exact SHA's `deploy-production` job and its exact `Deploy and smoke-test production` step succeed. A skipped, cancelled, or failed job is insufficient. An operator can dispatch Delivery from `main` with its full current SHA as the `head` input after resolving a failure. The retry requires successful push CI for that SHA.
 
 Set these values separately in each GitHub delivery environment. Store delivery credentials only as environment secrets. Names and URLs below are synthetic examples. Set account IDs, names, paths, and credentials to match the approved resources before enabling the workflow.
 
