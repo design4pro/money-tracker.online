@@ -45,6 +45,7 @@ let smoke = "failure";
 let priorAttemptHead = merge;
 let manualProof = false;
 let missingJobLookups = 0;
+let goneAttemptLookups = 0;
 const deliveryPages = [];
 let failProductionJobs = false;
 let onProductionJobs;
@@ -214,6 +215,10 @@ async function provider(req) {
     }
     if (/^\/actions\/runs\/\d+\/attempts\/1$/.test(path)) {
       const id = Number(path.split("/")[3]);
+      if (id === 11) {
+        goneAttemptLookups++;
+        return new Response(null, {status: 410});
+      }
       return json({id, run_attempt: 1, head_sha: id === 1 ? head : id === 2 ? priorAttemptHead : merge,
         status: "completed", conclusion: "success", head_branch: "main", event: id === 1 ? "push" : id === 4 ? "workflow_dispatch" : "workflow_run",
         path: id < 10 ? ".github/workflows/delivery.yml" : ".github/workflows/other.yml",
@@ -544,6 +549,7 @@ test("missing jobs and failed automatic attempts cannot starve successful manual
     }
     assert.equal(verified, true);
     assert.equal(missingJobLookups, 1);
+    assert.equal(goneAttemptLookups, 1);
   } finally {
     manualProof = false;
   }

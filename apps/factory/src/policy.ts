@@ -63,7 +63,7 @@ export async function deployment(github: Github, env: Env, search: DeploymentSea
         }
       }
     } catch (error) {
-      if (!(error instanceof ProviderError) || error.status !== 404) throw error;
+      if (!(error instanceof ProviderError) || ![404, 410].includes(error.status)) throw error;
     }
     search.remaining.shift();
   }
