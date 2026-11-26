@@ -13,13 +13,14 @@ import {bearer} from "./signatures";
 const WAIT = 60_000;
 const DAY = 24 * 60 * 60_000;
 const SUPERSEDED = "release-superseded-without-production-smoke";
+const PENDING_PRODUCTION = "phase='blocked' AND json_extract(state,'$.reason')=? AND json_extract(state,'$.productionVerification') IS NOT NULL";
 
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Ticket = {
   issue: number; actor: string; phase: Phase; created: number; due: number; failures: number;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
-  pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string;
+  pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string;
 };
 type Finish = Extract<Ingress, {kind: "finish"}>;
 
@@ -80,9 +81,9 @@ export class Factory extends DurableObject<Env> {
           at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (excluded.issue IS NOT NULL OR result.issue IS NULL)`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "production") {
-        this.sql.exec(`UPDATE ticket SET due=0 WHERE phase='blocked'
-          AND json_extract(state,'$.reason')=? AND json_extract(state,'$.merge')=?`,
-          SUPERSEDED, event.head);
+        this.sql.exec(`UPDATE ticket SET due=?, state=json_set(state,'$.due',?,'$.productionVerification',?)
+          WHERE phase='blocked' AND json_extract(state,'$.reason')=? AND json_extract(state,'$.merge')=?`,
+          now, now, id, SUPERSEDED, event.head);
       } else if (event.kind === "alert") {
         this.queue(`ops:${event.key}`, this.env.OPS_SCHEDULE_ID, "read", {repo: this.env.REPO, code: event.code, head: event.head});
         this.audit(`ops:${event.key}`, "alert-accepted");
@@ -212,14 +213,21 @@ export class Factory extends DurableObject<Env> {
     // Webhook wakeups can deliver late production evidence even after the
     // superseded ticket released its slot.
     const superseded = this.tickets(
-      "phase='blocked' AND json_extract(state,'$.reason')=? AND due<=? ORDER BY due,issue LIMIT 1",
+      `${PENDING_PRODUCTION} AND due<=? ORDER BY due,issue LIMIT 1`,
       SUPERSEDED, now,
     );
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
         await this.advance(ticket, fctl, github);
+        if (ticket.productionVerification) {
+          const current = this.tickets("issue=?", ticket.issue)[0];
+          if (current.productionVerification === ticket.productionVerification) {
+            this.ticket(current, {productionVerification: undefined});
+          }
+        }
       } catch {
         const current = this.tickets("issue=?", ticket.issue)[0];
+        if (current.productionVerification !== ticket.productionVerification) continue;
         const failures = current.failures + 1;
         this.ticket(current, {failures, due: now + Math.min(900_000, 15_000 * 2 ** Math.min(failures, 6))});
         this.audit(String(ticket.issue), "provider-retry");
@@ -253,7 +261,13 @@ export class Factory extends DurableObject<Env> {
       EXISTS(SELECT 1 FROM ticket WHERE phase NOT IN ('closed','blocked','ready') OR
         (phase='ready' AND NOT EXISTS(SELECT 1 FROM slot))) OR
       EXISTS(SELECT 1 FROM dispatch WHERE key LIKE 'ops:%' AND state IN ('queued','posting')) AS pending`).one();
-    if (pending.pending || bootstrap.length) await this.ctx.storage.setAlarm(Date.now() + WAIT);
+    const productionDue = this.sql.exec<{due: number | null}>(
+      `SELECT MIN(due) AS due FROM ticket WHERE ${PENDING_PRODUCTION}`, SUPERSEDED,
+    ).one().due;
+    if (productionDue !== null || pending.pending || bootstrap.length) {
+      const regularDue = pending.pending || bootstrap.length ? Date.now() + WAIT : Infinity;
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, productionDue ?? Infinity)));
+    }
     // Leave one watchdog pass when an ingress may have interleaved with the pump.
     else if (now - 120_000 < Number(this.sql.exec("SELECT MAX(at) AS newest FROM delivery").one().newest)) {
       await this.ctx.storage.setAlarm(Date.now() + WAIT);
@@ -383,8 +397,7 @@ export class Factory extends DurableObject<Env> {
       if (!Number.isFinite(mergedAt)) return this.block(ticket, "merge-timestamp");
       if (ticket.phase === "pr") this.ticket(ticket, {phase: "release", merge: pr.merge_commit_sha, mergedAt, reason: "awaiting-production-smoke"});
       if (!await deployment(github, this.env, pr.merge_commit_sha)) {
-        if (ticket.phase === "blocked") this.ticket(ticket, {});
-        else if (await github.mainAdvancedPast(pr.merge_commit_sha)) {
+        if (ticket.phase !== "blocked" && await github.mainAdvancedPast(pr.merge_commit_sha)) {
           const release = this.tickets("issue=?", ticket.issue)[0];
           this.block(release, SUPERSEDED, true);
         }
@@ -396,12 +409,13 @@ export class Factory extends DurableObject<Env> {
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});
       this.ctx.storage.transactionSync(() => {
-        this.ticket(ticket, {phase: "closed", merge: pr.merge_commit_sha as string, mergedAt});
+        this.ticket(ticket, {phase: "closed", merge: pr.merge_commit_sha as string, mergedAt, productionVerification: undefined});
         this.sql.exec("DELETE FROM slot WHERE issue=?", ticket.issue);
       });
       return;
     }
 
+    if (ticket?.phase === "blocked") return;
     if (pr.state !== "open") {
       if (ticket) this.block(ticket, "pr-closed-without-merge");
       return;

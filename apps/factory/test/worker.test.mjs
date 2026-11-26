@@ -42,6 +42,7 @@ let candidateBase = base;
 let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
+let failProductionJobs = false;
 const weekMs = 7 * 24 * 60 * 60 * 1000;
 const epochFriday = Date.UTC(2020, 0, 3, 9);
 const weekEnd = epochFriday + Math.floor((Date.now() - epochFriday) / weekMs) * weekMs;
@@ -178,6 +179,7 @@ async function provider(req) {
     ].map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
       conclusion: "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
     if (path.startsWith("/actions/runs/")) {
+      if (failProductionJobs && path.includes("/runs/2/")) return new Response(null, {status: 503});
       const commit = path.includes("/runs/1/") ? head : path.includes("/runs/3/") ? descendant : merge;
       return json({total_count: 1, jobs: [{name: "deploy-production", head_sha: commit, conclusion: "success",
         steps: [{name: "Production smoke", conclusion: commit === merge ? smoke : "success"}]}]});
@@ -211,6 +213,12 @@ before(async () => {
       export class Factory extends Controller {
         async fetch(request) {
           const path = new URL(request.url).pathname;
+          if (path === "/test/idle") {
+            this.ctx.storage.sql.exec("DELETE FROM ticket WHERE issue=2");
+            this.ctx.storage.sql.exec("UPDATE delivery SET at=0");
+            return new Response(null, {status: 204});
+          }
+          if (path === "/test/alarm") return Response.json(await this.ctx.storage.getAlarm());
           if (path === "/test/tick" || path === "/test/pump") {
             if (path === "/test/tick") {
               this.ctx.storage.sql.exec("UPDATE ticket SET due=0");
@@ -316,11 +324,21 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.deepEqual(superseded.slot, []);
   assert.deepEqual(calls.closed, []);
   smoke = "success";
+  failProductionJobs = true;
   assert.equal((await github({action: "completed", workflow_run: {
     head_sha: merge, head_branch: "main", path: ".github/workflows/delivery.yml", conclusion: "success",
   }}, undefined, undefined, "workflow_run")).status, 202);
+  assert.equal((await call("/test/idle")).status, 204);
   assert.equal((await call("/test/pump")).status, 204);
+  const retry = (await status()).tickets.find(ticket => ticket.issue === 1);
+  assert.equal(retry.phase, "blocked");
+  assert.equal(retry.failures, 1);
+  assert.equal(await (await call("/test/alarm")).json(), retry.due);
+  assert.deepEqual(calls.closed, []);
+  failProductionJobs = false;
+  await tick();
   assert.deepEqual(calls.closed, ["/issues/1"]);
+  assert.equal(await (await call("/test/alarm")).json(), null);
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "closed");
 
   const url = new URL("https://factory.invalid/ops/alert");
