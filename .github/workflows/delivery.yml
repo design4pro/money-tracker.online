@@ -1,0 +1,112 @@
+name: Delivery
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-delivery
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    name: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install and verify release tooling
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/contracts.mjs
+          for package in apps/app apps/site apps/factory; do
+            npm ci --prefix "$package"
+            npm run build --prefix "$package"
+          done
+          npm ci --prefix scripts --ignore-scripts
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Deploy and verify staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          SIGN_IN_URL: ${{ vars.SIGN_IN_URL }}
+          APP_PROTECTED_PATH: ${{ vars.APP_PROTECTED_PATH }}
+          CMS_ADMIN_PATH: ${{ vars.CMS_ADMIN_PATH }}
+          CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
+          APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
+          APP_URL: ${{ vars.APP_URL }}
+          APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
+          APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
+          SITE_WORKER_NAME: ${{ vars.SITE_WORKER_NAME }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
+          SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
+          FACTORY_WORKER_NAME: ${{ vars.FACTORY_WORKER_NAME }}
+          FACTORY_URL: ${{ vars.FACTORY_URL }}
+          FACTORY_ACCESS_CLIENT_ID: ${{ secrets.FACTORY_ACCESS_CLIENT_ID }}
+          FACTORY_ACCESS_CLIENT_SECRET: ${{ secrets.FACTORY_ACCESS_CLIENT_SECRET }}
+        run: node scripts/deliver.mjs staging
+
+  deploy-production:
+    name: deploy-production
+    if: github.ref == 'refs/heads/main' && github.ref_protected
+    needs: deploy-staging
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Install and verify release tooling
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/contracts.mjs
+          for package in apps/app apps/site apps/factory; do
+            npm ci --prefix "$package"
+            npm run build --prefix "$package"
+          done
+          npm ci --prefix scripts --ignore-scripts
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Deploy and verify production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          SIGN_IN_URL: ${{ vars.SIGN_IN_URL }}
+          APP_PROTECTED_PATH: ${{ vars.APP_PROTECTED_PATH }}
+          CMS_ADMIN_PATH: ${{ vars.CMS_ADMIN_PATH }}
+          CMS_UNAUTHENTICATED_STATUS: ${{ vars.CMS_UNAUTHENTICATED_STATUS }}
+          APP_WORKER_NAME: ${{ vars.APP_WORKER_NAME }}
+          APP_URL: ${{ vars.APP_URL }}
+          APP_ACCESS_CLIENT_ID: ${{ secrets.APP_ACCESS_CLIENT_ID }}
+          APP_ACCESS_CLIENT_SECRET: ${{ secrets.APP_ACCESS_CLIENT_SECRET }}
+          SITE_WORKER_NAME: ${{ vars.SITE_WORKER_NAME }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_ACCESS_CLIENT_ID: ${{ secrets.SITE_ACCESS_CLIENT_ID }}
+          SITE_ACCESS_CLIENT_SECRET: ${{ secrets.SITE_ACCESS_CLIENT_SECRET }}
+          FACTORY_WORKER_NAME: ${{ vars.FACTORY_WORKER_NAME }}
+          FACTORY_URL: ${{ vars.FACTORY_URL }}
+          FACTORY_ACCESS_CLIENT_ID: ${{ secrets.FACTORY_ACCESS_CLIENT_ID }}
+          FACTORY_ACCESS_CLIENT_SECRET: ${{ secrets.FACTORY_ACCESS_CLIENT_SECRET }}
+          PRODUCTION_CUTOVER_APPROVED: ${{ vars.PRODUCTION_CUTOVER_APPROVED }}
+        run: node scripts/deliver.mjs production

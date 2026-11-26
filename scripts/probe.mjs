@@ -1,0 +1,55 @@
+export const packages = ['app', 'site', 'factory'];
+
+export function required(name) {
+  const value = process.env[name];
+  if (!value?.trim()) throw new Error(`Missing ${name}`);
+  return value;
+}
+
+export function sha(value) {
+  if (!/^[a-f0-9]{40}$/.test(value)) throw new Error('Expected a full Git SHA');
+  return value;
+}
+
+export function endpoint(worker, path, local = false) {
+  const origin = new URL(required(`${worker.toUpperCase()}_URL`));
+  if ((!local && origin.protocol !== 'https:') || origin.username || origin.password ||
+      origin.pathname !== '/' || origin.search || origin.hash) {
+    throw new Error(`Invalid ${worker} origin`);
+  }
+  if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Expected an absolute path');
+  const url = new URL(path, origin);
+  if (url.origin !== origin.origin || url.hash || url.search) throw new Error('Invalid probe path');
+  return url;
+}
+
+export function access(worker) {
+  const id = process.env[`${worker.toUpperCase()}_ACCESS_CLIENT_ID`];
+  const secret = process.env[`${worker.toUpperCase()}_ACCESS_CLIENT_SECRET`];
+  if (Boolean(id) !== Boolean(secret)) throw new Error(`Incomplete ${worker} Access credentials`);
+  return id ? { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret } : {};
+}
+
+export function request(url, options = {}) {
+  return fetch(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(10_000) });
+}
+
+export async function verifyHealth(response, expected) {
+  if (response.status !== 200 || !/^application\/json\b/i.test(response.headers.get('content-type') ?? '')) {
+    throw new Error(`Unexpected health response (${response.status})`);
+  }
+  const body = await response.json();
+  if (body?.ok !== true || body.sourceSha !== expected) {
+    throw new Error('Health did not confirm the expected source SHA');
+  }
+}
+
+export function verifyBoundary(response, protectedUrl, signInUrl) {
+  if ([401, 403].includes(response.status)) return;
+  const location = response.headers.get('location');
+  if ([301, 302, 303, 307, 308].includes(response.status) && location) {
+    const redirect = new URL(location, protectedUrl);
+    if (redirect.origin === signInUrl.origin && redirect.pathname === signInUrl.pathname) return;
+  }
+  throw new Error(`Protected route did not enforce the expected auth boundary (${response.status})`);
+}
