@@ -31,8 +31,8 @@ export async function operations(request: Request, env: Env, path: string) {
     if (path === "/ops/polar-lag") {
       const now = Date.now()
       const oldest = await env.DB.prepare(
-        `SELECT min(recheck_at) AS oldest FROM entitlement
-         WHERE recheck_at > 0 AND recheck_at <= ?
+        `SELECT min(COALESCE(refresh_failed_since, recheck_at)) AS oldest FROM entitlement
+         WHERE (refresh_failed_since IS NOT NULL OR (recheck_at > 0 AND recheck_at <= ?))
            AND (status = 'active' OR pending_until > ?)`
       )
         .bind(now, now)

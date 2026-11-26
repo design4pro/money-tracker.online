@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 import { ArrowDownLeft, ArrowUpRight, List, Plus, Trash2 } from "lucide-react"
 import type { Ledger } from "@/server/ledger"
@@ -13,6 +13,7 @@ export function LedgerPanel() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [entry, setEntry] = useState<Entry>()
+  const pending = useRef(new Map<string, string>())
 
   useEffect(() => {
     let live = true
@@ -34,8 +35,13 @@ export function LedgerPanel() {
   async function change(body: Record<string, unknown>) {
     setBusy(true)
     setError("")
+    const payload = JSON.stringify(body)
+    const requestId = pending.current.get(payload) ?? crypto.randomUUID()
+    pending.current.set(payload, requestId)
     try {
-      setLedger(await requestJson<Ledger>("ledger", body))
+      await requestJson<{ ok: true }>("ledger", { ...body, requestId })
+      pending.current.delete(payload)
+      setAttempt((value) => value + 1)
       return true
     } catch (problem) {
       setError(errorMessage(problem))
@@ -89,9 +95,18 @@ export function LedgerPanel() {
   return (
     <>
       {error && (
-        <p className="mb-4 text-sm text-destructive" role="alert">
-          {error}
-        </p>
+        <div className="mb-4">
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => setAttempt((value) => value + 1)}
+            disabled={busy}
+          >
+            Refresh ledger
+          </Button>
+        </div>
       )}
       <section className="mb-5" aria-labelledby="balances">
         <h2 id="balances" className="mb-3">

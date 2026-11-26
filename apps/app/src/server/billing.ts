@@ -207,11 +207,21 @@ export async function reconcile(
     await db
       .prepare(
         `
-      UPDATE entitlement SET recheck_at = ?
-      WHERE user_id = ? AND next_revision = ? AND recheck_at <= ?
+      UPDATE entitlement
+      SET refresh_failed_since = COALESCE(refresh_failed_since,
+            CASE WHEN recheck_at > 0 THEN min(recheck_at, ?) ELSE ? END),
+          recheck_at = CASE WHEN recheck_at <= ? THEN ? ELSE recheck_at END
+      WHERE user_id = ? AND next_revision = ?
     `
       )
-      .bind(observedAt + recheckInterval, userId, revision, observedAt)
+      .bind(
+        observedAt,
+        observedAt,
+        observedAt,
+        observedAt + recheckInterval,
+        userId,
+        revision
+      )
       .run()
     throw error
   }
@@ -221,6 +231,7 @@ export async function reconcile(
       .prepare(
         `
     UPDATE entitlement SET status = ?, expires_at = ?, checked_at = ?, recheck_at = ?,
+      refresh_failed_since = CASE WHEN next_revision = ? THEN NULL ELSE refresh_failed_since END,
       pending_until = CASE WHEN ? > 0 THEN 0 ELSE pending_until END, applied_revision = ?
     WHERE user_id = ? AND applied_revision < ?
       AND (? IS NULL OR NOT EXISTS (SELECT 1 FROM polar_event WHERE id = ?))
@@ -231,6 +242,7 @@ export async function reconcile(
         expires,
         observedAt,
         observedAt + recheckInterval,
+        revision,
         expires,
         revision,
         userId,

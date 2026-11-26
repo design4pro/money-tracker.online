@@ -13,14 +13,9 @@ export function issueEvidence(issue: Json): {feature: string; deployed: string} 
   }
 }
 
-export async function deployment(github: Github, env: Env, commit: string, exact = false): Promise<boolean> {
+export async function deployment(github: Github, env: Env, head: string): Promise<boolean> {
   for (const run of await github.productionDeploys()) {
-    const head = run.head_sha as string;
-    if (head !== commit) {
-      if (exact) continue;
-      const compare = record(await github.api(`/compare/${commit}...${head}?per_page=1`));
-      if (compare.status !== "ahead" || record(compare.merge_base_commit).sha !== commit) continue;
-    }
+    if (run.head_sha !== head) continue;
     if (deployed(await github.api(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`),
       head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
   }

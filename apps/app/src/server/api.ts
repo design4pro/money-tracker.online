@@ -85,8 +85,10 @@ export async function pilotApi(
     ) {
       if (status !== "active")
         throw new RequestError("An active subscription is required.", 403)
-      if (method === "POST")
+      if (method === "POST") {
         await writeLedger(db, user.id, await readBody(request))
+        return json({ ok: true })
+      }
       return json(await readLedger(db, user.id))
     }
     return json({ message: "Endpoint not found." }, 404)

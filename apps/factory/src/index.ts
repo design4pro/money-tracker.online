@@ -232,7 +232,7 @@ export class Factory extends DurableObject<Env> {
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, result)) return this.block(ticket, "triage-result");
-    if (!await deployment(github, env, evidence.deployed, true)) return this.block(ticket, "parity-deployment-evidence");
+    if (!await deployment(github, env, evidence.deployed)) return this.block(ticket, "parity-deployment-evidence");
     this.ticket(ticket, {phase: "ready", ...evidence, triageRun: String(run.id), triageSession: sessionId,
       triageComment: result.comment, due: Date.now()});
   }

@@ -11,6 +11,7 @@ const otherHead = "b".repeat(40);
 const merge = "c".repeat(40);
 const base = "d".repeat(40);
 const candidate = "e".repeat(40);
+const descendant = "f".repeat(40);
 const upstream = "2aae986ff5ad1da1dd8d967498b3b32d6ded413d";
 const key = Buffer.from("synthetic webhook key for replay tests");
 const discovery = {type: "Bot", id: 33, login: "factory-test[bot]"};
@@ -141,14 +142,15 @@ async function provider(req) {
     if (path.startsWith("/actions/workflows/")) return json({workflow_runs: [
       ...(implemented && searchParams.get("event") === "workflow_dispatch" ? [{id: 2, run_attempt: 1, head_sha: merge}] : []),
       ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
+      ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
     ].map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
       conclusion: "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
     if (path.startsWith("/actions/runs/")) {
-      const prior = path.includes("/runs/1/");
-      return json({total_count: 1, jobs: [{name: "deploy-production", head_sha: prior ? head : merge, conclusion: "success",
-        steps: [{name: "Production smoke", conclusion: prior ? "success" : smoke}]}]});
+      const commit = path.includes("/runs/1/") ? head : path.includes("/runs/3/") ? descendant : merge;
+      return json({total_count: 1, jobs: [{name: "deploy-production", head_sha: commit, conclusion: "success",
+        steps: [{name: "Production smoke", conclusion: commit === merge ? smoke : "success"}]}]});
     }
-    if (path.startsWith("/compare/")) return json({status: "diverged"});
+    if (path === `/compare/${merge}...${descendant}`) return json({status: "ahead", merge_base_commit: {sha: merge}});
   }
   throw new Error(`Unexpected provider route ${method} ${pathname}`);
 }

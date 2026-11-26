@@ -55,6 +55,8 @@ Production and staging must use their own Cloudflare and Polar bindings and conf
 
 ## Pilot operations
 
-Set the app Worker secret `POLAR_SIGNAL_TOKEN` and send it as a bearer token over HTTPS. `GET /ops/polar-lag` returns `lagSeconds`, the age of the oldest overdue eligible scheduled Polar refresh, or zero if none are due. It measures scheduled refresh lag.
+Set the app Worker secret `POLAR_SIGNAL_TOKEN` and send it as a bearer token over HTTPS. `GET /ops/polar-lag` returns `lagSeconds`, the age of the oldest overdue or unresolved eligible Polar refresh, or zero if none are outstanding. Failed refreshes retain the original obligation age across retry backoff until a successful reconciliation.
 
-`GET /ops/pilot-milestones` returns three aggregate counts among current accounts: `signUps`, `firstPaid` (ever observed with an active paid entitlement), and `firstTransaction` (first recorded transaction at or after first paid). Migration 0002 records the first observed milestones on the existing entitlement and ledger writes. Renewal, expiry, retries, and transaction deletion preserve the first timestamps. The migration leaves historical milestone times unknown until the next qualifying write. The endpoint returns counts only and disables caching.
+`GET /ops/pilot-milestones` returns three aggregate counts among current accounts: `signUps`, `firstPaid` (ever observed with an active paid entitlement), and `firstTransaction` (first transaction recorded once the first-paid milestone exists). Migration 0002 records the first observed milestones on the existing entitlement and ledger writes. Renewal, expiry, retries, and transaction deletion preserve the first timestamps. The migration leaves historical milestone times unknown until the next qualifying write. The endpoint returns counts only and disables caching.
+
+Ledger forms retain a request UUID across retries of the same mutation. D1 commits the mutation and its receipt together, so repeating a request after a response is lost returns the original outcome. Ledger refresh is a separate read.

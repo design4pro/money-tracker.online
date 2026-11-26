@@ -1,4 +1,3 @@
-import { operations } from "../src/server/ops"
 import assert from "node:assert/strict"
 import { createHmac } from "node:crypto"
 import { readFile } from "node:fs/promises"
@@ -15,6 +14,7 @@ import {
   reconcile,
   recheck,
 } from "../src/server/billing"
+import { operations } from "../src/server/ops"
 import { readLedger, writeLedger } from "../src/server/ledger"
 import type { Env, PolarEvent } from "../src/server/env"
 
@@ -113,17 +113,22 @@ before(async () => {
       .filter(Boolean)
       .map((statement) => db.prepare(statement))
   )
-  const milestones = await readFile(
-    new URL("../migrations/0002_pilot_milestones.sql", import.meta.url),
-    "utf8"
-  )
-  await db.batch(
-    milestones
-      .trim()
-      .split(/;\s*(?=ALTER TABLE|CREATE TRIGGER|$)/)
-      .filter(Boolean)
-      .map((statement) => db.prepare(statement))
-  )
+  for (const migration of [
+    "0002_pilot_milestones.sql",
+    "0003_pilot_write_safety.sql",
+  ]) {
+    const changes = await readFile(
+      new URL(`../migrations/${migration}`, import.meta.url),
+      "utf8"
+    )
+    await db.batch(
+      changes
+        .trim()
+        .split(/;\s*(?=ALTER TABLE|CREATE TABLE|CREATE TRIGGER|DROP TRIGGER|$)/)
+        .filter(Boolean)
+        .map((statement) => db.prepare(statement))
+    )
+  }
 
   env = {
     DB: db,
@@ -264,7 +269,10 @@ test("D1 ledger isolates two users, keeps signed exact balances by currency and 
       currency,
     })
     assert.equal(response.status, 200, await response.clone().text())
-    const data = await response.json<Awaited<ReturnType<typeof readLedger>>>()
+    assert.deepEqual(await response.json(), { ok: true })
+    const data = await (
+      await pilot("ledger", cookie)
+    ).json<Awaited<ReturnType<typeof readLedger>>>()
     const account = data.accounts.find((item) => item.name === name)
     assert.ok(account)
     return account
@@ -695,4 +703,134 @@ test("operations report aggregate milestones and refresh lag without exposing us
   assert.deepEqual(await (await get(lag, opsEnv.POLAR_SIGNAL_TOKEN)).json(), {
     lagSeconds: 90,
   })
+})
+
+test("a lost ledger response and concurrent retries apply each mutation once", async () => {
+  await reconcile(env, alice.id, undefined, async () => Date.now() + 60_000)
+  const account = (await readLedger(env.DB, alice.id)).accounts[0]
+  const command = {
+    action: "add-transaction",
+    requestId: crypto.randomUUID(),
+    accountId: account.id,
+    description: "Synthetic replay",
+    amountMinor: 101,
+    bookedOn: "2026-11-03",
+  }
+  const original = await readLedger(env.DB, alice.id)
+  // Discard the first committed response, as if the connection dropped.
+  await pilot("ledger", alice.cookie, command)
+  const retried = await Promise.all([
+    pilot("ledger", alice.cookie, command),
+    pilot("ledger", alice.cookie, command),
+  ])
+  for (const result of retried)
+    assert.deepEqual(await result.json(), { ok: true })
+  assert.equal(
+    (await readLedger(env.DB, alice.id)).transactions.length,
+    original.transactions.length + 1
+  )
+
+  const different = await pilot("ledger", alice.cookie, {
+    ...command,
+    amountMinor: 102,
+  })
+  assert.equal(different.status, 409)
+  const remove = {
+    action: "delete-transaction",
+    id: command.requestId,
+    requestId: crypto.randomUUID(),
+  }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    assert.deepEqual(
+      await (await pilot("ledger", alice.cookie, remove)).json(),
+      { ok: true }
+    )
+  }
+  assert.deepEqual(
+    await (await pilot("ledger", alice.cookie, command)).json(),
+    { ok: true }
+  )
+  assert.deepEqual(await readLedger(env.DB, alice.id), original)
+})
+
+test("a later transaction qualifies when a pre-migration entitlement is first measured", async () => {
+  const db = env.DB
+  const account = (await readLedger(db, bob.id)).accounts[0]
+  const entry = {
+    action: "add-transaction",
+    accountId: account.id,
+    description: "Synthetic milestone",
+    amountMinor: 1,
+    bookedOn: "2026-11-03",
+  }
+  await reconcile(env, bob.id, undefined, async () => Date.now() + 60_000)
+  await db
+    .prepare(
+      "UPDATE user SET first_paid_at = NULL, first_transaction_at = NULL WHERE id = ?"
+    )
+    .bind(bob.id)
+    .run()
+  await writeLedger(db, bob.id, entry)
+  const milestone = () =>
+    db
+      .prepare(
+        "SELECT first_paid_at, first_transaction_at FROM user WHERE id = ?"
+      )
+      .bind(bob.id)
+      .first<{
+        first_paid_at: number | null
+        first_transaction_at: number | null
+      }>()
+  assert.deepEqual(await milestone(), {
+    first_paid_at: null,
+    first_transaction_at: null,
+  })
+
+  await reconcile(env, bob.id, undefined, async () => Date.now() + 60_000)
+  assert.equal((await milestone())?.first_transaction_at, null)
+  await writeLedger(db, bob.id, entry)
+  const measured = await milestone()
+  assert.ok(
+    measured?.first_paid_at &&
+      measured.first_transaction_at &&
+      measured.first_transaction_at >= measured.first_paid_at
+  )
+  await writeLedger(db, bob.id, entry)
+  assert.deepEqual(await milestone(), measured)
+})
+
+test("Polar refresh lag survives retry backoff until an authoritative refresh succeeds", async () => {
+  const db = env.DB
+  const due = Date.now() - 1_500_000
+  const fail = () =>
+    reconcile(env, alice.id, undefined, async () => {
+      throw new Error("synthetic outage")
+    })
+  await reconcile(env, alice.id, undefined, async () => Date.now() + 60_000)
+  await db
+    .prepare("UPDATE entitlement SET recheck_at = ? WHERE user_id = ?")
+    .bind(due, alice.id)
+    .run()
+  await assert.rejects(fail(), /synthetic outage/)
+  await assert.rejects(fail(), /synthetic outage/)
+  const state = await db
+    .prepare(
+      "SELECT recheck_at, refresh_failed_since FROM entitlement WHERE user_id = ?"
+    )
+    .bind(alice.id)
+    .first<{ recheck_at: number; refresh_failed_since: number }>()
+  assert.ok(state && state.recheck_at > Date.now())
+  assert.equal(state.refresh_failed_since, due)
+  const lag = () =>
+    operations(
+      new Request("https://app.invalid/ops/polar-lag", {
+        headers: { Authorization: "Bearer synthetic-lag-token" },
+      }),
+      { ...env, POLAR_SIGNAL_TOKEN: "synthetic-lag-token" },
+      "/ops/polar-lag"
+    )
+  const outage = await (await lag()).json<{ lagSeconds: number }>()
+  assert.ok(outage.lagSeconds >= 1500)
+  await reconcile(env, alice.id, undefined, async () => Date.now() + 60_000)
+  assert.deepEqual(await (await lag()).json(), { lagSeconds: 0 })
 })
