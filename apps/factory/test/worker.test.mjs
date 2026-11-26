@@ -174,10 +174,16 @@ async function provider(req) {
       return json({total_count: projected.length, check_runs: projected});
     }
     if (path.startsWith("/actions/workflows/")) return json({workflow_runs: [
-      ...(implemented && searchParams.get("event") === "workflow_run" ? [{id: 2, run_attempt: 1, head_sha: merge}] : []),
+      // Thirty newer successful runs fill an unfiltered first page and hide the exact merge.
+      ...(implemented && searchParams.get("event") === "workflow_run"
+        ? [...Array.from({length: 30}, (_, id) => ({id: id + 10, run_attempt: 1, head_sha: descendant})),
+          {id: 2, run_attempt: 1, head_sha: merge}]
+        : []),
       ...(searchParams.get("event") === "push" ? [{id: 1, run_attempt: 1, head_sha: head}] : []),
       ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
-    ].map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
+    ].filter(run => !searchParams.has("head_sha") || run.head_sha === searchParams.get("head_sha"))
+      .slice(0, Number(searchParams.get("per_page")))
+      .map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: "completed",
       conclusion: "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
     if (path.startsWith("/actions/runs/")) {
       if (failProductionJobs && path.includes("/runs/2/")) return new Response(null, {status: 503});

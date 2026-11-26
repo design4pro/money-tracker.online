@@ -14,8 +14,7 @@ export function issueEvidence(issue: Json): {feature: string; deployed: string} 
 }
 
 export async function deployment(github: Github, env: Env, head: string): Promise<boolean> {
-  for (const run of await github.productionDeploys()) {
-    if (run.head_sha !== head) continue;
+  for (const run of await github.productionDeploys(head)) {
     if (deployed(await github.api(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`),
       head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
   }
