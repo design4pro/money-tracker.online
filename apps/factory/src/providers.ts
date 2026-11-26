@@ -190,16 +190,28 @@ export class Github {
     return comparison.status === "ahead" && record(comparison.merge_base_commit).sha === commit;
   }
 
-  async productionDeploys(head: string): Promise<Json[]> {
-    if (!sha(head)) return [];
-    const responses = await Promise.all(["workflow_run", "workflow_dispatch", "push"].map(event =>
-      this.api(`/actions/workflows/delivery.yml/runs?branch=main&event=${event}&head_sha=${head}&per_page=30`)));
-    // GitHub allows the original attempt and up to 50 reruns.
-    return responses.flatMap(response => list(record(response).workflow_runs).map(record)).filter(run =>
-      integer(run.id) && integer(run.run_attempt) && run.run_attempt <= 51 && run.head_sha === head &&
-      run.head_branch === "main" && ["workflow_run", "workflow_dispatch", "push"].includes(String(run.event)) &&
-      run.path === ".github/workflows/delivery.yml" && String(record(run.repository).id) === this.env.REPO_ID &&
-      String(record(run.head_repository).id) === this.env.REPO_ID);
+  async *productionDeploys(head: string): AsyncGenerator<Json> {
+    if (!sha(head)) return;
+    const events = ["workflow_run", "workflow_dispatch", "push"];
+    for (const event of events) {
+      // Filtered workflow-run searches expose at most 1,000 runs per query.
+      for (let page = 1; page <= 10; page++) {
+        const response = record(await this.api(
+          `/actions/workflows/delivery.yml/runs?branch=main&event=${event}&head_sha=${head}&per_page=100&page=${page}`));
+        if (!Array.isArray(response.workflow_runs) || response.workflow_runs.length > 100) {
+          throw new Error("Invalid Delivery runs page");
+        }
+        for (const value of response.workflow_runs) {
+          const run = record(value);
+          // GitHub allows the original attempt and up to 50 reruns.
+          if (integer(run.id) && integer(run.run_attempt) && run.run_attempt <= 51 && run.head_sha === head &&
+              run.head_branch === "main" && run.event === event && run.path === ".github/workflows/delivery.yml" &&
+              String(record(run.repository).id) === this.env.REPO_ID &&
+              String(record(run.head_repository).id) === this.env.REPO_ID) yield run;
+        }
+        if (response.workflow_runs.length < 100) break;
+      }
+    }
   }
 }
 

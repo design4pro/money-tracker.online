@@ -44,6 +44,7 @@ let conclusion = "neutral";
 let smoke = "failure";
 let priorAttemptHead = merge;
 let rerunStatus = "completed";
+const deliveryPages = [];
 let failProductionJobs = false;
 let onProductionJobs;
 const weekMs = 7 * 24 * 60 * 60 * 1000;
@@ -180,10 +181,19 @@ async function provider(req) {
       const requested = searchParams.get("head_sha");
       assert.ok([head, merge].includes(requested), "expected an exact SHA at the provider boundary");
       assert.equal(searchParams.has("status"), false, "a failed rerun must not hide prior attempts");
+      const perPage = Number(searchParams.get("per_page"));
+      const page = Number(searchParams.get("page"));
+      assert.equal(perPage, 100);
+      assert.ok(page >= 1 && page <= 10);
+      if (requested === merge && searchParams.get("event") === "workflow_run") deliveryPages.push(page);
       return json({workflow_runs: [
         // Thirty newer successful runs fill an unfiltered first page and hide the exact merge.
         ...(implemented && searchParams.get("event") === "workflow_run"
           ? [...Array.from({length: 30}, (_, id) => ({id: id + 10, run_attempt: 1, head_sha: descendant})),
+            // Newer failed runs for the same SHA fill the first filtered page.
+            ...Array.from({length: 100}, (_, id) => ({
+              id: id + 100, run_attempt: 1, head_sha: merge, conclusion: "failure",
+            })),
             {id: 2, run_attempt: 2, head_sha: merge, status: rerunStatus,
               conclusion: rerunStatus === "completed" ? "failure" : null}]
           : []),
@@ -191,9 +201,9 @@ async function provider(req) {
         ...(implemented && searchParams.get("event") === "push" ? [{id: 3, run_attempt: 1, head_sha: descendant}] : []),
       ].filter(run => run.head_sha === requested ||
         (requested === merge && run.id === 3)) // Model a provider returning an unrelated result.
-        .slice(0, Number(searchParams.get("per_page")))
+        .slice((page - 1) * perPage, page * perPage)
         .map(run => ({...run, head_branch: "main", event: searchParams.get("event"), status: run.status ?? "completed",
-          conclusion: run.id === 2 ? run.conclusion : "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
+          conclusion: Object.hasOwn(run, "conclusion") ? run.conclusion : "success", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100}}))});
     }
     if (path === "/actions/runs/2/attempts/1") {
       return json({id: 2, run_attempt: 1, head_sha: priorAttemptHead, status: "completed", conclusion: "success"});
@@ -391,6 +401,7 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.equal((await call("/test/idle")).status, 204);
   await tick();
   assert.deepEqual(calls.closed, ["/issues/1"]);
+  assert.deepEqual([...new Set(deliveryPages)], [1, 2]);
   assert.equal(await (await call("/test/alarm")).json(), null);
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "closed");
 

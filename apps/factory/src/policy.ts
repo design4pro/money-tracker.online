@@ -14,7 +14,7 @@ export function issueEvidence(issue: Json): {feature: string; deployed: string} 
 }
 
 export async function deployment(github: Github, env: Env, head: string): Promise<boolean> {
-  for (const run of await github.productionDeploys(head)) {
+  for await (const run of github.productionDeploys(head)) {
     const latest = run.run_attempt;
     if (!integer(latest)) continue;
     for (let attempt = latest; attempt >= 1; attempt--) {
