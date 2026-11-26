@@ -68,7 +68,7 @@ Monitor requests use `Authorization: Bearer …` and a stable deduplication key.
 | Implement | When asked, push | Controller-supplied issue, feature, deployment SHA and plan comment ID. The signed `implemented` result names a same-repo PR on the dispatched session branch with the exact issue/session marker. |
 | Review | Native Codex review, three rounds of findings passed back | fctl's latest review state is `passed`, zero new/open findings and a successful native check for the exact PR head. Neutral fails. |
 | Ops | When asked, read | Allowlisted monitor code and optional SHA |
-| Retro | When asked, read. Production Worker Cron requests it Friday 09:00 UTC. | Bounded digest of retrospective outcomes and technical topics, then one improvement with a metric and reproducible evaluation |
+| Retro | When asked, read. Production Worker Cron requests it Friday 09:00 UTC. | Bounded digest and read-only GitHub evidence. Compare issue-to-verified-production time, first native review outcomes, and production failure share against the preceding week. Give denominators and propose one measurable improvement. |
 
 The versioned files in `profiles/v1` define the result lines. Triage, Plan and Implement put the compact v1 JSON at the very start of the final reply so it appears in signed `session.finished.data.message`. Status labels, issue prose and arbitrary comments confer no authority. Dedicated app path approval is conservative. Only UI component/style paths, dedicated locale JSON and Markdown under `docs/` qualify as routine, with sensitive names excluded. Everything outside that subset requires exact-head human approval.
 
