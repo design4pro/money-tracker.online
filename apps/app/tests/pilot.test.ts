@@ -719,6 +719,10 @@ test("a lost ledger response and concurrent retries apply each mutation once", a
   const original = await readLedger(env.DB, alice.id)
   // Discard the first committed response, as if the connection dropped.
   await pilot("ledger", alice.cookie, command)
+  assert.equal(
+    (await readLedger(env.DB, alice.id)).transactions.length,
+    original.transactions.length + 1
+  )
   const retried = await Promise.all([
     pilot("ledger", alice.cookie, command),
     pilot("ledger", alice.cookie, command),
