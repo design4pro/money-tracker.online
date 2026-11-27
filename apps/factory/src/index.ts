@@ -289,7 +289,8 @@ export class Factory extends DurableObject<Env> {
       `SELECT MIN(due) AS due FROM ticket WHERE ${PENDING_PRODUCTION}`, SUPERSEDED,
     ).one().due;
     const recoveryDue = this.sql.exec<{due: number | null}>(
-      "SELECT MIN(due) AS due FROM ticket WHERE json_extract(state, '$.recoveryPending') = 1",
+      `SELECT MIN(due) AS due FROM ticket WHERE json_extract(state, '$.recoveryPending') = 1
+        AND (phase='triage' OR (phase IN ('plan','implement') AND issue=(SELECT issue FROM slot)))`,
     ).one().due;
     if (productionDue !== null || recoveryDue !== null || pending.pending || bootstrap.length) {
       const regularDue = pending.pending || bootstrap.length ? Date.now() + WAIT : Infinity;
