@@ -1,5 +1,5 @@
-import {approval, deployed, fctlRepo, integer, list, record, reviewPassed, routineFile, sha} from "./contracts";
-import type {Env, Json} from "./contracts";
+import {approval, deployed, identifier, integer, list, record, routineFile, sha} from "./contracts";
+import type {DeliveryTarget, Env, Json} from "./contracts";
 import {ProviderError} from "./providers";
 import type {Fctl, Github} from "./providers";
 
@@ -21,9 +21,13 @@ export interface DeploymentSearch {
   exhausted?: boolean;
 }
 
-export async function deployment(github: Github, env: Env, search: DeploymentSearch): Promise<boolean | undefined> {
+export async function deployment(github: Github, env: Env, search: DeploymentSearch,
+  target: DeliveryTarget = "production"): Promise<boolean | undefined> {
   const {head} = search;
-  if (!sha(head) || !!env.DELIVERY_SMOKE_STEP === !!env.DELIVERY_SMOKE_JOB) return false;
+  const deployName = `deploy-${target}`;
+  const smokeStep = target === "staging" ? env.DELIVERY_STAGING_SMOKE_STEP : env.DELIVERY_SMOKE_STEP;
+  const smokeJob = target === "staging" ? env.DELIVERY_STAGING_SMOKE_JOB : env.DELIVERY_SMOKE_JOB;
+  if (!sha(head) || !!smokeStep === !!smokeJob) return false;
 
   // A pump can check triage, the active release and a superseded release.
   // Allow at most seven evidence requests per ticket and persist its cursor.
@@ -32,7 +36,7 @@ export async function deployment(github: Github, env: Env, search: DeploymentSea
     if (!search.remaining) {
       if (!budget) return;
       budget--;
-      const {candidates, exhausted} = await github.productionChecks(head, search.page);
+      const {candidates, exhausted} = await github.deliveryChecks(head, search.page, deployName);
       search.remaining = candidates;
       search.exhausted = exhausted;
     }
@@ -52,14 +56,14 @@ export async function deployment(github: Github, env: Env, search: DeploymentSea
       const job = record(await github.api(`/actions/jobs/${id}`));
       const attempt = job.run_attempt;
       // GitHub permits 50 reruns in addition to the original attempt.
-      if (job.id === id && job.run_id === run && job.name === "deploy-production" && job.head_sha === head &&
+      if (job.id === id && job.run_id === run && job.name === deployName && job.head_sha === head &&
           job.head_branch === "main" && job.status === "completed" && job.conclusion === "success" &&
           integer(attempt) && attempt <= 51) {
         budget--;
-        if (await github.productionAttempt(run, attempt, head)) {
+        if (await github.deliveryAttempt(run, attempt, head)) {
           budget--;
           if (deployed(await github.api(`/actions/runs/${run}/attempts/${attempt}/jobs?per_page=100`),
-            head, env.DELIVERY_SMOKE_STEP, env.DELIVERY_SMOKE_JOB)) return true;
+            head, deployName, id, run, attempt, smokeStep, smokeJob)) return true;
         }
       }
     } catch (error) {
@@ -76,30 +80,22 @@ export function linked(body: unknown, issue: number, session: string): boolean {
 }
 
 export async function gate(
-  github: Github, fctl: Fctl, env: Env, pr: Json, number: number, session?: Json,
+  github: Github, fctl: Fctl, env: Env, pr: Json, number: number, issued: boolean,
 ): Promise<boolean> {
   const head = record(pr.head).sha;
   if (!sha(head) || pr.state !== "open" || pr.draft !== false || record(pr.base).ref !== "main" ||
       String(record(record(pr.base).repo).id) !== env.REPO_ID || String(record(record(pr.head).repo).id) !== env.REPO_ID ||
       pr.mergeable !== true) return false;
-  if (!await github.verifyPullRequest(number, head, pr.merge_commit_sha, record(pr.base).sha) || !await github.fctlReviewCheck(head)) return false;
+  if (!await github.verifyPullRequest(number, head, pr.merge_commit_sha, record(pr.base).sha)) return false;
   const review = await fctl.currentReview(number, head);
-  if (review.state !== "passed" || review.findings !== 0 || review.still_open !== 0 || !identifierForReview(review)) return false;
+  if (review.state !== "passed" || review.findings !== 0 || review.still_open !== 0 ||
+      !identifier(review.session_id, "ses") || !await github.fctlReviewCheck(head, review.session_id)) return false;
 
-  if (session) {
-    const owned = list(session.pull_requests).map(record).find(p => p.number === number && fctlRepo(p.repo) === env.REPO);
-    const checks = record(owned?.checks);
-    if (!reviewPassed(checks, head, env.FCTL_PROJECT_ID) ||
-        record(checks.review).session_id !== review.session_id || record(review.opened_by).id !== session.id ||
-        session.branch !== record(pr.head).ref) return false;
+  if (issued) {
     const files = await github.pages(`/pulls/${number}/files`);
     if (integer(pr.changed_files) && files.length === pr.changed_files && files.length > 0 && files.every(file =>
       routineFile(file.filename) && (file.status === "renamed" ? routineFile(file.previous_filename) :
         !file.previous_filename && ["added", "modified", "removed"].includes(String(file.status))))) return true;
   }
   return approval(await github.pages(`/pulls/${number}/reviews`), head, env.HUMAN_REVIEWER_IDS ?? "", record(pr.user).id);
-}
-
-function identifierForReview(review: Json): boolean {
-  return typeof review.session_id === "string" && /^ses_[A-Za-z0-9]{1,64}$/.test(review.session_id);
 }

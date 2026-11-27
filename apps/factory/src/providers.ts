@@ -37,11 +37,14 @@ export class Fctl {
   constructor(private readonly env: Env) {}
 
   api(path: string, payload?: unknown, ops = false): Promise<unknown> {
+    return this.authenticated(path, ops ? this.env.FCTL_OPS_TOKEN : this.env.FCTL_TOKEN, payload);
+  }
+
+  private authenticated(path: string, token: string | undefined, payload?: unknown): Promise<unknown> {
     const base = new URL(this.env.FCTL_SERVER);
     if (base.protocol !== "https:" || base.username || base.password || base.pathname !== "/" || base.search || base.hash) {
       throw new Error("Invalid fctl origin");
     }
-    const token = ops ? this.env.FCTL_OPS_TOKEN : this.env.FCTL_TOKEN;
     if (!token) throw new Error("Missing fctl token");
     const headers = new Headers({Authorization: `Bearer ${token}`, "Content-Type": "application/json"});
     const {FCTL_ACCESS_CLIENT_ID: id, FCTL_ACCESS_CLIENT_SECRET: secret} = this.env;
@@ -117,9 +120,21 @@ export class Fctl {
   }
 
   async currentReview(pr: number, head: string): Promise<Json> {
-    const page = record(await this.api(`/projects/${this.env.FCTL_PROJECT_ID}/reviews?limit=100`));
-    return list(page.reviews).map(record).find(review => review.number === pr && review.head_sha === head &&
-      fctlRepo(review.repo) === this.env.REPO) ?? {};
+    const dispatchProject = this.env.FCTL_PROJECT_ID;
+    const project = this.env.FCTL_REVIEW_PROJECT_ID ?? dispatchProject;
+    if (!identifier(dispatchProject, "prj") || !identifier(project, "prj")) return {};
+    const token = project === dispatchProject ? this.env.FCTL_TOKEN : this.env.FCTL_REVIEW_TOKEN;
+    if (!token) return {};
+    try {
+      const page = record(await this.authenticated(`/projects/${project}/reviews?limit=100`, token));
+      const matches = list(page.reviews).map(record).filter(review => review.number === pr &&
+        review.head_sha === head && fctlRepo(review.repo) === this.env.REPO);
+      const review = matches[0];
+      return matches.length === 1 && (review.project_id === undefined || review.project_id === project) ? review : {};
+    } catch (error) {
+      if (error instanceof ProviderError && [401, 403, 404].includes(error.status)) return {};
+      throw error;
+    }
   }
 }
 
@@ -202,12 +217,15 @@ export class Github {
       list(run.pull_requests).map(record).some(pr => pr.number === number && record(pr.head).sha === head && record(pr.base).sha === base));
   }
 
-  async fctlReviewCheck(head: string): Promise<boolean> {
+  async fctlReviewCheck(head: string, session: string): Promise<boolean> {
     const checks = record(await this.api(`/commits/${head}/check-runs?check_name=fctl%20review&filter=latest&per_page=100`));
     const candidates = list(checks.check_runs).map(record).filter(check => check.name === "fctl review" &&
       check.head_sha === head && String(record(check.app).id) === this.env.GITHUB_REVIEW_APP_ID);
-    return typeof checks.total_count === "number" && checks.total_count <= 100 && candidates.length === 1 &&
-      candidates[0].status === "completed" && candidates[0].conclusion === "success";
+    if (typeof checks.total_count !== "number" || checks.total_count > 100 || candidates.length !== 1) return false;
+    const check = candidates[0];
+    const details = typeof check.details_url === "string" ? URL.parse(check.details_url) : null;
+    return check.status === "completed" && check.conclusion === "success" &&
+      details?.href === new URL(`/s/${session}`, this.env.FCTL_SERVER).href;
   }
 
   async hasNoClosingIssues(number: number): Promise<boolean> {
@@ -248,14 +266,14 @@ export class Github {
     return comparison.status === "ahead" && record(comparison.merge_base_commit).sha === commit;
   }
 
-  async productionChecks(head: string, page: number) {
+  async deliveryChecks(head: string, page: number, deployName: string) {
     const response = record(await this.api(
-      `/commits/${head}/check-runs?check_name=deploy-production&filter=all&status=completed&per_page=100&page=${page}`));
+      `/commits/${head}/check-runs?check_name=${deployName}&filter=all&status=completed&per_page=100&page=${page}`));
     if (!Array.isArray(response.check_runs) || response.check_runs.length > 100) {
-      throw new Error("Invalid production check page");
+      throw new Error("Invalid Delivery check page");
     }
     const candidates = response.check_runs.map(record).flatMap(check => {
-      if (check.name !== "deploy-production" || check.head_sha !== head || check.status !== "completed" ||
+      if (check.name !== deployName || check.head_sha !== head || check.status !== "completed" ||
           check.conclusion !== "success" || record(check.app).slug !== "github-actions" ||
           String(record(check.app).id) !== this.env.GITHUB_ACTIONS_APP_ID || typeof check.details_url !== "string") return [];
       const url = URL.parse(check.details_url);
@@ -270,7 +288,7 @@ export class Github {
     return {candidates, exhausted: response.check_runs.length < 100};
   }
 
-  async productionAttempt(run: number, attempt: number, head: string): Promise<boolean> {
+  async deliveryAttempt(run: number, attempt: number, head: string): Promise<boolean> {
     const evidence = record(await this.api(`/actions/runs/${run}/attempts/${attempt}`));
     return evidence.id === run && evidence.run_attempt === attempt && evidence.head_sha === head &&
       evidence.status === "completed" && evidence.conclusion === "success" && evidence.head_branch === "main" &&

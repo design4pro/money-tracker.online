@@ -8,6 +8,8 @@ export interface Env {
   FCTL_WORKSPACE_ID: string;
   FCTL_PROJECT_ID: string;
   FCTL_TOKEN: string;
+  FCTL_REVIEW_PROJECT_ID?: string;
+  FCTL_REVIEW_TOKEN?: string;
   FCTL_OPS_TOKEN: string;
   FCTL_WEBHOOK_SECRET: string;
   FCTL_ACCOUNT_ID: string;
@@ -31,6 +33,9 @@ export interface Env {
   HUMAN_REVIEWER_IDS?: string;
   BOOTSTRAP_PRS?: string;
   SOURCE_SHA?: string;
+  DELIVERY_TARGET?: string;
+  DELIVERY_STAGING_SMOKE_STEP?: string;
+  DELIVERY_STAGING_SMOKE_JOB?: string;
   DELIVERY_SMOKE_STEP?: string;
   DELIVERY_SMOKE_JOB?: string;
   MERGE_ENABLED?: string;
@@ -95,14 +100,6 @@ export function nativeRun(value: unknown, schedule: string, session: string, rep
     event.url === `https://github.com/${repo}/issues/${issue}`;
 }
 
-export function reviewPassed(value: unknown, head: string, project: string): boolean {
-  const checks = record(value);
-  const review = record(checks.review);
-  return checks.sha === head && review.project_id === project && review.state === "passed" &&
-    review.findings === 0 && (review.still_open === 0 || review.still_open === undefined) &&
-    identifier(review.session_id, "ses");
-}
-
 export function routineFile(path: unknown): boolean {
   if (typeof path !== "string" || !/^[A-Za-z0-9_./-]+$/.test(path) ||
       path.split("/").some(part => part.startsWith(".") || part === "")) return false;
@@ -128,17 +125,22 @@ export function approval(reviews: unknown[], head: string, ids: string, author: 
     Array.from(latest.values()).some(r => r.state === "APPROVED" && r.commit_id === head);
 }
 
-export function deployed(value: unknown, head: string, smokeStep?: string, smokeJob?: string): boolean {
+export type DeliveryTarget = "production" | "staging";
+
+export function deployed(value: unknown, head: string, deployName: string, id: number, run: number, attempt: number,
+  smokeStep?: string, smokeJob?: string): boolean {
   const response = record(value);
   const jobs = list(response.jobs).map(record);
   if (response.total_count !== jobs.length || !!smokeStep === !!smokeJob) return false;
   const successfulJob = (name: string) => {
     const matches = jobs.filter(job => job.name === name);
-    if (matches.length === 1 && matches[0].head_sha === head && matches[0].conclusion === "success") return matches[0];
+    const job = matches[0];
+    if (matches.length === 1 && job.head_sha === head && job.head_branch === "main" && job.run_id === run &&
+        job.run_attempt === attempt && job.status === "completed" && job.conclusion === "success") return job;
   };
-  const deploy = successfulJob("deploy-production");
-  if (!deploy) return false;
-  if (smokeJob) return smokeJob !== "deploy-production" && !!successfulJob(smokeJob);
+  const deploy = successfulJob(deployName);
+  if (deploy?.id !== id) return false;
+  if (smokeJob) return smokeJob !== deployName && !!successfulJob(smokeJob);
   const steps = list(deploy.steps).map(record).filter(step => step.name === smokeStep);
   return steps.length === 1 && steps[0].conclusion === "success";
 }
