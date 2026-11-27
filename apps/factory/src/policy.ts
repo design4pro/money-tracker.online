@@ -5,9 +5,26 @@ import type {Fctl, Github} from "./providers";
 
 export const UPSTREAM_SHA = "2aae986ff5ad1da1dd8d967498b3b32d6ded413d";
 
-export function issueEvidence(issue: Json): {feature: string; deployed: string} | undefined {
-  if (issue.state !== "open" || issue.pull_request || typeof issue.body !== "string" ||
-      !list(issue.labels).some(label => record(label).name === "factory:parity")) return;
+export const STAGING_UI_LABEL = "factory:staging-ui";
+const PARITY_LABEL = "factory:parity";
+const stagingMarker = /<!--\s*factory:staging-ui\b/gi;
+
+export function hasStagingClassification(issue: Json): boolean {
+  return list(issue.labels).some(label => record(label).name === STAGING_UI_LABEL) ||
+    typeof issue.body === "string" && !!issue.body.match(stagingMarker);
+}
+
+export function issueEvidence(issue: Json, staging = false): {feature: string; deployed: string} | undefined {
+  if (issue.state !== "open" || issue.pull_request || typeof issue.body !== "string") return;
+  const labels = list(issue.labels).map(label => record(label).name);
+  if (staging) {
+    if (!labels.includes(STAGING_UI_LABEL) || !labels.includes("type: feature") || labels.includes(PARITY_LABEL) ||
+        issue.body.match(stagingMarker)?.length !== 1 || /<!--\s*factory:parity\b/i.test(issue.body)) return;
+    const match = /^<!-- factory:staging-ui v1 feature_id=([a-z][a-z0-9-]{2,63}) upstream=v0\.34\.3@([0-9a-f]{40}) deployed=([0-9a-f]{40}) -->\r?$/m.exec(issue.body);
+    if (match?.[2] === UPSTREAM_SHA) return {feature: match[1], deployed: match[3]};
+    return;
+  }
+  if (!labels.includes(PARITY_LABEL) || hasStagingClassification(issue)) return;
   const match = /^<!-- factory:parity v1 feature_id=([a-z][a-z0-9-]{2,63}) upstream=v0\.34\.3@(\w{40}) deployed=([0-9a-f]{40}) -->\r?$/m.exec(issue.body);
   if (match?.[2] === UPSTREAM_SHA && issue.body.split("<!-- factory:parity ").length === 2) {
     return {feature: match[1], deployed: match[3]};

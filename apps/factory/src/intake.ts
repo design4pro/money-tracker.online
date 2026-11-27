@@ -2,6 +2,8 @@ import {record} from "./contracts";
 import type {Env, Json} from "./contracts";
 import {bytes, digest} from "./signatures";
 
+export type StagingIntake = {id: number; snapshot: string; feature: string; deployed: string};
+
 export type MaintainerIntake = {id: number; snapshot: string};
 
 export function maintainerIdentity(issue: Json, env: Env, number: number, id: number): boolean {

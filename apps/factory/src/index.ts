@@ -6,8 +6,8 @@ import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
 import type {Ingress} from "./ingress";
 import {featureSnapshot, maintainerIdentity} from "./intake";
-import type {MaintainerIntake} from "./intake";
-import {deployment, gate, issueEvidence, linked} from "./policy";
+import type {MaintainerIntake, StagingIntake} from "./intake";
+import {deployment, gate, hasStagingClassification, issueEvidence, linked} from "./policy";
 import type {DeploymentSearch} from "./policy";
 import {CREDENTIAL_PAUSE, Fctl, Github, ProviderError} from "./providers";
 import type {RecoveryProgress} from "./providers";
@@ -33,7 +33,7 @@ type CredentialRecovery = {
 type Ticket = {
   issue: number; actor: string; phase: Phase; created: number; due: number; failures: number; recoveryPending?: true;
   credentialRecovery?: CredentialRecovery;
-  maintainer?: MaintainerIntake; main?: string;
+  maintainer?: MaintainerIntake; staging?: StagingIntake; main?: string;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
   pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch; stagingHistory?: DeploymentSearch;
@@ -75,7 +75,15 @@ export class Factory extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
-    if (request.method === "GET" && new URL(request.url).pathname === "/ops/status") {
+    const path = new URL(request.url).pathname;
+    if (request.method === "GET" && path === "/health/staging-ui") {
+      if (this.env.DELIVERY_TARGET !== "staging") return new Response(null, {status: 404});
+      const {busy} = this.sql.exec(`SELECT
+        EXISTS(SELECT 1 FROM slot) OR
+        EXISTS(SELECT 1 FROM ticket WHERE phase NOT IN ('closed','blocked')) AS busy`).one();
+      return Response.json({idle: busy === 0, sourceSha: this.env.SOURCE_SHA ?? null}, {headers: {"Cache-Control": "no-store"}});
+    }
+    if (request.method === "GET" && path === "/ops/status") {
       if (!await bearer(request.headers, this.env.OPS_TOKEN)) return new Response(null, {status: 401});
       return Response.json({
         slot: this.sql.exec("SELECT issue FROM slot").toArray(),
@@ -92,7 +100,7 @@ export class Factory extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       if (!this.sql.exec("INSERT OR IGNORE INTO delivery VALUES (?, ?) RETURNING id", id, now).toArray().length) return;
       if (event.kind === "issue") {
-        const ticket: Ticket = {issue: event.issue, actor: event.actor, maintainer: event.maintainer, phase: "triage", due: now, created: now, failures: 0};
+        const ticket: Ticket = {issue: event.issue, actor: event.actor, maintainer: event.maintainer, staging: event.staging, phase: "triage", due: now, created: now, failures: 0};
         this.sql.exec("INSERT OR IGNORE INTO ticket VALUES (?, ?, ?, NULL, ?)", ticket.issue, ticket.phase, now, JSON.stringify(ticket));
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
@@ -277,7 +285,15 @@ export class Factory extends DurableObject<Env> {
     if (result === "recovery-pending") return result;
     const interrupted = result && "interruptedIdleAt" in result ? result.interruptedIdleAt : undefined;
     const parsed = result && !("interruptedIdleAt" in result) ? result : undefined;
-    if (!reservation && finish && interrupted === undefined) return parsed;
+    if (!reservation && finish && interrupted === undefined) {
+      if (ticket.staging && parsed && parsed.stage === stage && parsed.issue === ticket.issue &&
+          parsed.status !== "blocked") {
+        const matches = await verify();
+        if (this.finish(id, schedule)?.at !== finish.at) return "recovery-pending" as const;
+        if (!matches) return;
+      }
+      return parsed;
+    }
 
     if (reservation && parsed?.stage === stage && parsed.issue === ticket.issue) {
       let reason: string | undefined;
@@ -564,7 +580,7 @@ export class Factory extends DurableObject<Env> {
 
   private async readIssue(github: Github, ticket: Ticket): Promise<Json | undefined> {
     const path = `/issues/${ticket.issue}`;
-    return ticket.maintainer ? this.readEvidence(github, path, true) : record(await github.api(path));
+    return ticket.maintainer || ticket.staging ? this.readEvidence(github, path, true) : record(await github.api(path));
   }
 
   private async matchesMaintainer(ticket: Ticket, issue?: Json): Promise<boolean> {
@@ -576,15 +592,29 @@ export class Factory extends DurableObject<Env> {
       await featureSnapshot(issue) === maintainer.snapshot;
   }
 
+  private async matchesStaging(ticket: Ticket, issue?: Json, allowClosed = false): Promise<boolean> {
+    const staged = ticket.staging;
+    if (this.env.DELIVERY_TARGET !== "staging" || !staged || !issue || issue.number !== ticket.issue ||
+        issue.repository_url !== `https://api.github.com/repos/${this.env.REPO}`) return false;
+    const author = record(issue.user);
+    if (author.type !== "Bot" || author.id !== staged.id || String(author.id) !== this.env.GITHUB_DISCOVERY_BOT_ID ||
+        author.login !== ticket.actor) return false;
+    const open = allowClosed && issue.state === "closed" ? {...issue, state: "open"} : issue;
+    const evidence = issueEvidence(open, true);
+    return evidence?.feature === staged.feature && evidence.deployed === staged.deployed &&
+      await featureSnapshot(open) === staged.snapshot;
+  }
+
   private async matchesDispatchEvidence(github: Github, ticket: Ticket, stage: "plan" | "implement"): Promise<boolean> {
     return await this.checkComment(github, ticket.issue,
       stage === "plan" ? "triage" : "plan", stage === "plan" ? ticket.triageComment : ticket.planComment) &&
-      await this.matchesMaintainer(ticket, await this.readIssue(github, ticket));
+      (ticket.staging ? await this.matchesStaging(ticket, await this.readIssue(github, ticket)) :
+        await this.matchesMaintainer(ticket, await this.readIssue(github, ticket)));
   }
 
   private async triage(ticket: Ticket, fctl: Fctl, github: Github) {
     const {env} = this;
-    const {maintainer} = ticket;
+    const {maintainer, staging} = ticket;
     if (!ticket.credentialRecovery && Date.now() - ticket.created > DAY) {
       return this.block(ticket, maintainer ? "maintainer-triage-timeout" : "native-triage-timeout");
     }
@@ -593,7 +623,8 @@ export class Factory extends DurableObject<Env> {
       return this.block(ticket, "triage-schedule-identity");
     }
     const issue = await this.readIssue(github, ticket);
-    const evidence = issue && !maintainer ? issueEvidence(issue) : undefined;
+    const evidence = staging ? {feature: staging.feature, deployed: staging.deployed} :
+      issue && !maintainer ? issueEvidence(issue) : undefined;
     let runId: string | undefined;
     let sessionId: unknown;
     if (maintainer) {
@@ -609,6 +640,10 @@ export class Factory extends DurableObject<Env> {
       runId = dispatch.run;
       sessionId = dispatch.session;
     } else {
+      if (staging && !await this.matchesStaging(ticket, issue)) {
+        return ticket.credentialRecovery ? this.recoveryWait(ticket, "credential-recovery-evidence-changed-operator") :
+          this.block(ticket, "issue-evidence-changed");
+      }
       if (!issue || !evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
           record(issue.user).login !== ticket.actor) return this.block(ticket, "issue-evidence");
       if (this.tickets("feature=? AND issue<>?", evidence.feature, ticket.issue).length) return this.block(ticket, "duplicate-feature");
@@ -618,7 +653,7 @@ export class Factory extends DurableObject<Env> {
         if (reserved.stage !== "triage" || reserved.schedule !== schedule) {
           return this.recoveryWait(ticket, "credential-recovery-identity-operator");
         }
-        if (reserved.parity?.feature !== evidence.feature || reserved.parity.deployed !== evidence.deployed) {
+        if (!staging && (reserved.parity?.feature !== evidence.feature || reserved.parity.deployed !== evidence.deployed)) {
           return this.recoveryWait(ticket, "credential-recovery-evidence-changed-operator");
         }
         runId = reserved.run;
@@ -640,19 +675,21 @@ export class Factory extends DurableObject<Env> {
     const result = await this.stageResult(ticket, fctl, github, "triage", runId, schedule, session, finish, async () => {
       const current = await this.readIssue(github, ticket);
       if (maintainer) return this.matchesMaintainer(ticket, current);
+      if (staging) return this.matchesStaging(ticket, current);
       const parity = current && issueEvidence(current);
       return !!parity && parity.feature === evidence?.feature && parity.deployed === evidence?.deployed &&
         current.number === ticket.issue && String(record(current.user).id) === env.GITHUB_DISCOVERY_BOT_ID &&
         record(current.user).login === ticket.actor;
-    }, evidence);
+    }, staging ? undefined : evidence);
     if (result === "waiting" || result === "recovery-pending") return result;
     if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !ticket.credentialRecovery && !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
     if (evidence) {
-      const verified = await this.verifyDeployment(ticket, github, evidence.deployed);
+      const verified = await this.verifyDeployment(ticket, github, evidence.deployed, staging ? "staging" : "production");
       if (verified === undefined) return;
-      if (!verified) return this.block({...ticket, productionHistory: undefined}, "parity-deployment-evidence");
+      if (!verified) return this.block({...ticket, productionHistory: undefined, stagingHistory: undefined},
+        staging ? "staging-ui-deployment-evidence" : "parity-deployment-evidence");
     } else {
       const ref = record(await github.api("/git/ref/heads/main"));
       const commit = record(ref.object);
@@ -661,7 +698,7 @@ export class Factory extends DurableObject<Env> {
       }
       main = commit.sha;
     }
-    this.ticket(ticket, {phase: "ready", ...evidence, main, productionHistory: undefined, triageRun: runId, triageSession: sessionId,
+    this.ticket(ticket, {phase: "ready", ...evidence, main, productionHistory: undefined, stagingHistory: undefined, triageRun: runId, triageSession: sessionId,
       triageComment: result.comment, due: Date.now()});
   }
 
@@ -670,7 +707,10 @@ export class Factory extends DurableObject<Env> {
     const issue = ticket.issue;
     const provenance = ticket.maintainer
       ? {provenance: "maintainer", main_sha: ticket.main, issue_snapshot_sha256: ticket.maintainer.snapshot}
-      : {provenance: "parity", feature_id: ticket.feature, deployed_sha: ticket.deployed};
+      : ticket.staging
+        ? {provenance: "staging-ui", feature_id: ticket.staging.feature, deployed_sha: ticket.staging.deployed,
+          author_id: ticket.staging.id, actor: ticket.actor, issue_snapshot_sha256: ticket.staging.snapshot}
+        : {provenance: "parity", feature_id: ticket.feature, deployed_sha: ticket.deployed};
     const context = {repo: env.REPO, issue, ...provenance};
     switch (ticket.phase) {
       case "triage":
@@ -683,7 +723,7 @@ export class Factory extends DurableObject<Env> {
         });
         return;
       case "planned": {
-        if (!ticket.maintainer) {
+        if (!ticket.maintainer && !ticket.staging) {
           const current = record(await github.api(`/issues/${issue}`));
           const evidence = issueEvidence(current);
           if (!evidence || evidence.feature !== ticket.feature || evidence.deployed !== ticket.deployed ||
@@ -701,10 +741,11 @@ export class Factory extends DurableObject<Env> {
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
         // Reconciliation must use the exact context sent in the original POST.
-        const pending = ticket.maintainer && current.state === "queued"
+        const bound = ticket.maintainer || ticket.staging;
+        const pending = bound && current.state === "queued"
           ? {...current, context: JSON.stringify({...record(JSON.parse(current.context)), ticket_bot_id: env.GITHUB_TRIAGE_BOT_ID})}
           : current;
-        const dispatch = await this.dispatch(fctl, pending, ticket.maintainer
+        const dispatch = await this.dispatch(fctl, pending, bound
           ? () => this.matchesDispatchEvidence(github, ticket, stage)
           : undefined);
         if (dispatch.state === "blocked") {
@@ -718,7 +759,7 @@ export class Factory extends DurableObject<Env> {
           return finish ? this.block(ticket, "dispatch-session-identity", stage === "plan") : this.ticket(ticket, {});
         }
         const result = await this.stageResult(ticket, fctl, github, stage, String(dispatch.run), dispatch.schedule, session, finish, async () => {
-          if (ticket.maintainer) return this.matchesDispatchEvidence(github, ticket, stage);
+          if (bound) return this.matchesDispatchEvidence(github, ticket, stage);
           const current = await this.readIssue(github, ticket);
           const evidence = current && issueEvidence(current);
           return !!evidence && evidence.feature === ticket.feature && evidence.deployed === ticket.deployed &&
@@ -774,7 +815,7 @@ export class Factory extends DurableObject<Env> {
       this.implementationLink(pr, ticket, session) && this.sessionHasPR(session, number));
     if (pr.merged === true) {
       if (!ticket) return;
-      if (!relation || !sha(pr.merge_commit_sha) || String(record(record(pr.base).repo).id) !== this.env.REPO_ID ||
+      if (!relation || (ticket.staging && this.env.DELIVERY_TARGET !== "staging") || !sha(pr.merge_commit_sha) || String(record(record(pr.base).repo).id) !== this.env.REPO_ID ||
           String(record(record(pr.head).repo).id) !== this.env.REPO_ID) {
         return this.block(ticket, "merged-pr-provenance");
       }
@@ -810,7 +851,11 @@ export class Factory extends DurableObject<Env> {
         if (issue.state !== "closed" && await featureSnapshot(issue) !== ticket.maintainer.snapshot) {
           return this.block(release, "release-issue-evidence-changed", true);
         }
-      } else if (issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
+      } else if (ticket.staging) {
+        if (!await this.matchesStaging(ticket, issue, true)) {
+          return this.block(release, "release-issue-evidence-changed", true);
+        }
+      } else if (hasStagingClassification(issue) || issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
         return this.block(ticket, "release-issue-identity");
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});
@@ -828,7 +873,8 @@ export class Factory extends DurableObject<Env> {
     }
     if (ticket) this.ticket(ticket, {head: currentHead});
     if (this.env.MERGE_ENABLED !== "true") return;
-    const matches = relation && await gate(github, fctl, this.env, pr, number, !!ticket) && await github.hasNoClosingIssues(number);
+    const matchesIssue = () => ticket?.staging ? this.matchesDispatchEvidence(github, ticket, "implement") : true;
+    const matches = relation && await matchesIssue() && await gate(github, fctl, this.env, pr, number, !!ticket) && await github.hasNoClosingIssues(number);
     await github.setGate(currentHead, `factory-pr-${number}`, matches);
     if (!matches) return;
     const latest = record(await github.api(`/pulls/${number}`));
@@ -837,7 +883,7 @@ export class Factory extends DurableObject<Env> {
         record(latest.base).ref !== "main" || record(latest.base).sha !== record(pr.base).sha ||
         record(record(latest.base).repo).id !== record(record(pr.base).repo).id ||
         record(record(latest.head).repo).id !== record(record(pr.head).repo).id ||
-        record(latest.head).ref !== record(pr.head).ref || latest.body !== pr.body || !await github.hasNoClosingIssues(number)) {
+        record(latest.head).ref !== record(pr.head).ref || latest.body !== pr.body || !await github.hasNoClosingIssues(number) || !await matchesIssue()) {
       await github.setGate(currentHead, `factory-pr-${number}`, false);
       return;
     }

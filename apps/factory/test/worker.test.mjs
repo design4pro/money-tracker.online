@@ -88,6 +88,19 @@ function issue(number) {
     body: `<!-- factory:parity v1 feature_id=feature-${number} upstream=v0.34.3@${upstream} deployed=${head} -->`};
 }
 
+function stagingIssue(number) {
+  return {...issue(number), title: "Filter ledger transactions by direction",
+    repository_url: `https://api.github.com/repos/${repo}`,
+    labels: [{name: "factory:staging-ui"}, {name: "type: feature"}],
+    body: issue(number).body.replace("factory:parity", "factory:staging-ui")};
+}
+
+function stagingRun(number, actor = discovery.login) {
+  return {id: `srn_Staging${number}`, schedule_id: "sch_Triage", outcome: "started", trigger: "event",
+    session: {id: `ses_TriageStaging${number}`},
+    event: {kind: "issue_opened", number, repo: ref, actor, url: `https://github.com/${repo}/issues/${number}`}};
+}
+
 function session(id, schedule, access) {
   return {id, project_id: env.FCTL_PROJECT_ID, workspace: {id: env.FCTL_WORKSPACE_ID}, schedule: {id: schedule},
     agent_kind: "codex", github_access: access, created_at: sessionCreatedAt.get(id) ?? Date.now() - 10_000, branch: "codex/pilot",
@@ -144,7 +157,7 @@ async function provider(req) {
       }
       if (id === "sch_Plan") {
         calls.plan++;
-        if (ambiguousMaintainerPlan || context.provenance !== "maintainer") {
+        if (ambiguousMaintainerPlan || context.provenance === "parity") {
           return new Response(null, {status: 502});
         }
       }
@@ -269,8 +282,9 @@ async function provider(req) {
       const name = searchParams.get("check_name");
       if (name === "deploy-staging") {
         stagingLookups++;
-        assert.equal(sha, merge);
+        assert.equal(sha, stagingProof.head ?? merge);
         assert.equal(searchParams.get("filter"), "all");
+        if (stagingProof.missing) return json({total_count: 0, check_runs: []});
         return json({total_count: 1, check_runs: [{name, head_sha: sha, status: "completed", conclusion: "success",
           app: {id: 77, slug: "github-actions"}, details_url: `https://github.com/${repo}/actions/runs/5/job/505`,
           ...stagingProof.check}]});
@@ -316,10 +330,10 @@ async function provider(req) {
         pull_requests: [{number: 23, head: {sha: revision}, base: {sha: base}}]}]});
     }
     const stagingJob = {id: 505, run_id: 5, run_attempt: 2, name: "deploy-staging", head_branch: "main",
-      head_sha: merge, status: "completed", conclusion: "success"};
+      head_sha: stagingProof?.head ?? merge, status: "completed", conclusion: "success"};
     if (path === "/actions/jobs/505") return json(stagingJob);
     if (path === "/actions/runs/5/attempts/2") return json({
-      id: 5, run_attempt: 2, head_sha: merge, head_branch: "main", status: "completed", conclusion: "success",
+      id: 5, run_attempt: 2, head_sha: stagingJob.head_sha, head_branch: "main", status: "completed", conclusion: "success",
       event: "workflow_run", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100},
       ...stagingProof.attempt,
     });
@@ -500,6 +514,10 @@ const triage = number => ({v: 1, stage: "triage", status: "ready", issue: number
 
 test("signed pilot pipeline survives replays, out-of-order evidence and ambiguous dispatch", async () => {
   assert.equal((await call("/health")).status, 200);
+  assert.equal((await call("/health/staging-ui")).status, 404);
+  assert.equal((await github({...opened(99), issue: stagingIssue(99)})).status, 403);
+  assert.equal((await github({...opened(99), issue: {...issue(99),
+    body: issue(99).body + "\n" + stagingIssue(99).body}})).status, 403);
   assert.equal((await call("/ops/status")).status, 401);
   assert.equal((await github(opened(1), "fake", `sha256=${"0".repeat(64)}`)).status, 401);
   assert.equal((await finish("sch_Triage", "ses_Triage1", triage(1), 0, true)).status, 401);
@@ -1014,13 +1032,72 @@ for (const order of ["signed order", "reverse arrival order"]) {
     () => stagingRelease("skipped", order));
 }
 
-async function stagingRelease(productionConclusion, recovery) {
+test("staging intake rejects conflicting classifications, unbound evidence and incomplete exact smoke", async () => {
+  const old = mf;
+  const previousRuns = runs.sch_Triage;
+  const previousNative = native;
+  mf = new Miniflare({...workerOptions, bindings: {...env, DELIVERY_TARGET: "staging", HUMAN_REVIEWER_IDS: "81",
+    DELIVERY_STAGING_SMOKE_STEP: "Deploy and verify staging", MERGE_ENABLED: "false"}});
+  const find = async number => (await status()).tickets.find(ticket => ticket.issue === number);
+  const open = (issue, sender = discovery) => github({action: "opened", issue, sender});
+  const original = stagingIssue(71);
+  try {
+    const user = {id: 81, login: "maintainer", type: "User"};
+    assert.equal((await open({...original, user}, user)).status, 403);
+    assert.equal((await open(original, {...discovery, id: 34})).status, 403);
+    assert.equal((await open({...original, user: {...discovery, id: 34}}, {...discovery, id: 34})).status, 403);
+    assert.equal((await open(original, {...discovery, login: "other[bot]"})).status, 403);
+    assert.equal((await open({...original, labels: [...original.labels, {name: "factory:parity"}]})).status, 403);
+    assert.equal((await open({...original, body: original.body + "\n" + original.body})).status, 403);
+    assert.equal((await open({...original, body: original.body.replace(upstream, otherHead)})).status, 403);
+    const lookups = productionLookups;
+    const stageLookups = stagingLookups;
+    native = true;
+    runs.sch_Triage = [71, 72, 73, 74, 75].map(number => stagingRun(number));
+    for (const [number, proof] of [
+      [71, {}],
+      [72, {attempt: {head_sha: otherHead}}],
+      [73, {job: {steps: [{name: "Deploy and verify staging", conclusion: "failure"}]}}],
+      [74, {missing: true}],
+      [75, {job: {steps: []}}],
+    ]) {
+      const staged = stagingIssue(number);
+      currentIssues.set(number, number === 71 ? {...staged, body: staged.body.replace(head, otherHead)} : staged);
+      stagingProof = {head, ...proof};
+      assert.equal((await open(staged)).status, 202);
+      const comment = number + 1000;
+      issueComments.set(comment, {id: comment, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`,
+        body: "<!-- factory:triage v1 -->"});
+      await finish("sch_Triage", `ses_TriageStaging${number}`, {v: 1, stage: "triage", status: "ready", issue: number, comment});
+      await tick();
+      assert.equal((await find(number)).reason, number === 71 ? "issue-evidence-changed" : "staging-ui-deployment-evidence", JSON.stringify(await status()));
+    }
+    assert.equal(productionLookups, lookups);
+    assert.equal(stagingLookups, stageLookups + 4);
+    assert.deepEqual((await status()).slot, []);
+  } finally {
+    stagingProof = undefined;
+    runs.sch_Triage = previousRuns;
+    native = previousNative;
+    for (const number of [71, 72, 73, 74, 75]) {
+      currentIssues.delete(number);
+      issueComments.delete(number + 1000);
+    }
+    await mf.dispose();
+    mf = old;
+  }
+});
+
+test("native staging UI intake keeps its signed snapshot through implementation recovery and exact staging closure",
+  () => stagingRelease("skipped", "restart", true));
+
+async function stagingRelease(productionConclusion, recovery, staging = false) {
   const number = 41;
-  const author = {type: "User", id: 81, login: "maintainer"};
-  const openedIssue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+  const author = staging ? discovery : {type: "User", id: 81, login: "maintainer"};
+  const openedIssue = staging ? stagingIssue(number) : {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
     title: "Adjust a pilot feature", body: "Acceptance criteria", labels: [{name: "type: feature"}]};
   const old = mf;
-  const bindings = {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false", DELIVERY_TARGET: "staging",
+  const bindings = {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false", DELIVERY_TARGET: "staging", SOURCE_SHA: head,
     DELIVERY_STAGING_SMOKE_STEP: "Deploy and verify staging", FCTL_REVIEW_PROJECT_ID: reviewProject,
     FCTL_REVIEW_TOKEN: "fake-review-pat"};
   mf = new Miniflare({...workerOptions, bindings});
@@ -1028,7 +1105,8 @@ async function stagingRelease(productionConclusion, recovery) {
   const initialProduction = productionLookups;
   const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
   const configure = changes => mf.setOptions({...workerOptions, bindings: {...bindings, MERGE_ENABLED: "true", ...changes}});
-  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase};
+  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native};
+  const previousRuns = runs.sch_Triage;
   try {
     currentIssues.set(number, openedIssue);
     for (const [id, stage] of [[410, "triage"], [411, "plan"]]) {
@@ -1042,8 +1120,26 @@ async function stagingRelease(productionConclusion, recovery) {
     revision = head;
     conclusion = "success";
     splitReview = {record: {}};
-    await github({action: "opened", issue: openedIssue, sender: author});
-    await finish("sch_Maintainer", "ses_Maintainer41", {v: 1, stage: "triage", status: "ready", issue: number, comment: 410});
+    if (staging) {
+      assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: true, sourceSha: head});
+      native = true;
+      runs.sch_Triage = [stagingRun(number, "wrong[bot]")];
+      stagingProof = {head};
+    }
+    assert.equal((await github({action: "opened", issue: openedIssue, sender: author})).status, 202);
+    const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 410};
+    if (staging) {
+      assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: false, sourceSha: head});
+      const at = Date.now() + 1000;
+      const id = `ses_TriageStaging${number}`;
+      transcripts.set(id, completionEvents(triageResult, at));
+      await finish("sch_Triage", id, undefined, 0, false, {at, turns: 1});
+      await tick();
+      assert.equal((await find()).phase, "triage");
+      runs.sch_Triage = [stagingRun(number)];
+    } else {
+      await finish("sch_Maintainer", "ses_Maintainer41", triageResult);
+    }
     await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 411});
     const id = "ses_Implement";
     const result = {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23};
@@ -1161,6 +1257,17 @@ async function stagingRelease(productionConclusion, recovery) {
     assert.equal((await find())?.phase, "pr", JSON.stringify(await status()));
     assert.equal((await find()).pr, 23);
     assert.equal(calls.merges.length, initial.merges);
+    if (staging) {
+      const snapshot = createHash("sha256").update(JSON.stringify([openedIssue.title, openedIssue.body, "type: feature"])).digest("hex");
+      for (const [session, field, comment] of [["ses_Plan", "triage_comment", 410], ["ses_Implement", "plan_comment", 411]]) {
+        const {v, invocation, ...context} = JSON.parse(contexts.get(session));
+        assert.equal(v, 1);
+        assert.ok(invocation);
+        assert.deepEqual(context, {repo, issue: number, provenance: "staging-ui", feature_id: `feature-${number}`,
+          deployed_sha: head, author_id: discovery.id, actor: discovery.login, issue_snapshot_sha256: snapshot,
+          [field]: comment, ticket_bot_id: "33"});
+      }
+    }
 
     for (const changes of [{FCTL_REVIEW_TOKEN: ""}, {FCTL_REVIEW_TOKEN: env.FCTL_TOKEN},
       {FCTL_REVIEW_PROJECT_ID: "prj_Wrong"}]) {
@@ -1193,6 +1300,13 @@ async function stagingRelease(productionConclusion, recovery) {
     assert.equal(calls.merges.length, initial.merges);
     assert.equal(calls.gates.at(-1).conclusion, "failure");
     approvedHead = head;
+    if (staging) {
+      currentIssues.set(number, {...openedIssue, title: "Changed scope"});
+      await tick();
+      assert.equal(calls.gates.at(-1).conclusion, "failure");
+      assert.equal(calls.merges.length, initial.merges);
+      currentIssues.set(number, openedIssue);
+    }
     await tick();
     assert.deepEqual(calls.merges.slice(initial.merges), [head]);
 
@@ -1233,8 +1347,11 @@ async function stagingRelease(productionConclusion, recovery) {
     assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
     assert.equal(calls.implement, initial.implement + 1);
     assert.equal(productionLookups, initialProduction);
+    if (staging) assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: true, sourceSha: head});
   } finally {
-    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase} = saved);
+    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native} = saved);
+    runs.sch_Triage = previousRuns;
+    transcripts.delete(`ses_TriageStaging${number}`);
     splitReview = stagingProof = approvedHead = undefined;
     changedPath = "apps/app/src/ui/view.css";
     await mf.dispose();
