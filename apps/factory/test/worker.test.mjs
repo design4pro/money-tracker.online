@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {createHmac, generateKeyPairSync} from "node:crypto";
+import {createHash, createHmac, generateKeyPairSync} from "node:crypto";
 import {after, before, test} from "node:test";
 import {build} from "esbuild";
 import {sendAlert} from "../../../scripts/monitor.mjs";
@@ -33,6 +33,11 @@ let serial = 0;
 const calls = {plan: 0, implement: 0, ops: 0, retroReads: 0, retroRuns: [], githubRequests: 0, prReads: 0, merges: [], closed: [], gates: []};
 const runs = {sch_Triage: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
+const currentIssues = new Map();
+const issueComments = new Map();
+let productionAvailable = true;
+let productionLookups = 0;
+let linkedIssue = 1;
 let native = false;
 let implemented = false;
 let changedHead = false;
@@ -108,7 +113,7 @@ async function provider(req) {
       contexts.set(sessionId, body.context);
       if (id === "sch_Plan") {
         calls.plan++;
-        return new Response(null, {status: 502});
+        if (JSON.parse(body.context).provenance !== "maintainer") return new Response(null, {status: 502});
       }
       if (id === "sch_Implement") calls.implement++;
       if (id === "sch_Ops") {
@@ -138,10 +143,12 @@ async function provider(req) {
     const path = pathname.replace(`/repos/${repo}`, "");
     if (/^\/issues\/\d+$/.test(path)) {
       if (method === "PATCH") calls.closed.push(path);
-      return json(issue(Number(path.split("/").at(-1))));
+      const number = Number(path.split("/").at(-1));
+      return json(currentIssues.get(number) ?? issue(number));
     }
     if (path.startsWith("/issues/comments/")) {
       const id = Number(path.split("/").at(-1));
+      if (issueComments.has(id)) return json(issueComments.get(id));
       const stage = id === 101 ? "plan" : "triage";
       return json({id, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${id === 102 ? 2 : 1}`,
         body: `<!-- factory:${stage} v1 -->\nEvidence`});
@@ -154,7 +161,7 @@ async function provider(req) {
         ...(implemented ? {merged_at: new Date().toISOString()} : {}),
         draft: false, mergeable: true, base: {ref: "main", sha: base, repo: {id: 100}},
         head: {sha: next, ref: "codex/pilot", repo: {id: 100}}, changed_files: 1,
-        body: "<!-- factory:implementation v1 issue=1 session=ses_Implement -->"});
+        body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`});
     }
     if (path === "/pulls/23/files") return json([{filename: "apps/app/src/ui/view.css", status: "modified"}]);
     if (path === "/pulls/23/merge") {
@@ -163,7 +170,7 @@ async function provider(req) {
       mainHead = merge;
       return json({merged: true, sha: merge});
     }
-    if (path === "/git/ref/heads/main") return json({object: {sha: mainHead}});
+    if (path === "/git/ref/heads/main") return json({ref: "refs/heads/main", object: {type: "commit", sha: mainHead}});
     if (path === `/git/commits/${candidate}`) return json({parents: [{sha: candidateBase}, {sha: revision}]});
     if (path === "/check-runs") {
       calls.gates.push(body);
@@ -173,6 +180,8 @@ async function provider(req) {
       const sha = path.split("/")[2];
       const name = searchParams.get("check_name");
       if (name === "deploy-production") {
+        productionLookups++;
+        if (!productionAvailable) return json({total_count: 0, check_runs: []});
         assert.ok([head, merge].includes(sha), "expected an exact SHA at the provider boundary");
         assert.equal(searchParams.get("filter"), "all");
         assert.equal(searchParams.get("status"), "completed");
@@ -552,5 +561,160 @@ test("missing jobs and failed automatic attempts cannot starve successful manual
     assert.equal(goneAttemptLookups, 1);
   } finally {
     manualProof = false;
+  }
+});
+
+test("signed maintainer intake plans and dispatches without production evidence", async () => {
+  const author = {type: "User", id: 81, login: "maintainer"};
+  const number = 31;
+  const openedIssue = {
+    number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+    title: "Add a pilot feature", body: "Acceptance criteria",
+    labels: [{name: "type: feature"}, {name: "pilot"}],
+  };
+  const opening = {action: "opened", issue: openedIssue, sender: author};
+  const addComment = (id, issue, stage) => issueComments.set(id, {
+    id, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${issue}`,
+    body: `<!-- factory:${stage} v1 -->\nEvidence`,
+  });
+  const nativeRun = (issue, actor, changes) => ({
+    schedule_id: "sch_Triage", outcome: "started", trigger: "event", id: `srn_Triage${issue}`,
+    session: {id: `ses_Triage${issue}`},
+    event: {kind: "issue_opened", number: issue, repo: ref, actor, url: `https://github.com/${repo}/issues/${issue}`, ...changes},
+  });
+  const find = async issue => (await status()).tickets.find(ticket => ticket.issue === issue);
+  const old = mf;
+  assert.equal((await github(opening)).status, 403);
+  mf = new Miniflare({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false"}});
+  native = true;
+  productionAvailable = false;
+  mainHead = base;
+  runs.sch_Triage = [];
+  linkedIssue = number;
+  implemented = false;
+  const initial = {...calls, closed: calls.closed.length, merges: calls.merges.length};
+  const lookups = productionLookups;
+  try {
+    assert.equal((await github(opening, "forged", `sha256=${"0".repeat(64)}`)).status, 401);
+    for (const changes of [
+      {sender: {...author, id: 82}},
+      {sender: {...author, login: "other"}},
+      {sender: {...author, type: "Bot"}},
+      {repository: {full_name: repo, id: 101}},
+      {repository: {full_name: "elsewhere/money-tracker.online", id: 100}},
+      {issue: {...openedIssue, repository_url: "https://api.github.com/repos/elsewhere/money-tracker.online"}},
+      {issue: {...openedIssue, labels: [{name: "factory:parity"}]}},
+      {issue: {...openedIssue, user: {...author, id: 82}}, sender: {...author, id: 82}},
+    ]) assert.equal((await github({...opening, ...changes})).status, 403);
+    currentIssues.set(number, openedIssue);
+    assert.equal((await github(opening)).status, 202);
+    assert.equal((await github(opening, "different-delivery")).status, 202);
+    addComment(310, number, "triage");
+    await finish("sch_Triage", "ses_Triage31", {v: 1, stage: "triage", status: "ready", issue: number, comment: 310});
+    runs.sch_Triage.push(nativeRun(number, "other"), nativeRun(number, author.login, {repo: {...ref, owner: "other"}}));
+    await tick();
+    assert.equal((await find(number)).phase, "triage");
+    assert.equal(calls.plan, initial.plan);
+
+    runs.sch_Triage.push(nativeRun(number, author.login));
+    for (let step = 0; step < 4; step++) await tick();
+    assert.equal(calls.plan, initial.plan + 1);
+    const snapshot = createHash("sha256").update(JSON.stringify([openedIssue.title, openedIssue.body, "type: feature"])).digest("hex");
+    const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot};
+    const {invocation: planInvocation, ...plan} = JSON.parse(contexts.get("ses_Plan"));
+    assert.ok(planInvocation);
+    assert.deepEqual(plan, {v: 1, ...context, triage_comment: 310});
+    assert.equal((await status()).audit.filter(entry => entry.subject === String(number) && entry.action === "issue-observed").length, 1);
+    addComment(311, number, "plan");
+    await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 311});
+    await tick();
+    await tick();
+    assert.equal((await find(number)).phase, "implement");
+    currentIssues.set(number, {...openedIssue, labels: [{name: "status: in progress"}, {name: "type: feature"}]});
+    await tick();
+    assert.equal(calls.implement, initial.implement + 1);
+    const {invocation: implementInvocation, ...implementation} = JSON.parse(contexts.get("ses_Implement"));
+    assert.ok(implementInvocation);
+    assert.deepEqual(implementation, {v: 1, ...context, plan_comment: 311});
+    assert.equal(productionLookups, lookups);
+
+    const parityIssue = 32;
+    assert.equal((await github(opened(parityIssue))).status, 202);
+    addComment(320, parityIssue, "triage");
+    runs.sch_Triage.push(nativeRun(parityIssue, discovery.login));
+    await finish("sch_Triage", "ses_Triage32", {v: 1, stage: "triage", status: "ready", issue: parityIssue, comment: 320});
+    await tick();
+    assert.equal((await find(parityIssue)).reason, "parity-deployment-evidence");
+
+    await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23});
+    await tick();
+    await tick();
+    assert.deepEqual((await status()).slot, [{issue: number}]);
+    assert.equal(calls.merges.length, initial.merges);
+    assert.equal((await find(number)).phase, "pr");
+    implemented = true;
+    mainHead = merge;
+    await tick();
+    assert.equal((await find(number)).phase, "release");
+    assert.equal(calls.closed.length, initial.closed);
+    productionAvailable = true;
+    manualProof = true;
+    for (let step = 0; step < 4; step++) await tick();
+    assert.equal((await find(number)).phase, "closed");
+    assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
+  } finally {
+    await mf.dispose();
+    mf = old;
+    manualProof = false;
+    linkedIssue = 1;
+  }
+});
+
+test("maintainer issue edits or identity changes block a queued implementation", async () => {
+  const user = {type: "User", id: 81, login: "maintainer"};
+  const old = mf;
+  const initial = calls.implement;
+  try {
+    for (const [index, changes] of [
+      {title: "Changed title"},
+      {body: "Changed acceptance criteria"},
+      {labels: [{name: "status: in progress"}]},
+      {user: {...user, id: 82}},
+      {state: "closed"},
+    ].entries()) {
+      const number = 40 + index;
+      const current = {number, user, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+        title: "Pilot feature", body: null, labels: [{name: "type: feature"}]};
+      currentIssues.set(number, current);
+      const sessionId = `ses_Triage${number}`;
+      runs.sch_Triage = [{
+        schedule_id: "sch_Triage", outcome: "started", trigger: "event", id: `srn_Triage${number}`, session: {id: sessionId},
+        event: {kind: "issue_opened", number, repo: ref, actor: user.login, url: `https://github.com/${repo}/issues/${number}`},
+      }];
+      for (const [id, stage] of [[400, "triage"], [401, "plan"]]) issueComments.set(id, {
+        id, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`, body: `<!-- factory:${stage} v1 -->`,
+      });
+      mf = new Miniflare({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false"}});
+      try {
+        assert.equal((await github({action: "opened", issue: current, sender: user})).status, 202);
+        await finish("sch_Triage", sessionId, {v: 1, stage: "triage", status: "ready", issue: number, comment: 400});
+        for (let step = 0; step < 4; step++) await tick();
+        await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 401});
+        await tick();
+        await tick();
+        assert.equal((await status()).tickets[0].phase, "implement");
+        currentIssues.set(number, {...current, ...changes});
+        await tick();
+        const state = await status();
+        assert.equal(state.tickets[0].reason, "issue-evidence-changed");
+        assert.equal(state.tickets[0].phase, "blocked");
+        assert.deepEqual(state.slot, []);
+        assert.equal(calls.implement, initial);
+      } finally {
+        await mf.dispose();
+      }
+    }
+  } finally {
+    mf = old;
   }
 });

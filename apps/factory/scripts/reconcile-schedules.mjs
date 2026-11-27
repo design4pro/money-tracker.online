@@ -22,6 +22,7 @@ function call(args, json = true) {
 if (call(["--version"], false) !== "fctl 0.39.0") throw new Error("Use the fctl 0.39.0 CLI.");
 
 const repo = "design4pro/money-tracker.online";
+const triageLabels = ["factory:parity", "type: feature"];
 const profiles = [
   {key: "PARITY", access: "comment", cron: "0 9 * * 1"},
   {key: "TRIAGE", access: "triage", event: true},
@@ -49,11 +50,13 @@ for (const profile of profiles) {
   if (found.length > 1) throw new Error(`Resolve duplicate schedules named ${name} before setup.`);
   const schedule = found[0];
   const when = profile.cron ? ["--cron", profile.cron] : profile.event ?
-    ["--on", "issue-opened", "--repo", repo, "--label", "factory:parity", "--by", "agents", "--max-per-hour", "3", "--max-per-day", "10"] :
+    ["--on", "issue-opened", "--repo", repo, "--label", triageLabels.join(","), "--by", "writers", "--max-per-hour", "3", "--max-per-day", "10"] :
     ["--when-asked"];
   const flags = ["--task-file", path, "--agent", "codex", "--base", "main", "--github", profile.access, "--tz", "Europe/Warsaw", ...when];
-  const expectedEvent = profile.event && schedule?.event?.kind === "issue_opened" && schedule.event.by === "agents" &&
-    String(schedule.event.repos) === repo && String(schedule.event.labels) === "factory:parity" &&
+  const expectedEvent = profile.event && schedule?.event?.kind === "issue_opened" && schedule.event.by === "writers" &&
+    Array.isArray(schedule.event.repos) && schedule.event.repos.length === 1 && schedule.event.repos[0] === repo &&
+    Array.isArray(schedule.event.labels) && schedule.event.labels.length === triageLabels.length &&
+    triageLabels.every(label => schedule.event.labels.includes(label)) &&
     !schedule.event.branches?.length && schedule.event.max_per_hour === 3 && schedule.event.max_per_day === 10;
   const drift = schedule && (schedule.prompt?.trim() !== prompt || schedule.agent_kind !== "codex" || schedule.base_branch !== "main" ||
     schedule.github_access !== profile.access || schedule.timezone !== "Europe/Warsaw" || (schedule.cron ?? undefined) !== profile.cron ||
@@ -61,7 +64,7 @@ for (const profile of profiles) {
   if (drift && schedule.enabled) throw new Error(`Pause ${name} before reconciling its drift.`);
   const result = schedule ? drift ? schedules("edit", schedule.id, ...flags) : schedule :
     schedules("add", name, ...flags, "--paused");
-  if (!/^sch_[A-Za-z0-9]+$/.test(result.id ?? "") || result.project_id !== project) throw new Error(`Unexpected identity for ${name}`);
+  if (!/^sch_[A-Za-z0-9]+$/.test(result.id ?? "") || result.project_id !== project || (schedule && result.id !== schedule.id)) throw new Error(`Unexpected identity for ${name}`);
   ids[`${profile.key}_SCHEDULE_ID`] = result.id;
   existing.push({id: result.id, enabled: result.enabled, created: !schedule});
 }
