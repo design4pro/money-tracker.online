@@ -92,20 +92,22 @@ export class Factory extends DurableObject<Env> {
         this.sql.exec("INSERT OR IGNORE INTO ticket VALUES (?, ?, ?, NULL, ?)", ticket.issue, ticket.phase, now, JSON.stringify(ticket));
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
+        // A known mismatch cannot replace or prevent storage of a signed
+        // turn candidate for the reserved stage, regardless of delivery order.
+        if (event.result && this.sql.exec(`SELECT 1 FROM ticket
+          WHERE phase IN ('triage','plan','implement')
+            AND json_extract(state,'$.credentialRecovery.session') = ?
+            AND json_extract(state,'$.credentialRecovery.schedule') = ?
+            AND (issue != ? OR phase != ?) LIMIT 1`,
+        event.session, event.schedule, event.result.issue, event.result.stage).toArray().length) return;
+
         // Keep out-of-order results until exact schedule/run/session evidence exists.
-        // Prefer a parsed message over recoverable evidence, unless a reserved
-        // continuation proves that message names the wrong issue or stage.
+        // Prefer a parsed message over recoverable evidence, and either over a non-result event.
         this.sql.exec(`INSERT INTO result VALUES (?, ?, ?, ?) ON CONFLICT(session) DO UPDATE SET
           at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (
-            excluded.issue IS NOT NULL OR
-            (json_type(excluded.state,'$.completedTurns') = 'integer' AND (
-              result.issue IS NULL OR EXISTS (
-                SELECT 1 FROM ticket
-                WHERE phase IN ('triage','plan','implement')
-                  AND json_extract(ticket.state,'$.credentialRecovery.session') = excluded.session
-                  AND json_extract(ticket.state,'$.credentialRecovery.schedule') = json_extract(excluded.state,'$.schedule')
-                  AND (ticket.issue != result.issue OR phase != json_extract(result.state,'$.result.stage'))))) OR
-            (result.issue IS NULL AND json_type(result.state,'$.completedTurns') IS NULL))
+            excluded.issue IS NOT NULL OR (result.issue IS NULL AND (
+              json_type(excluded.state,'$.completedTurns') = 'integer' OR
+              json_type(result.state,'$.completedTurns') IS NULL)))
             AND (json_type(result.state,'$.recovery.interruptedIdleAt') IS NULL OR
               json_extract(excluded.state,'$.turns') > json_extract(result.state,'$.completedTurns'))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));

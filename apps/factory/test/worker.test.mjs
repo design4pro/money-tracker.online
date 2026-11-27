@@ -1069,17 +1069,18 @@ async function stagingRelease(productionConclusion, recovery) {
         assert.equal((await find()).phase, "implement");
         assert.deepEqual((await status()).slot, [{issue: number}]);
         assert.equal(continuations.length, before + 1);
+        const validAt = finishAt + 8000;
         const mismatched = {v: 1, stage: "plan", status: "planned", issue: number, comment: 411};
-        await finish("sch_Implement", id, mismatched, 0, false, {at: finishAt + 8000, turns: 2});
+        await finish("sch_Implement", id, mismatched, 0, false, {at: validAt + 8000, turns: 3});
         await tick();
         assert.equal((await find()).phase, "implement");
-        const validAt = finishAt + 16_000;
-        for (const [value, time] of [[mismatched, finishAt + 8000], [result, validAt]]) {
+        for (const [value, time] of [[result, validAt], [mismatched, validAt + 8000], [mismatched, validAt + 16_000]]) {
           questionTurn.push(...completionEvents(value, time).slice(-4)
             .map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
         }
-        sessionState.set(id, ownedSession("idle", undefined, 3));
-        await finish("sch_Implement", id, undefined, 0, false, {at: validAt, turns: 3});
+        sessionState.set(id, ownedSession("idle", undefined, 4));
+        await finish("sch_Implement", id, undefined, 0, false, {at: validAt, turns: 2});
+        await finish("sch_Implement", id, mismatched, 0, false, {at: validAt + 16_000, turns: 4});
       } else {
         const stoppedAt = Date.now();
         sessionState.set(id, ownedSession("stopped"));
