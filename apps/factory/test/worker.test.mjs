@@ -239,8 +239,13 @@ async function provider(req) {
         body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`});
     }
     if (path === "/pulls/25") return json({
-      number: 25, base: {ref: "main", repo: {id: 100}}, head: {sha: revision, ref: "codex/pilot", repo: {id: 100}},
+      number: 25, state: "open", base: {ref: "main", repo: {id: 100}}, head: {sha: revision, ref: "codex/pilot", repo: {id: 100}},
       body: `<!-- factory:implementation v1 issue=${linkedIssue + 1} session=ses_Implement -->`,
+    });
+    if (path === "/pulls/26") return json({
+      number: 26, state: "closed", merged: false, base: {ref: "main", repo: {id: 100}},
+      head: {sha: revision, ref: "codex/pilot", repo: {id: 100}},
+      body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`,
     });
     if (path === "/pulls/23/files") return json([{filename: changedPath, status: "modified"}]);
     if (path === "/pulls/23/reviews") return json(approvedHead ? [{
@@ -1075,18 +1080,20 @@ async function stagingRelease(productionConclusion, recovery) {
         assert.equal((await find()).phase, "implement");
         assert.deepEqual((await status()).slot, [{issue: number}]);
         assert.equal(continuations.length, before + 1);
-        const validAt = finishAt + 8000;
+        const blockedAt = finishAt + 8000;
+        const validAt = blockedAt + 8000;
+        const staleBlock = {v: 1, stage: "implement", status: "blocked", issue: number};
         const wrongStage = {v: 1, stage: "plan", status: "planned", issue: number, comment: 411};
         const wrongIssue = {...result, issue: number + 1};
         const laterTurns = [wrongStage, wrongIssue, wrongStage, wrongIssue].map((value, index) => ({
-          value, at: validAt + 8000 * (index + 1), turns: index + 3,
+          value, at: validAt + 8000 * (index + 1), turns: index + 4,
         }));
         for (const {value, at, turns} of laterTurns.slice(0, 2)) {
           await finish("sch_Implement", id, value, 0, false, {at, turns});
         }
         await tick();
         assert.equal((await find()).phase, "implement");
-        for (const {value, at} of [{value: result, at: validAt}, ...laterTurns]) {
+        for (const {value, at} of [{value: staleBlock, at: blockedAt}, {value: result, at: validAt}, ...laterTurns]) {
           questionTurn.push(...completionEvents(value, at).slice(-4)
             .map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
         }
@@ -1094,10 +1101,12 @@ async function stagingRelease(productionConclusion, recovery) {
         const malformed = completionEvents(result, malformedAt).slice(-4);
         malformed[0].data.message.content[0].text = "Missing the stage JSON.";
         questionTurn.push(...malformed.map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
-        sessionState.set(id, ownedSession("idle", undefined, 7));
-        const opaqueFinishes = [{at: validAt, turns: 2}, {at: malformedAt, turns: 7}];
-        if (recovery === "reverse arrival order") opaqueFinishes.reverse();
-        for (const options of opaqueFinishes) await finish("sch_Implement", id, undefined, 0, false, options);
+        sessionState.set(id, ownedSession("idle", undefined, 8));
+        const finishes = [
+          {value: staleBlock, at: blockedAt, turns: 2}, {at: validAt, turns: 3}, {at: malformedAt, turns: 8},
+        ];
+        if (recovery === "reverse arrival order") finishes.reverse();
+        for (const {value, ...options} of finishes) await finish("sch_Implement", id, value, 0, false, options);
         for (const {value, at, turns} of laterTurns.slice(2)) {
           await finish("sch_Implement", id, value, 0, false, {at, turns});
         }
@@ -1125,20 +1134,25 @@ async function stagingRelease(productionConclusion, recovery) {
         assert.equal(continuations.length, before + 1);
         const wrongPRAt = at + 8000;
         const inlineWrongPRAt = wrongPRAt + 8000;
-        const newerAt = inlineWrongPRAt + 8000;
+        const closedPRAt = inlineWrongPRAt + 8000;
+        const newerAt = closedPRAt + 8000;
         const wrongPR = {...result, pr: 24};
         const wrongMarker = {...result, pr: 25};
-        const turns = [[wrongPR, wrongPRAt], [wrongMarker, inlineWrongPRAt], [result, newerAt]];
+        const closedPR = {...result, pr: 26};
+        const turns = [[wrongPR, wrongPRAt], [wrongMarker, inlineWrongPRAt], [closedPR, closedPRAt], [result, newerAt]];
         const later = turns.flatMap(([value, time]) => completionEvents(value, time).slice(-4));
         transcripts.set(id, [...restarted, ...later.map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
         const links = session(id, "sch_Implement", "push").pull_requests;
-        sessionState.set(id, {...ownedSession("idle", undefined, 4), pull_requests: [...links, {repo: ref, number: 25}]});
+        sessionState.set(id, {...ownedSession("idle", undefined, 5), pull_requests: [...links, ...[25, 26].map(number => ({repo: ref, number}))]});
         await finish("sch_Implement", id, undefined, 0, false, {at: wrongPRAt, turns: 2});
         await finish("sch_Implement", id, wrongMarker, 0, false, {at: inlineWrongPRAt, turns: 3});
-        await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 4});
-        for (let step = 0; step < 3 && (await find()).reason !== "credential-recovery-awaiting-pr-link"; step++) await tick();
-        assert.equal((await find()).phase, "implement");
-        assert.equal((await find()).reason, "credential-recovery-awaiting-pr-link");
+        await finish("sch_Implement", id, closedPR, 0, false, {at: closedPRAt, turns: 4});
+        for (let step = 0; step < 3; step++) {
+          await tick();
+          assert.equal((await find()).phase, "implement");
+          assert.equal((await find()).reason, "credential-recovery-awaiting-pr-link");
+        }
+        await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 5});
       }
     } else {
       await finish("sch_Implement", id, result);
@@ -1279,10 +1293,10 @@ test("native refresh to idle prompts once after the signed boundary and leaves o
     const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 510};
     commentErrors.set(509, 503);
     await finish("sch_Maintainer", id, {...triageResult, comment: 509}, 0, false, {at: at + 8000, turns: 2});
-    await finish("sch_Maintainer", id, triageResult, 0, false, {at: at + 16_000, turns: 3});
     await tick();
     assert.equal((await find()).phase, "triage");
     assert.equal((await find()).reason, "credential-recovery-evidence-retry");
+    await finish("sch_Maintainer", id, triageResult, 0, false, {at: at + 16_000, turns: 3});
     for (let step = 0; step < 5 && (await find()).reason !== "session-usage-limit"; step++) await tick();
     assert.equal((await find()).phase, "plan");
     assert.equal((await find()).reason, "session-usage-limit");

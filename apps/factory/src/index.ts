@@ -103,7 +103,7 @@ export class Factory extends DurableObject<Env> {
         if (active) {
           // An explicit mismatch cannot supersede a signed turn candidate.
           if (event.result && (event.result.issue !== active.issue || event.result.stage !== active.phase)) return;
-          if (event.completedTurns || event.result && event.result.status !== "blocked") {
+          if (event.completedTurns || event.result) {
             this.sql.exec("INSERT OR IGNORE INTO recovery_finish VALUES (?, ?, ?, 0, ?)",
               event.session, event.schedule, event.at, JSON.stringify(event));
             return;
@@ -222,7 +222,7 @@ export class Factory extends DurableObject<Env> {
 
   private recoveryFinish(session: string, schedule: string): Finish | undefined {
     const row = this.sql.exec<{state: string}>(
-      "SELECT state FROM recovery_finish WHERE session=? AND schedule=? AND due<=? ORDER BY at LIMIT 1",
+      "SELECT state FROM recovery_finish WHERE session=? AND schedule=? AND due<=? ORDER BY at DESC LIMIT 1",
       session, schedule, Date.now()).toArray()[0];
     return row ? JSON.parse(row.state) as Finish : undefined;
   }
@@ -261,8 +261,7 @@ export class Factory extends DurableObject<Env> {
     const eligible = (item?: Finish) => item && item.at >= Number(session.created_at) &&
       (reservation?.interruptedTurns === undefined || (item.turns ?? item.completedTurns ?? 0) > reservation.interruptedTurns);
     const candidate = reservation && this.recoveryFinish(id, schedule);
-    const inline = finish?.result && eligible(finish);
-    const selected = reservation ? inline ? finish : candidate : finish;
+    const selected = reservation ? candidate : finish;
     if (!reservation && finish && !eligible(finish)) return;
     let result: Awaited<ReturnType<Fctl["resultAt"]>>;
     try {
@@ -273,8 +272,8 @@ export class Factory extends DurableObject<Env> {
         ? "credential-recovery-transcript-unavailable-operator" : "credential-recovery-transcript-retry";
       return this.deferRecoveryFinish(ticket, candidate, reason);
     }
-    // A newer inline finish can arrive while a candidate's transcript is being read.
-    if (this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
+    // The normal finish can be superseded during a transcript read.
+    if (!reservation && this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
     if (result === "recovery-pending") return result;
     const interrupted = result && "interruptedIdleAt" in result ? result.interruptedIdleAt : undefined;
     const parsed = result && !("interruptedIdleAt" in result) ? result : undefined;
@@ -296,10 +295,9 @@ export class Factory extends DurableObject<Env> {
           reason = expired ? "credential-recovery-evidence-unavailable-operator" : "credential-recovery-evidence-retry";
         }
       }
-      if (this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
-      if (!reason) return parsed;
-      return candidate && selected === candidate ? this.deferRecoveryFinish(ticket, candidate, reason, parsed) :
-        this.recoveryWait(ticket, reason);
+      if (candidate && reason) return this.deferRecoveryFinish(ticket, candidate, reason, parsed);
+      // A newer completion can arrive while recovering the transcript or checking GitHub.
+      return this.recoveryFinish(id, schedule)?.at === candidate?.at ? parsed : "recovery-pending" as const;
     }
     if (reservation && candidate && selected === candidate) {
       const more = this.ctx.storage.transactionSync(() => {
@@ -515,7 +513,7 @@ export class Factory extends DurableObject<Env> {
   private async recoveryPR(github: Github, ticket: Ticket, session: Json, number: number): Promise<boolean> {
     if (!this.sessionHasPR(session, number)) return false;
     const pr = await this.readEvidence(github, `/pulls/${number}`);
-    if (!pr || pr.number !== number) return false;
+    if (!pr || pr.number !== number || pr.state !== "open" && pr.merged !== true) return false;
     const head = record(pr.head);
     const base = record(pr.base);
     return sha(head.sha) && base.ref === "main" && String(record(head.repo).id) === this.env.REPO_ID &&
