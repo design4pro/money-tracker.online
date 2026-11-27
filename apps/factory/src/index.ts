@@ -10,6 +10,7 @@ import type {MaintainerIntake} from "./intake";
 import {deployment, gate, issueEvidence, linked} from "./policy";
 import type {DeploymentSearch} from "./policy";
 import {Fctl, Github, ProviderError} from "./providers";
+import type {RecoveryProgress} from "./providers";
 import {activeRetroSchedule, RETRO_CRON, RETRO_OBJECT, weeklyEnd, weeklyReport} from "./retro";
 import {bearer} from "./signatures";
 
@@ -26,7 +27,7 @@ type Ticket = {
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
   pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch;
 };
-type Finish = Extract<Ingress, {kind: "finish"}>;
+type Finish = Extract<Ingress, {kind: "finish"}> & {recovery?: RecoveryProgress};
 
 export default {
   fetch(request, env) {
@@ -178,6 +179,15 @@ export class Factory extends DurableObject<Env> {
     const row = this.sql.exec<{state: string}>("SELECT state FROM result WHERE session=?", session).toArray()[0];
     const finish = row ? JSON.parse(row.state) as Finish : undefined;
     return finish?.schedule === schedule ? finish : undefined;
+  }
+
+  private finishResult(fctl: Fctl, finish: Finish) {
+    if (!finish.completedTurns) return finish.result;
+    return fctl.resultAt(finish.session, finish.at, finish.completedTurns, finish.recovery, progress => {
+      // A newer signed finish may have arrived during the transcript read.
+      this.sql.exec("UPDATE result SET state=json_set(state, '$.recovery', json(?)) WHERE session=? AND at=?",
+        JSON.stringify(progress), finish.session, finish.at);
+    });
   }
 
   private async pumpRetro() {
@@ -389,7 +399,7 @@ export class Factory extends DurableObject<Env> {
     const session = await fctl.session(sessionId, schedule);
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (finish.at < Number(session.created_at)) return this.block(ticket, "triage-result");
-    const result = finish.completedTurns ? await fctl.resultAt(sessionId, finish.at, finish.completedTurns) : finish.result;
+    const result = await this.finishResult(fctl, finish);
     if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
@@ -463,7 +473,7 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, "dispatch-session-identity", stage === "plan");
         }
         if (finish.at < Number(session.created_at)) return this.block(ticket, `${stage}-result`, stage === "plan");
-        const result = finish.completedTurns ? await fctl.resultAt(dispatch.session, finish.at, finish.completedTurns) : finish.result;
+        const result = await this.finishResult(fctl, finish);
         if (result?.stage !== stage || result.issue !== issue) {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }

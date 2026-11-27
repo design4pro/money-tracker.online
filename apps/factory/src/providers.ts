@@ -1,5 +1,5 @@
 import {fctlRepo, identifier, integer, list, parseResult, record, sha} from "./contracts";
-import type {Env, Json} from "./contracts";
+import type {Env, Json, Result} from "./contracts";
 import {base64, bytes} from "./signatures";
 
 export class ProviderError extends Error {
@@ -25,6 +25,13 @@ export async function request(url: URL, headers: HeadersInit, method = "GET", pa
   if (response.status === 204) return undefined;
   return response.json();
 }
+
+export type RecoveryProgress = {
+  after: number;
+  ordinal: number;
+  previousAssistant?: Result;
+  terminalResult?: Result;
+};
 
 export class Fctl {
   constructor(private readonly env: Env) {}
@@ -66,14 +73,12 @@ export class Fctl {
     return typeof message === "string" && message.endsWith(`<context>\n${context}\n</context>`);
   }
 
-  async resultAt(session: string, at: number, completedTurns: number) {
+  async resultAt(session: string, at: number, completedTurns: number, progress: RecoveryProgress | undefined,
+    checkpoint: (next: RecoveryProgress) => void) {
     const incomplete = () => {
       if (Date.now() - at < 300_000) throw new Error("Completion events not available yet");
     };
-    let after = 0;
-    let ordinal = 0;
-    let previous: Json | undefined;
-    let result: ReturnType<typeof parseResult>;
+    let {after, ordinal, previousAssistant, terminalResult} = progress ?? {after: 0, ordinal: 0};
     for (let page = 0; page < 5; page++) {
       let response: Json;
       try {
@@ -93,17 +98,19 @@ export class Fctl {
         // including errors. Its finished webhook is emitted after idle settles.
         if (ordinal === completedTurns) {
           return event.kind === "status" && data.status === "idle" && typeof event.ts === "number" && event.ts <= at
-            ? result : undefined;
+            ? terminalResult : undefined;
         }
         if (event.kind === "codex" && data.type === "result" && ++ordinal === completedTurns) {
           if (data.subtype !== "success" || data.is_error !== false || (data.queued_turn_count ?? 0) !== 0) return;
-          result = finalAssistantResult(previous);
-          if (!result) return;
+          if (!previousAssistant) return;
+          terminalResult = previousAssistant;
         }
-        previous = event;
+        previousAssistant = finalAssistantResult(event);
       }
       if (response.has_more !== true || response.events.length === 0) return incomplete();
     }
+    if (Date.now() - at < 300_000) checkpoint({after, ordinal, previousAssistant, terminalResult});
+    return incomplete();
   }
 
   async currentReview(pr: number, head: string): Promise<Json> {
