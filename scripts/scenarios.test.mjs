@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const target = process.env.SCENARIO_TARGET ? pathToFileURL(`${process.env.SCENARIO_TARGET}/`) : new URL('.', import.meta.url);
-const { verifyBoundary, verifyHealth } = await import(new URL('probe.mjs', target));
+const { cmsBoundary, verifyBoundary, verifyCmsBoundary, verifyHealth } = await import(new URL('probe.mjs', target));
 const { release } = await import(new URL('release.mjs', target));
 const { verifyContracts } = await import(new URL('contracts.mjs', target));
 const { activeDeployment, deploymentResult, requireCutoverApproval, requireNoPublicRoutes } = await import(new URL('deployments.mjs', target));
@@ -116,6 +116,67 @@ test('auth boundary accepts denial or the expected sign-in redirect', () => {
   verifyBoundary(redirect('/sign-in?next=/private'), target, signIn);
   assert.throws(() => verifyBoundary(new Response(null), target, signIn));
   assert.throws(() => verifyBoundary(redirect('https://access.invalid/sign-in'), target, signIn));
+});
+
+test('deployed CMS smoke accepts only the configured Cloudflare Access login redirect', t => {
+  const site = 'https://staging.money-tracker.online';
+  const admin = '/_emdash/admin';
+  const team = 'design4pro.cloudflareaccess.com';
+  const login = `https://${team}/cdn-cgi/access/login/${new URL(site).hostname}`;
+  const query = `redirect_url=${admin}&kid=example&meta=example`;
+  const access = `${login}?${query}`;
+  const redirect = location => new Response(null, { status: 302, headers: { location } });
+  const originalEnv = process.env;
+  process.env = {
+    ...originalEnv,
+    SITE_URL: site,
+    CMS_ADMIN_PATH: admin,
+    CMS_LOGIN_URL: '',
+    CMS_UNAUTHENTICATED_STATUS: '',
+    CF_ACCESS_TEAM_DOMAIN: team,
+  };
+  t.after(() => { process.env = originalEnv; });
+
+  const deployed = cmsBoundary();
+  verifyCmsBoundary(redirect(access), deployed);
+  verifyCmsBoundary(redirect(`${access}&redirect_url=${encodeURIComponent(admin)}`), deployed);
+  verifyCmsBoundary(redirect(`${admin}/login?next=${admin}`), deployed);
+  verifyCmsBoundary(new Response(null, { status: 401 }), deployed);
+  verifyCmsBoundary(new Response(null, { status: 403, headers: { location: 'https://[' } }), deployed);
+  for (const location of [
+    access.replace(team, 'another.cloudflareaccess.com'),
+    access.replace(team, `${team}.invalid`),
+    access.replace('https:', 'http:'),
+    access.replace('https:', ''),
+    access.replace(team, `user:password@${team}`),
+    access.replace(team, `@${team}`),
+    access.replace('/access/login/', '/access/other/../login/'),
+    access.replace('/access/login/', '/access/logout/'),
+    access.replace('login/staging.', 'login/other.'),
+    `${login}?kid=example`,
+    `${login}?redirect_url=${site}${admin}`,
+    `${login}?redirect_url=${admin}/login`,
+    `${access}&redirect%5Furl=/other`,
+    `${access}&kid=different`,
+    `${access}&malformed=%ZZ`,
+    `${access}#fragment`,
+    'https://[',
+  ]) {
+    assert.throws(() => verifyCmsBoundary(redirect(location), deployed), /auth boundary/, location);
+  }
+  assert.throws(() => verifyCmsBoundary(new Response(null, {
+    status: 307, headers: { location: access },
+  }), deployed), /auth boundary/);
+  assert.throws(() => verifyCmsBoundary(redirect(access), cmsBoundary(true)), /auth boundary/);
+  delete process.env.CF_ACCESS_TEAM_DOMAIN;
+  assert.throws(() => verifyCmsBoundary(redirect(access), cmsBoundary()), /auth boundary/);
+
+  process.env.CF_ACCESS_TEAM_DOMAIN = team;
+  process.env.CMS_UNAUTHENTICATED_STATUS = '403';
+  const exact = cmsBoundary();
+  verifyCmsBoundary(new Response(null, { status: 403 }), exact);
+  assert.throws(() => verifyCmsBoundary(new Response(null, { status: 401 }), exact), /Unexpected CMS status/);
+  assert.throws(() => verifyCmsBoundary(redirect(access), exact), /Unexpected CMS status/);
 });
 
 for (const [failure, expected] of [

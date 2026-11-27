@@ -51,7 +51,7 @@ Set these values separately in each GitHub delivery environment. Store delivery 
 | `CF_ACCESS_TEAM_DOMAIN` | Team hostname used for the CMS application. Store `CF_ACCESS_AUDIENCE` as a site Worker secret. |
 | `SIGN_IN_URL` | Full sign-in URL on `APP_ORIGIN`, for example `https://app-staging.example.com/login` |
 | `APP_PROTECTED_PATH`, `CMS_ADMIN_PATH` | Paths `/billing` and `/_emdash/admin` for the operations under test |
-| `CMS_UNAUTHENTICATED_STATUS` | Optional exact `401` or `403`. Leave unset to allow either or a matching login redirect. |
+| `CMS_UNAUTHENTICATED_STATUS` | Optional exact `401` or `403`. Leave unset to allow either status, the same-origin CMS login redirect, or a deployed `302` to the `CF_ACCESS_TEAM_DOMAIN` login route for the `SITE_URL` hostname with `redirect_url` set to `CMS_ADMIN_PATH`. |
 | `CMS_LOGIN_URL` | Optional same-origin CMS login URL or path, default `/_emdash/admin/login` |
 | `CLOUDFLARE_API_TOKEN` | Environment secret with scoped Worker deployment and app migration access |
 | `{APP,SITE,FACTORY}_ACCESS_CLIENT_ID` and `{APP,SITE,FACTORY}_ACCESS_CLIENT_SECRET` | Paired environment secrets where a Worker probe crosses a Cloudflare Access policy |
