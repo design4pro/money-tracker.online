@@ -35,6 +35,7 @@ const calls = {maintainerTriage: 0, nativeTriageReads: 0, plan: 0, implement: 0,
 const runs = {sch_Triage: [], sch_Maintainer: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
 const transcripts = new Map();
+const sessionCreatedAt = new Map();
 const transcriptReads = [];
 const currentIssues = new Map();
 const issueErrors = new Map();
@@ -77,7 +78,7 @@ function issue(number) {
 
 function session(id, schedule, access) {
   return {id, project_id: env.FCTL_PROJECT_ID, workspace: {id: env.FCTL_WORKSPACE_ID}, schedule: {id: schedule},
-    agent_kind: "codex", github_access: access, created_at: Date.now() - 10_000, branch: "codex/pilot",
+    agent_kind: "codex", github_access: access, created_at: sessionCreatedAt.get(id) ?? Date.now() - 10_000, branch: "codex/pilot",
     pull_requests: access === "push" ? [{repo: ref, number: 23, checks: {sha: revision,
       review: {state: "passed", project_id: env.FCTL_PROJECT_ID, findings: 0, still_open: 0, session_id: "ses_Review"}}}] : []};
 }
@@ -705,8 +706,12 @@ test("signed maintainer intake plans and dispatches without production evidence"
       author_id: author.id, issue_snapshot_sha256: snapshot});
     assert.equal(transcriptReads.length, beforeReads);
     const events = completionEvents(triageResult, at);
-    transcripts.set("ses_Maintainer31", events.slice(0, -1));
+    transcripts.set("ses_Maintainer31", events.filter(event => event.seq !== 36));
     assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false, eventOptions)).status, 202);
+    for (const [index, type] of ["session.question", "session.failed", "session.stopped"].entries()) {
+      assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false,
+        {at: at + index + 1, type})).status, 202);
+    }
     await tick();
     assert.equal((await find(number)).phase, "triage");
     assert((await status()).audit.some(entry => entry.subject === String(number) && entry.action === "provider-retry"));
@@ -798,6 +803,7 @@ test("only an omitted finish message can recover its own successful Codex turn",
       events[36].data = {...events[36].data, subtype: "error_during_execution", is_error: true};
       events.push(...later);
     }},
+    {name: "expired incomplete sequence", age: 301_000, change: events => { events.splice(35, 1); }},
     {name: "idle after signed timestamp", change: (events, at) => { events[37].ts = at + 1; }},
     {name: "user text", change: events => { events[34].kind = "user_message"; }},
     {name: "tool text", change: events => { events[34].data.message.content[0].type = "tool_result"; }},
@@ -818,7 +824,8 @@ test("only an omitted finish message can recover its own successful Codex turn",
       const comment = 600 + index;
       issueComments.set(comment, {id: comment, user: discovery, issue_url: issue.repository_url + `/issues/${number}`,
         body: "<!-- factory:triage v1 -->"});
-      const at = Date.now();
+      const at = Date.now() - (scenario.age ?? 0);
+      sessionCreatedAt.set(id, at - 10_000);
       const events = completionEvents({v: 1, stage: "triage", issue: number, status: "ready", comment}, at);
       scenario.change?.(events, at);
       transcripts.set(id, events);
@@ -838,6 +845,7 @@ test("only an omitted finish message can recover its own successful Codex turn",
       currentIssues.delete(100 + index);
       issueComments.delete(600 + index);
       transcripts.delete(`ses_Maintainer${100 + index}`);
+      sessionCreatedAt.delete(`ses_Maintainer${100 + index}`);
     }
     await mf.dispose();
     mf = old;

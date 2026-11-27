@@ -81,8 +81,12 @@ export class Factory extends DurableObject<Env> {
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
         // Keep out-of-order results until exact schedule/run/session evidence exists.
+        // Prefer a parsed message over recoverable evidence, and either over a non-result event.
         this.sql.exec(`INSERT INTO result VALUES (?, ?, ?, ?) ON CONFLICT(session) DO UPDATE SET
-          at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (excluded.issue IS NOT NULL OR result.issue IS NULL)`,
+          at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (
+            excluded.issue IS NOT NULL OR (result.issue IS NULL AND (
+              json_type(excluded.state,'$.completedTurns') = 'integer' OR
+              json_type(result.state,'$.completedTurns') IS NULL)))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "production") {
         this.sql.exec(`UPDATE ticket SET due=?, state=json_set(json_remove(state,'$.productionHistory'),'$.due',?,'$.productionVerification',?)

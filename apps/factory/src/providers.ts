@@ -67,15 +67,18 @@ export class Fctl {
   }
 
   async resultAt(session: string, at: number, completedTurns: number) {
+    const incomplete = () => {
+      if (Date.now() - at < 300_000) throw new Error("Completion events not available yet");
+    };
     let after = 0;
     let ordinal = 0;
     let previous: Json | undefined;
     let result: ReturnType<typeof parseResult>;
     for (let page = 0; page < 5; page++) {
       const response = record(await this.api(`/sessions/${session}/events?after=${after}&limit=100`));
-      if (!Array.isArray(response.events) || response.events.length > 100) throw new Error("Invalid fctl event page");
+      if (!Array.isArray(response.events) || response.events.length > 100) return incomplete();
       for (const event of response.events.map(record)) {
-        if (!integer(event.seq) || event.seq !== after + 1) throw new Error("Incomplete fctl event sequence");
+        if (!integer(event.seq) || event.seq !== after + 1) return incomplete();
         after = event.seq;
         const data = record(event.data);
         if (["git", "log", "notice"].includes(String(event.kind)) || event.kind === "codex" &&
@@ -94,11 +97,7 @@ export class Fctl {
         }
         previous = event;
       }
-      if (response.has_more !== true) {
-        if (Date.now() - at < 300_000) throw new Error("Completion events not available yet");
-        return;
-      }
-      if (response.events.length === 0) throw new Error("Invalid fctl event cursor");
+      if (response.has_more !== true || response.events.length === 0) return incomplete();
     }
   }
 
