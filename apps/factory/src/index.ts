@@ -99,9 +99,9 @@ export class Factory extends DurableObject<Env> {
               json_type(excluded.state,'$.completedTurns') = 'integer' OR
               json_type(result.state,'$.completedTurns') IS NULL OR
               (json_type(result.state,'$.recovery.interruptedIdleAt') = 'integer' AND
-                json_extract(excluded.state,'$.eventType') IN ('session.finished','session.failed','session.stopped')))))
+                json_extract(excluded.state,'$.eventType') IN ('session.finished','session.failed')))))
             AND (json_type(result.state,'$.recovery.interruptedIdleAt') IS NULL OR
-              json_extract(excluded.state,'$.eventType') IN ('session.failed','session.stopped') OR
+              json_extract(excluded.state,'$.eventType') = 'session.failed' OR
               json_extract(excluded.state,'$.turns') > json_extract(result.state,'$.completedTurns'))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "delivery") {
@@ -230,7 +230,12 @@ export class Factory extends DurableObject<Env> {
       }
       return this.finish(id, schedule)?.at === finish?.at ? result : "recovery-pending" as const;
     }
-    if (finish && !result) return;
+    const reservation = ticket.credentialRecovery;
+    // fctl stops the old runner as part of resuming a paused Codex session.
+    // The stop alone cannot settle the reserved continuation's outcome.
+    const restartStop = finish?.eventType === "session.stopped" && reservation?.action === "resume" &&
+      reservation.session === id && reservation.run === run && reservation.stage === stage && finish.at >= reservation.reservedAt;
+    if (finish && !result && !restartStop) return;
 
     const interrupted = result?.interruptedIdleAt;
     const paused = session.status === "paused" && session.status_reason === CREDENTIAL_PAUSE;
@@ -239,9 +244,10 @@ export class Factory extends DurableObject<Env> {
         ? "session-usage-limit" : "session-paused-operator");
     }
     if (session.status === "failed" || session.status === "stopped") {
-      return this.recoveryWait(ticket, `session-${session.status}-operator`);
+      const reason = restartStop && session.status === "stopped" && Date.now() < reservation.reservedAt + CREDENTIAL_WAIT
+        ? "credential-restart-stop-observed" : `session-${session.status}-operator`;
+      return this.recoveryWait(ticket, reason);
     }
-    const reservation = ticket.credentialRecovery;
     if (reservation) {
       if (reservation.session !== id || reservation.run !== run || reservation.stage !== stage) {
         return this.recoveryWait(ticket, "credential-recovery-identity-operator");

@@ -458,6 +458,27 @@ function interruptionEvents(at, prefix = 0, reason = credentialPause) {
   ];
 }
 
+function credentialRestartEvents(at) {
+  const events = interruptionEvents(at, 89);
+  return [
+    ...events.slice(0, -2),
+    {seq: 91, ts: at - 5490, kind: "log", data: {}},
+    {...events[90], seq: 92},
+    {seq: 93, ts: at - 5390, kind: "git", data: {}},
+    {seq: 94, ts: at - 5380, kind: "codex", data: {type: "assistant", message: {
+      content: [{type: "tool_use", name: "Read"}],
+    }}},
+    {seq: 95, ts: at - 5370, kind: "codex", data: {type: "user", message: {
+      content: [{type: "tool_result", content: "Late output"}],
+    }}},
+    ...["stopping", "queued", "provisioning", "preparing", "preparing", "preparing", "preparing", "preparing",
+      "preparing", "preparing"].map((status, index) => ({
+      seq: 96 + index, ts: at - 5360 + index, kind: "status", data: {status},
+    })),
+    {...events[91], seq: 106},
+  ];
+}
+
 function ownedSession(status, status_reason, turns = 0) {
   return {status, status_reason, created_by: {id: env.FCTL_ACCOUNT_ID}, role: "owner", stats: {turns}};
 }
@@ -962,22 +983,30 @@ async function stagingRelease(productionConclusion, interrupted = false) {
       assert.match(resume.body.prompt, /original factory implement task for issue #41/);
       assert.deepEqual(resume.body.attachments, []);
       await tick(); // fctl may still report the original pause.
+      const stoppedAt = Date.now();
+      sessionState.set(id, ownedSession("stopped"));
+      await finish("sch_Implement", id, undefined, 0, false, {at: stoppedAt, type: "session.stopped"});
+      await tick();
+      assert.equal((await find()).phase, "implement", "the resume can stop the original runner");
+      assert.equal((await find()).reason, "credential-restart-stop-observed");
       sessionState.set(id, ownedSession("idle", undefined, 1));
-      const at = Date.now();
+      const at = stoppedAt + 1000;
       const options = {at, turns: 1};
-      transcripts.set(id, interruptionEvents(at));
+      const restarted = credentialRestartEvents(at);
+      transcripts.set(id, restarted);
       await finish("sch_Implement", id, undefined, 0, false, options);
       await tick();
       await finish("sch_Implement", id, undefined, 0, false, options);
-      await finish("sch_Implement", id, result, 0, false, {at: at + 1, turns: 1});
+      await finish("sch_Implement", id, undefined, 0, false, {at: at + 1, type: "session.stopped"});
+      await finish("sch_Implement", id, result, 0, false, {at: at + 2, turns: 1});
       await tick();
       assert.deepEqual((await status()).slot, [{issue: number}]);
       assert.equal((await find()).phase, "implement");
       assert.equal(calls.merges.length, initial.merges);
       assert.equal(continuations.length, before + 1);
       const newerAt = at + 8000;
-      transcripts.set(id, [...interruptionEvents(at), ...completionEvents(result, newerAt).slice(-4)
-        .map((event, index) => ({...event, seq: index + 4}))]);
+      transcripts.set(id, [...restarted, ...completionEvents(result, newerAt).slice(-4)
+        .map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
       sessionState.set(id, ownedSession("idle", undefined, 2));
       await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 2});
     } else {
@@ -1168,7 +1197,18 @@ test("only an omitted finish message can recover its own successful Codex turn",
       events[36].data = {...events[36].data, subtype: "error_during_execution", is_error: true};
       events.push(...later);
     }},
-    {name: "interruption caused by a usage limit", change: (events, at) => {
+    ...[
+      {kind: "user_message", data: {text: "A new turn"}},
+      {kind: "codex", data: {type: "result", subtype: "success", is_error: false}},
+      {kind: "codex", data: {type: "assistant", message: {content: [{type: "text", text: "A new reply"}]}}},
+    ].map(entry => ({
+      name: `new ${entry.data.type ?? entry.kind} before interrupted idle`, pages: 2, change: (events, at) => {
+        const restart = credentialRestartEvents(at);
+        restart[104] = {...restart[104], ...entry};
+        events.splice(0, events.length, ...restart);
+      },
+    })),
+    {name: "interruption caused by a usage limit", pages: 1, change: (events, at) => {
       events.splice(0, events.length, ...interruptionEvents(at, 0, "Waiting for the ChatGPT plan usage limit to reset"));
     }},
     {name: "expired endpoint error", age: 301_000, error: () => new Response(null, {status: 503})},
@@ -1209,7 +1249,7 @@ test("only an omitted finish message can recover its own successful Codex turn",
       const ticket = (await status()).tickets.find(entry => entry.issue === number);
       assert.equal(ticket.reason, "triage-result", scenario.name);
       assert.equal(calls.plan, initialPlans, scenario.name);
-      assert.equal(transcriptReads.length - beforeReads, scenario.error || scenario.name === "interruption caused by a usage limit" ? 1 : scenario.change ? 2 : 0, scenario.name);
+      assert.equal(transcriptReads.length - beforeReads, scenario.pages ?? (scenario.error ? 1 : scenario.change ? 2 : 0), scenario.name);
     }
   } finally {
     for (const [index] of cases.entries()) {

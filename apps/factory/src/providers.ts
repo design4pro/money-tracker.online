@@ -118,6 +118,13 @@ export class Fctl {
           if (terminalInterrupted) continue;
         }
         if (ordinal === completedTurns) {
+          // A credential restart can flush raw tool output and report its
+          // startup statuses before idle. A delivered message or another
+          // result still breaks the signed turn's boundary.
+          if (terminalInterrupted && credentialPause && (
+            lateCodexToolEvent(event) ||
+            event.kind === "status" && ["stopping", "queued", "provisioning", "preparing"].includes(String(data.status))
+          )) continue;
           if (event.kind !== "status" || data.status !== "idle" || typeof event.ts !== "number" || event.ts > at) return;
           if (terminalInterrupted && credentialPause) {
             saveProgress(event.ts);
@@ -162,6 +169,14 @@ export class Fctl {
       throw error;
     }
   }
+}
+
+function lateCodexToolEvent(event: Json): boolean {
+  if (event.kind !== "codex") return false;
+  const data = record(event.data);
+  const kind = data.type === "assistant" ? "tool_use" : data.type === "user" ? "tool_result" : undefined;
+  const content = list(record(data.message).content);
+  return kind !== undefined && content.length > 0 && content.every(block => record(block).type === kind);
 }
 
 function finalAssistantResult(event: Json | undefined) {
