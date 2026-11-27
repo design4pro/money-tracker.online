@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -165,5 +166,13 @@
   .balance {
     background: color-mix(in oklch, var(--background) 95%, var(--primary));
     border-color: color-mix(in oklch, var(--border) 75%, var(--primary));
+  }
+}
+
+@layer components {
+  .spending-chat,
+  .spending-chat-entry {
+    font-family: "Geist Variable", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
   }
 }

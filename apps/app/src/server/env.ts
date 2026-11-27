@@ -16,5 +16,6 @@ export interface Env {
   POLAR_WEBHOOK_SECRET?: string
   POLAR_MONTHLY_PRODUCT_ID?: string
   POLAR_YEARLY_PRODUCT_ID?: string
+  LOCAL_CHAT_PROOF?: string
   SOURCE_SHA?: string
 }
