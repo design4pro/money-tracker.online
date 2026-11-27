@@ -44,6 +44,7 @@ const credentialPause = "Waiting for a fresh ChatGPT credential";
 const transcriptReads = [];
 const currentIssues = new Map();
 const issueErrors = new Map();
+const issueReads = new Map();
 const issueComments = new Map();
 const commentErrors = new Map();
 let productionAvailable = true;
@@ -227,6 +228,7 @@ async function provider(req) {
     if (/^\/issues\/\d+$/.test(path)) {
       if (method === "PATCH") calls.closed.push(path);
       const number = Number(path.split("/").at(-1));
+      await issueReads.get(number)?.();
       const status = issueErrors.get(number);
       if (status === 301) return new Response(null, {status, headers: {Location: "https://api.github.com/repos/elsewhere/project/issues/222"}});
       if (status) return new Response(null, {status});
@@ -1100,6 +1102,12 @@ test("staging pre-work evidence blocks release the slot only with no linked PR a
   }
 });
 
+test("a newer signed staging completion supersedes a pre-work block during corroboration", async () => {
+  for (const mode of [{}, {omitted: true}, {recovery: true, omitted: true}, {recovery: true, deferred: true}]) {
+    await stagingRelease("skipped", undefined, true, {changed: true, superseded: true, ...mode});
+  }
+});
+
 async function stagingRelease(productionConclusion, recovery, staging = false, preWork) {
   const number = 41;
   const author = staging ? discovery : {type: "User", id: 81, login: "maintainer"};
@@ -1156,10 +1164,49 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
       for (let step = 0; step < 8 && calls.implement === initial.implement; step++) await tick();
       assert.equal(calls.implement, initial.implement + 1);
       implementationHasPR = !!preWork.linked;
+      if (preWork.recovery) {
+        sessionState.set(id, ownedSession("paused", credentialPause));
+        await tick();
+        assert.equal((await find()).credentialRecovery.session, id);
+        sessionState.set(id, ownedSession("idle", undefined, 1));
+      }
       if (preWork.changed) currentIssues.set(number, {...openedIssue, title: "Changed before work"});
-      await finish("sch_Implement", id, {v: 1, stage: "implement", status: "blocked", issue: number,
-        reason: "pre-work-evidence-changed"});
+      const at = Date.now();
+      const blocked = {v: 1, stage: "implement", status: "blocked", issue: number, reason: "pre-work-evidence-changed"};
+      let newerFinish;
+      if (preWork.superseded) {
+        issueReads.set(number, async () => {
+          issueReads.delete(number);
+          implementationHasPR = !preWork.deferred;
+          if (preWork.recovery) sessionState.set(id, ownedSession("idle", undefined, 2));
+          const newerAt = at + 8000;
+          if (preWork.omitted) {
+            const earlier = completionEvents(blocked, at);
+            const later = completionEvents(result, newerAt).slice(-4);
+            transcripts.set(id, [...earlier, ...later.map((event, index) => ({...event, seq: earlier.length + index + 1}))]);
+          }
+          newerFinish = (await finish("sch_Implement", id, preWork.omitted ? undefined : result, 0, false,
+            {at: newerAt, turns: 2})).status;
+        });
+      }
+      await finish("sch_Implement", id, blocked, 0, false, {at, turns: 1});
       await tick();
+      if (preWork.superseded) {
+        assert.equal(newerFinish, 202);
+        assert.equal((await find()).phase, "implement");
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        await tick();
+        if (preWork.deferred) {
+          assert.equal((await find()).reason, "credential-recovery-awaiting-pr-link");
+          await tick();
+          assert.equal((await find()).phase, "implement");
+          assert.deepEqual((await status()).slot, [{issue: number}]);
+        } else {
+          assert.equal((await find()).phase, "pr");
+          assert.equal((await find()).pr, 23);
+        }
+        return;
+      }
       const released = preWork.changed && !preWork.linked;
       assert.equal((await find()).reason, released ? "implementation-pre-work-evidence-changed" : "implement-result");
       assert.deepEqual((await status()).slot, released ? [] : [{issue: number}]);
@@ -1393,6 +1440,7 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
     ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR} = saved);
     runs.sch_Triage = previousRuns;
     transcripts.delete(`ses_TriageStaging${number}`);
+    issueReads.delete(number);
     splitReview = stagingProof = approvedHead = undefined;
     changedPath = "apps/app/src/ui/view.css";
     await mf.dispose();

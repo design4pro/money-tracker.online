@@ -120,11 +120,14 @@ export class Factory extends DurableObject<Env> {
 
         // Keep out-of-order results until exact schedule/run/session evidence exists.
         // Prefer a parsed message over recoverable evidence, and either over a non-result event.
+        // A newer completed turn must be checked before an older pre-work result can free a slot.
         this.sql.exec(`INSERT INTO result VALUES (?, ?, ?, ?) ON CONFLICT(session) DO UPDATE SET
           at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (
             excluded.issue IS NOT NULL OR (result.issue IS NULL AND (
               json_type(excluded.state,'$.completedTurns') = 'integer' OR
-              json_type(result.state,'$.completedTurns') IS NULL)))
+              json_type(result.state,'$.completedTurns') IS NULL)) OR
+            (json_extract(result.state,'$.result.reason') = 'pre-work-evidence-changed'
+              AND json_extract(excluded.state,'$.completedTurns') > COALESCE(json_extract(result.state,'$.turns'),0)))
             AND (json_type(result.state,'$.recovery.interruptedIdleAt') IS NULL OR
               json_extract(excluded.state,'$.turns') > json_extract(result.state,'$.completedTurns'))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
@@ -228,10 +231,10 @@ export class Factory extends DurableObject<Env> {
     return finish?.schedule === schedule ? finish : undefined;
   }
 
-  private recoveryFinish(session: string, schedule: string): Finish | undefined {
+  private recoveryFinish(session: string, schedule: string, includeDeferred = false): Finish | undefined {
     const row = this.sql.exec<{state: string}>(
       "SELECT state FROM recovery_finish WHERE session=? AND schedule=? AND due<=? ORDER BY at DESC LIMIT 1",
-      session, schedule, Date.now()).toArray()[0];
+      session, schedule, includeDeferred ? Number.MAX_SAFE_INTEGER : Date.now()).toArray()[0];
     return row ? JSON.parse(row.state) as Finish : undefined;
   }
 
@@ -761,6 +764,10 @@ export class Factory extends DurableObject<Env> {
         if (session.id !== dispatch.session || session.agent_kind !== "codex" || session.github_access !== dispatch.access) {
           return finish ? this.block(ticket, "dispatch-session-identity", stage === "plan") : this.ticket(ticket, {});
         }
+        const selectedFinish = () => ticket.credentialRecovery
+          ? this.recoveryFinish(String(session.id), dispatch.schedule)
+          : this.finish(String(session.id), dispatch.schedule);
+        const selectedAt = ticket.credentialRecovery ? selectedFinish()?.at : finish?.at;
         const result = await this.stageResult(ticket, fctl, github, stage, String(dispatch.run), dispatch.schedule, session, finish, async () => {
           if (bound) return this.matchesDispatchEvidence(github, ticket, stage);
           const current = await this.readIssue(github, ticket);
@@ -775,11 +782,24 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (result.status === "blocked") {
-          if (stage === "implement" && bound && result.reason === "pre-work-evidence-changed" &&
-              !session.pull_request && (session.pull_requests === undefined ||
-                Array.isArray(session.pull_requests) && session.pull_requests.length === 0) &&
-              !await this.matchesDispatchEvidence(github, ticket, stage)) {
-            return this.block(ticket, "implementation-pre-work-evidence-changed", true);
+          if (stage === "implement" && bound && result.reason === "pre-work-evidence-changed") {
+            // A newer completion may be waiting for its PR link to appear.
+            if (ticket.credentialRecovery && this.recoveryFinish(String(session.id), dispatch.schedule, true)?.at !== selectedAt) {
+              return this.recoveryWait(ticket);
+            }
+            const noPR = (value: Json) => !value.pull_request &&
+              (value.pull_requests === undefined || Array.isArray(value.pull_requests) && value.pull_requests.length === 0);
+            if (noPR(session)) {
+              const mismatch = !await this.matchesDispatchEvidence(github, ticket, stage);
+              if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
+              if (mismatch) {
+                const latest = await fctl.session(dispatch.session, dispatch.schedule);
+                if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
+                if (latest.id !== dispatch.session || latest.agent_kind !== "codex" ||
+                    latest.github_access !== dispatch.access || !noPR(latest)) return this.ticket(ticket, {});
+                return this.block(ticket, "implementation-pre-work-evidence-changed", true);
+              }
+            }
           }
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
@@ -792,7 +812,7 @@ export class Factory extends DurableObject<Env> {
           if (result.status !== "implemented") return this.block(ticket, "implementation-pr-missing");
           if (ticket.staging && !ticket.credentialRecovery) {
             const linkedPR = await this.matchesImplementationPR(github, ticket, session, result.pr);
-            if (this.finish(String(session.id), dispatch.schedule)?.at !== finish?.at) return "recovery-pending" as const;
+            if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
             if (!linkedPR) return this.ticket(ticket, {});
           } else if (!this.sessionHasPR(session, result.pr)) {
             return this.ticket(ticket, {});
