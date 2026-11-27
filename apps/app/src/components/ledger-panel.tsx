@@ -14,6 +14,7 @@ export function LedgerPanel() {
   const [busy, setBusy] = useState(false)
   const [entry, setEntry] = useState<Entry>()
   const [search, setSearch] = useState("")
+  const [direction, setDirection] = useState("all")
   const pending = useRef(new Map<string, string>())
 
   useEffect(() => {
@@ -96,8 +97,12 @@ export function LedgerPanel() {
   const patterns = terms.map(
     (term) => new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu")
   )
-  const transactions = ledger.transactions.filter(({ description }) =>
-    patterns.every((pattern) => pattern.test(description))
+  const transactions = ledger.transactions.filter(
+    ({ amount_minor, description }) =>
+      (direction === "all" ||
+        (direction === "spending" && amount_minor < 0) ||
+        (direction === "income" && amount_minor > 0)) &&
+      patterns.every((pattern) => pattern.test(description))
   )
 
   return (
@@ -252,15 +257,29 @@ export function LedgerPanel() {
               <Plus aria-hidden="true" /> Add transaction
             </Button>
           </div>
-          <label className="mt-4">
-            Search transaction descriptions
-            <input
-              type="search"
-              className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label>
+              Search transaction descriptions
+              <input
+                type="search"
+                className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <label>
+              Transaction direction
+              <select
+                className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                value={direction}
+                onChange={(event) => setDirection(event.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="spending">Spending</option>
+                <option value="income">Income</option>
+              </select>
+            </label>
+          </div>
           {ledger.transactions.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">
               {accounts.size
@@ -269,7 +288,7 @@ export function LedgerPanel() {
             </p>
           ) : transactions.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground" role="status">
-              No transactions match your search.
+              No transactions match your filters.
             </p>
           ) : (
             <ul className="mt-4 divide-y">
