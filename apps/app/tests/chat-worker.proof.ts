@@ -15,6 +15,14 @@ const browser = process.env.CHAT_BROWSER === "1"
 const origin = "http://localhost:3000"
 const secret = "synthetic-chat-proof-secret-for-local-use-only"
 
+function monthStart(date: Date, offset = 0) {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1)
+  )
+    .toISOString()
+    .slice(0, 10)
+}
+
 test("Agent-Native streams owner-only monthly totals from the built Worker", async () => {
   const modules = [
     "index.js",
@@ -132,22 +140,25 @@ test("Agent-Native streams owner-only monthly totals from the built Worker", asy
     const unverified = await fixture("unverified", true, false)
     const unsubscribed = await fixture("unsubscribed", false)
     const now = new Date()
-    const month = (offset: number) =>
-      new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
-        .toISOString()
-        .slice(0, 10)
-    const from = month(0)
-    const until = month(1)
+    const monthlyEntries = [
+      [alice.id, "USD", -125],
+      [alice.id, "USD", -300],
+      [alice.id, "USD", 1000],
+      [alice.id, "EUR", -750],
+      [bob.id, "USD", -49],
+      [unverified.id, "USD", -123456],
+      [unsubscribed.id, "USD", -654321],
+    ] as const
+    // Either month may be current by the time the Worker handles a turn.
+    // Expenses on both month starts also exercise the exclusive upper bound.
     const fixtures = [
-      [alice.id, "USD", -125, from],
-      [alice.id, "USD", -300, from],
-      [alice.id, "USD", 1000, from],
-      [alice.id, "EUR", -750, from],
-      [alice.id, "USD", -8000, month(-1)],
-      [alice.id, "USD", -9000, until],
-      [bob.id, "USD", -49, from],
-      [unverified.id, "USD", -123456, from],
-      [unsubscribed.id, "USD", -654321, from],
+      ...[monthStart(now), monthStart(now, 1)].flatMap((date) =>
+        monthlyEntries.map(
+          ([id, currency, amount]) => [id, currency, amount, date] as const
+        )
+      ),
+      [alice.id, "USD", -8000, monthStart(now, -1)],
+      [alice.id, "USD", -9000, monthStart(now, 2)],
     ] as const
     await db.batch(
       fixtures.flatMap(([id, currency, amount, date], index) => [
@@ -201,7 +212,6 @@ test("Agent-Native streams owner-only monthly totals from the built Worker", asy
       ])
       return text.join("")
     }
-    const prefix = `Spending from ${from} up to ${until} (exclusive, UTC): `
     for (const [viewer, other, expected] of [
       [alice, bob, "750 minor units (EUR), 425 minor units (USD)"],
       [bob, alice, "49 minor units (USD)"],
@@ -211,6 +221,25 @@ test("Agent-Native streams owner-only monthly totals from the built Worker", asy
       })
       assert.equal(ledger.status, 200)
       const { transactions } = await ledger.json<Ledger>()
+      const beforeTurn = new Date()
+      const text = await answer(viewer.cookie, other.id)
+      const afterTurn = new Date()
+      const period = [beforeTurn, afterTurn]
+        .map((date) => {
+          const from = monthStart(date)
+          const until = monthStart(date, 1)
+          return {
+            from,
+            until,
+            prefix: `Spending from ${from} up to ${until} (exclusive, UTC): `,
+          }
+        })
+        .find(({ prefix }) => text.startsWith(prefix))
+      assert.ok(
+        period,
+        "The answer must identify the UTC month at the time of the turn"
+      )
+      const { from, until, prefix } = period
       const derived = new Map<string, bigint>()
       for (const row of transactions) {
         if (
@@ -229,7 +258,7 @@ test("Agent-Native streams owner-only monthly totals from the built Worker", asy
         .map(([currency, amount]) => `${amount} minor units (${currency})`)
         .join(", ")
       assert.equal(fromLedger, expected)
-      assert.equal(await answer(viewer.cookie, other.id), prefix + fromLedger)
+      assert.equal(text, prefix + fromLedger)
     }
     for (const [cookie, status, message] of [
       ["", 401, "Sign in with a verified email to continue."],
