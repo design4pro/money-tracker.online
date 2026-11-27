@@ -92,11 +92,13 @@ export function LedgerPanel() {
   const categories = new Map(
     ledger.categories.map((category) => [category.id, category.name])
   )
-  const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  const transactions = ledger.transactions.filter(({ description }) => {
-    const text = description.toLowerCase()
-    return terms.every((term) => text.includes(term))
-  })
+  const terms = search.trim().split(/\s+/).filter(Boolean)
+  const patterns = terms.map(
+    (term) => new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu")
+  )
+  const transactions = ledger.transactions.filter(({ description }) =>
+    patterns.every((pattern) => pattern.test(description))
+  )
 
   return (
     <>
