@@ -173,7 +173,7 @@ export function LedgerPanel() {
                     </select>
                   </label>
                   <label className="sm:col-span-2">
-                    Amount in minor units
+                    <span id="amount-minor-label">Amount in minor units</span>
                     <input
                       name="amountMinor"
                       type="number"
@@ -181,6 +181,7 @@ export function LedgerPanel() {
                       min="-9007199254740991"
                       max="9007199254740991"
                       required
+                      aria-labelledby="amount-minor-label"
                       aria-describedby="minor-units"
                     />
                     <span
