@@ -304,7 +304,9 @@ test("Agent-Native streams owner-only monthly totals from the built Worker", asy
 
     if (browser) {
       const { checkChatBrowser } = await import("./chat-browser")
+      const { checkLedgerBrowser } = await import("./ledger-browser")
       await checkChatBrowser(origin, alice.cookie, unsubscribed.cookie)
+      await checkLedgerBrowser(origin, alice.cookie)
     }
     await worker.setOptions(options(false))
     const disabled = await worker.dispatchFetch(
