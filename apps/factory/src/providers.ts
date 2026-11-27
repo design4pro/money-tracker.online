@@ -123,6 +123,7 @@ export class Fctl {
           // result still breaks the signed turn's boundary.
           if (terminalInterrupted && credentialPause && (
             lateCodexToolEvent(event) ||
+            event.kind === "codex" && data.type === "system" && data.subtype === "init" ||
             event.kind === "status" && ["stopping", "queued", "provisioning", "preparing"].includes(String(data.status))
           )) continue;
           if (event.kind !== "status" || data.status !== "idle" || typeof event.ts !== "number" || event.ts > at) return;

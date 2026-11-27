@@ -475,7 +475,10 @@ function credentialRestartEvents(at) {
       "preparing", "preparing"].map((status, index) => ({
       seq: 96 + index, ts: at - 5360 + index, kind: "status", data: {status},
     })),
-    {...events[91], seq: 106},
+    {seq: 106, ts: at - 5340, kind: "log", data: {}},
+    {seq: 107, ts: at - 5330, kind: "log", data: {}},
+    {seq: 108, ts: at - 5320, kind: "codex", data: {type: "system", subtype: "init"}},
+    {...events[91], seq: 109},
   ];
 }
 
@@ -1277,6 +1280,10 @@ test("only an omitted finish message can recover its own successful Codex turn",
     {name: "idle after signed timestamp", change: (events, at) => { events[37].ts = at + 1; }},
     {name: "user text", change: events => { events[34].kind = "user_message"; }},
     {name: "tool text", change: events => { events[34].data.message.content[0].type = "tool_result"; }},
+    {name: "sandbox init after a successful result", change: events => {
+      const idle = events.pop();
+      events.push({...idle, kind: "codex", data: {type: "system", subtype: "init"}}, {...idle, seq: idle.seq + 1});
+    }},
     {name: "idle belongs to a later turn", change: events => {
       events[37] = {seq: 38, ts: events[37].ts, kind: "user_message", data: {}};
       events.push({seq: 39, ts: events[37].ts + 1, kind: "status", data: {status: "idle"}});
