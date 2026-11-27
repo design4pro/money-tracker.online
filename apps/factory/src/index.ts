@@ -238,9 +238,10 @@ export class Factory extends DurableObject<Env> {
     }
     // fctl stops the old runner as part of resuming a paused Codex session.
     // The stop alone cannot settle the reserved continuation's outcome.
-    const restartStop = finish?.eventType === "session.stopped" && reservation?.action === "resume" &&
-      finish.at >= reservation.reservedAt;
-    if (finish && !result && !restartStop) return;
+    const duringContinuation = reservation && finish && finish.at >= reservation.reservedAt;
+    const restartStop = duringContinuation && finish.eventType === "session.stopped" && reservation.action === "resume";
+    const continuationQuestion = duringContinuation && finish.eventType === "session.question";
+    if (finish && !result && !restartStop && !continuationQuestion) return;
 
     const interrupted = result?.interruptedIdleAt;
     const paused = session.status === "paused" && session.status_reason === CREDENTIAL_PAUSE;
@@ -254,6 +255,7 @@ export class Factory extends DurableObject<Env> {
       return this.recoveryWait(ticket, reason);
     }
     if (reservation) {
+      if (continuationQuestion || session.question) return this.recoveryWait(ticket, "credential-continuation-question-operator");
       // Queued, running and idle are all possible after an ambiguous POST.
       // Only the original session's newer signed result can advance the stage.
       if (ticket.reason?.endsWith("-operator")) return this.recoveryWait(ticket);

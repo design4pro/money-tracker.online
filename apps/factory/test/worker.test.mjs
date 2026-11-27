@@ -1046,6 +1046,13 @@ async function stagingRelease(productionConclusion, interrupted = false) {
       assert.match(resume.body.prompt, /original factory implement task for issue #41/);
       assert.deepEqual(resume.body.attachments, []);
       await tick(); // fctl may still report the original pause.
+      const questionAt = Date.now();
+      sessionState.set(id, {...ownedSession("idle"), question: {text: "Confirm the prior result"}});
+      await finish("sch_Implement", id, undefined, 0, false, {at: questionAt, type: "session.question"});
+      await tick();
+      assert.equal((await find()).phase, "implement");
+      assert.equal((await find()).reason, "credential-continuation-question-operator");
+      assert.deepEqual((await status()).slot, [{issue: number}]);
       const stoppedAt = Date.now();
       sessionState.set(id, ownedSession("stopped"));
       await finish("sch_Implement", id, undefined, 0, false, {at: stoppedAt, type: "session.stopped"});
