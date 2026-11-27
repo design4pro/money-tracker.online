@@ -93,16 +93,20 @@ export class Factory extends DurableObject<Env> {
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
         // Keep out-of-order results until exact schedule/run/session evidence exists.
-        // Prefer a parsed message over recoverable evidence, and either over a non-result event.
+        // Prefer a parsed message over recoverable evidence, unless a reserved
+        // continuation proves that message names the wrong issue or stage.
         this.sql.exec(`INSERT INTO result VALUES (?, ?, ?, ?) ON CONFLICT(session) DO UPDATE SET
           at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (
-            excluded.issue IS NOT NULL OR (result.issue IS NULL AND (
-              json_type(excluded.state,'$.completedTurns') = 'integer' OR
-              json_type(result.state,'$.completedTurns') IS NULL OR
-              (json_type(result.state,'$.recovery.interruptedIdleAt') = 'integer' AND
-                json_extract(excluded.state,'$.eventType') IN ('session.finished','session.failed')))))
+            excluded.issue IS NOT NULL OR
+            (json_type(excluded.state,'$.completedTurns') = 'integer' AND (
+              result.issue IS NULL OR EXISTS (
+                SELECT 1 FROM ticket
+                WHERE phase IN ('triage','plan','implement')
+                  AND json_extract(ticket.state,'$.credentialRecovery.session') = excluded.session
+                  AND json_extract(ticket.state,'$.credentialRecovery.schedule') = json_extract(excluded.state,'$.schedule')
+                  AND (ticket.issue != result.issue OR phase != json_extract(result.state,'$.result.stage'))))) OR
+            (result.issue IS NULL AND json_type(result.state,'$.completedTurns') IS NULL))
             AND (json_type(result.state,'$.recovery.interruptedIdleAt') IS NULL OR
-              json_extract(excluded.state,'$.eventType') = 'session.failed' OR
               json_extract(excluded.state,'$.turns') > json_extract(result.state,'$.completedTurns'))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "delivery") {
@@ -224,38 +228,42 @@ export class Factory extends DurableObject<Env> {
         reservation.schedule !== schedule || reservation.stage !== stage)) {
       return this.recoveryWait(ticket, "credential-recovery-identity-operator");
     }
-    if (finish && finish.at < Number(session.created_at)) return;
+    if (finish && finish.at < Number(session.created_at)) {
+      return reservation ? this.recoveryWait(ticket, "credential-recovery-finish-identity-operator") : undefined;
+    }
     const result = finish && await this.finishResult(fctl, finish);
     // Evidence can change while the transcript or session is being read.
     if (this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
     if (result === "recovery-pending") return result;
-    if (result && !("interruptedIdleAt" in result)) {
-      if (ticket.credentialRecovery && result.stage === stage && result.issue === ticket.issue &&
-          result.status !== "blocked" && !await verify()) {
+    const interrupted = result && "interruptedIdleAt" in result ? result.interruptedIdleAt : undefined;
+    const parsed = result && !("interruptedIdleAt" in result) ? result : undefined;
+    if (!reservation && finish && interrupted === undefined) return parsed;
+
+    if (reservation && parsed?.stage === stage && parsed.issue === ticket.issue) {
+      if (parsed.status !== "blocked" && !await verify()) {
         return this.recoveryWait(ticket, "credential-recovery-evidence-changed-operator");
       }
-      return this.finish(id, schedule)?.at === finish?.at ? result : "recovery-pending" as const;
+      return this.finish(id, schedule)?.at === finish?.at ? parsed : "recovery-pending" as const;
     }
-    // fctl stops the old runner as part of resuming a paused Codex session.
-    // The stop alone cannot settle the reserved continuation's outcome.
-    const duringContinuation = reservation && finish && finish.at >= reservation.reservedAt;
-    const restartStop = duringContinuation && finish.eventType === "session.stopped" && reservation.action === "resume";
-    const continuationQuestion = duringContinuation && finish.eventType === "session.question";
-    if (finish && !result && !restartStop && !continuationQuestion) return;
-
-    const interrupted = result?.interruptedIdleAt;
+    // A reserved continuation stays eligible until this session returns its
+    // stage result. An intermediate finish, stop, failure or question cannot
+    // establish the outcome of the continuation.
     const paused = session.status === "paused" && session.status_reason === CREDENTIAL_PAUSE;
     if (session.status === "paused" && !paused) {
       return this.recoveryWait(ticket, session.status_reason === "Waiting for the ChatGPT plan usage limit to reset"
         ? "session-usage-limit" : "session-paused-operator");
     }
     if (session.status === "failed" || session.status === "stopped") {
-      const reason = restartStop && session.status === "stopped" && Date.now() < reservation.reservedAt + CREDENTIAL_WAIT
-        ? "credential-restart-stop-observed" : `session-${session.status}-operator`;
+      const restarting = session.status === "stopped" && reservation?.action === "resume" &&
+        Date.now() < reservation.reservedAt + CREDENTIAL_WAIT;
+      const reason = restarting ? "credential-restart-stop-observed" : `session-${session.status}-operator`;
       return this.recoveryWait(ticket, reason);
     }
     if (reservation) {
-      if (continuationQuestion || session.question) return this.recoveryWait(ticket, "credential-continuation-question-operator");
+      if (session.question || finish?.eventType === "session.question") {
+        return this.recoveryWait(ticket, "credential-continuation-question-operator");
+      }
+      if (finish?.eventType === "session.failed") return this.recoveryWait(ticket, "session-failed-operator");
       // Queued, running and idle are all possible after an ambiguous POST.
       // Only the original session's newer signed result can advance the stage.
       if (ticket.reason?.endsWith("-operator")) return this.recoveryWait(ticket);

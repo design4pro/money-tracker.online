@@ -998,9 +998,12 @@ test("native parity triage follows its reserved run after it leaves recent histo
 });
 
 test("a lost credential resume response preserves the original implementation through exact staging smoke",
-  () => stagingRelease("skipped", true));
+  () => stagingRelease("skipped", "restart"));
 
-async function stagingRelease(productionConclusion, interrupted = false) {
+test("a question turn without a stage result preserves the original implementation until its successor",
+  () => stagingRelease("skipped", "question"));
+
+async function stagingRelease(productionConclusion, recovery) {
   const number = 41;
   const author = {type: "User", id: 81, login: "maintainer"};
   const openedIssue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
@@ -1033,7 +1036,7 @@ async function stagingRelease(productionConclusion, interrupted = false) {
     await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 411});
     const id = "ses_Implement";
     const result = {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23};
-    if (interrupted) {
+    if (recovery) {
       const before = continuations.length;
       sessionState.set(id, ownedSession("paused", credentialPause));
       continuationResponses.set(id, () => new Response("lost response", {status: 502}));
@@ -1046,39 +1049,65 @@ async function stagingRelease(productionConclusion, interrupted = false) {
       assert.match(resume.body.prompt, /original factory implement task for issue #41/);
       assert.deepEqual(resume.body.attachments, []);
       await tick(); // fctl may still report the original pause.
-      const questionAt = Date.now();
-      sessionState.set(id, {...ownedSession("idle"), question: {text: "Confirm the prior result"}});
-      await finish("sch_Implement", id, undefined, 0, false, {at: questionAt, type: "session.question"});
-      await tick();
-      assert.equal((await find()).phase, "implement");
-      assert.equal((await find()).reason, "credential-continuation-question-operator");
-      assert.deepEqual((await status()).slot, [{issue: number}]);
-      const stoppedAt = Date.now();
-      sessionState.set(id, ownedSession("stopped"));
-      await finish("sch_Implement", id, undefined, 0, false, {at: stoppedAt, type: "session.stopped"});
-      await tick();
-      assert.equal((await find()).phase, "implement", "the resume can stop the original runner");
-      assert.equal((await find()).reason, "credential-restart-stop-observed");
-      sessionState.set(id, ownedSession("idle", undefined, 1));
-      const at = stoppedAt + 1000;
-      const options = {at, turns: 1};
-      const restarted = credentialRestartEvents(at);
-      transcripts.set(id, restarted);
-      await finish("sch_Implement", id, undefined, 0, false, options);
-      await tick();
-      await finish("sch_Implement", id, undefined, 0, false, options);
-      await finish("sch_Implement", id, undefined, 0, false, {at: at + 1, type: "session.stopped"});
-      await finish("sch_Implement", id, result, 0, false, {at: at + 2, turns: 1});
-      await tick();
-      assert.deepEqual((await status()).slot, [{issue: number}]);
-      assert.equal((await find()).phase, "implement");
-      assert.equal(calls.merges.length, initial.merges);
-      assert.equal(continuations.length, before + 1);
-      const newerAt = at + 8000;
-      transcripts.set(id, [...restarted, ...completionEvents(result, newerAt).slice(-4)
-        .map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
-      sessionState.set(id, ownedSession("idle", undefined, 2));
-      await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 2});
+      if (recovery === "question") {
+        const questionAt = Date.now();
+        const finishAt = questionAt + 8000;
+        sessionState.set(id, {...ownedSession("idle", undefined, 1), question: {
+          text: "Confirm the prior result", asked_at: questionAt,
+        }});
+        await finish("sch_Implement", id, undefined, 0, false, {at: questionAt, type: "session.question"});
+        await tick();
+        assert.equal((await find()).reason, "credential-continuation-question-operator");
+        const questionTurn = completionEvents(result, finishAt);
+        questionTurn[34].data.message.content[0].text = "Waiting for an answer.";
+        transcripts.set(id, questionTurn);
+        await finish("sch_Implement", id, undefined, 0, false, {at: finishAt, turns: 1});
+        await tick();
+        assert.equal((await find()).reason, "credential-continuation-question-operator");
+        sessionState.set(id, ownedSession("idle", undefined, 1));
+        await tick();
+        assert.equal((await find()).phase, "implement");
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        assert.equal(continuations.length, before + 1);
+        const mismatched = {v: 1, stage: "plan", status: "planned", issue: number, comment: 411};
+        await finish("sch_Implement", id, mismatched, 0, false, {at: finishAt + 8000, turns: 2});
+        await tick();
+        assert.equal((await find()).phase, "implement");
+        const validAt = finishAt + 16_000;
+        for (const [value, time] of [[mismatched, finishAt + 8000], [result, validAt]]) {
+          questionTurn.push(...completionEvents(value, time).slice(-4)
+            .map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
+        }
+        sessionState.set(id, ownedSession("idle", undefined, 3));
+        await finish("sch_Implement", id, undefined, 0, false, {at: validAt, turns: 3});
+      } else {
+        const stoppedAt = Date.now();
+        sessionState.set(id, ownedSession("stopped"));
+        await finish("sch_Implement", id, undefined, 0, false, {at: stoppedAt, type: "session.stopped"});
+        await tick();
+        assert.equal((await find()).phase, "implement", "the resume can stop the original runner");
+        assert.equal((await find()).reason, "credential-restart-stop-observed");
+        sessionState.set(id, ownedSession("idle", undefined, 1));
+        const at = stoppedAt + 1000;
+        const options = {at, turns: 1};
+        const restarted = credentialRestartEvents(at);
+        transcripts.set(id, restarted);
+        await finish("sch_Implement", id, undefined, 0, false, options);
+        await tick();
+        await finish("sch_Implement", id, undefined, 0, false, options);
+        await finish("sch_Implement", id, undefined, 0, false, {at: at + 1, type: "session.stopped"});
+        await finish("sch_Implement", id, result, 0, false, {at: at + 2, turns: 1});
+        await tick();
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        assert.equal((await find()).phase, "implement");
+        assert.equal(calls.merges.length, initial.merges);
+        assert.equal(continuations.length, before + 1);
+        const newerAt = at + 8000;
+        transcripts.set(id, [...restarted, ...completionEvents(result, newerAt).slice(-4)
+          .map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
+        sessionState.set(id, ownedSession("idle", undefined, 2));
+        await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 2});
+      }
     } else {
       await finish("sch_Implement", id, result);
     }
