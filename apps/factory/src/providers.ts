@@ -137,7 +137,8 @@ export class Fctl {
           ordinal++;
           if (ordinal === completedTurns) {
             if ((data.queued_turn_count ?? 0) !== 0) return;
-            if (data.subtype === "interrupted" && data.is_error === true && typeof event.ts === "number" && event.ts <= at) {
+            if (credentialPause && data.subtype === "interrupted" && data.is_error === true &&
+                typeof event.ts === "number" && event.ts <= at) {
               terminalInterrupted = true;
             } else if (data.subtype === "success" && data.is_error === false && previousAssistant) {
               terminalResult = previousAssistant;

@@ -1278,6 +1278,10 @@ test("only an omitted finish message can recover its own successful Codex turn",
         events.splice(0, events.length, ...restart);
       },
     })),
+    {name: "credential pause after the interrupted result", pages: 1, change: (events, at) => {
+      const [pause, result, idle] = interruptionEvents(at);
+      events.splice(0, events.length, {...result, seq: 1}, {...pause, seq: 2, ts: result.ts + 1}, idle);
+    }},
     {name: "interruption caused by a usage limit", pages: 1, change: (events, at) => {
       events.splice(0, events.length, ...interruptionEvents(at, 0, "Waiting for the ChatGPT plan usage limit to reset"));
     }},
