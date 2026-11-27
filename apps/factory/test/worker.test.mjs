@@ -723,7 +723,7 @@ test("signed maintainer intake plans and dispatches without production evidence"
     await tick();
     assert.equal((await find(number)).phase, "triage");
     assert.equal((await find(number)).failures, 2);
-    const prefix = Array.from({length: 463}, (_, index) => ({seq: index + 1, ts: at - 6000, kind: "log", data: {}}));
+    const prefix = Array.from({length: 2463}, (_, index) => ({seq: index + 1, ts: at - 6000, kind: "log", data: {}}));
     transcripts.set("ses_Maintainer31", [
       ...prefix,
       ...events.map(event => ({...event, seq: prefix.length + event.seq})),
@@ -731,14 +731,24 @@ test("signed maintainer intake plans and dispatches without production evidence"
         .map(event => ({...event, seq: prefix.length + event.seq + 4})),
     ]);
     const beforeLongRead = transcriptReads.length;
-    await tick();
-    assert.equal((await find(number)).phase, "triage");
-    assert.deepEqual(transcriptReads.slice(beforeLongRead).map(read => read.after), [0, 100, 200, 300, 400]);
+    const retryAudits = async () => (await status()).audit.filter(entry =>
+      entry.subject === String(number) && entry.action === "provider-retry").length;
+    const beforeLongRetries = await retryAudits();
+    for (let batch = 0; batch < 5; batch++) {
+      await tick();
+      const ticket = await find(number);
+      assert.equal(ticket.phase, "triage");
+      assert.equal(ticket.failures, 0);
+      assert.equal(await retryAudits(), beforeLongRetries);
+      assert(ticket.due <= Date.now() + 1000);
+      assert.deepEqual(transcriptReads.slice(beforeLongRead + batch * 5).map(read => read.after),
+        Array.from({length: 5}, (_, index) => batch * 500 + index * 100));
+    }
     runs.sch_Plan = [];
     ambiguousMaintainerPlan = true;
     for (let step = 0; step < 3; step++) await tick();
     assert.equal(calls.plan, initial.plan + 1);
-    assert.deepEqual(transcriptReads.slice(beforeLongRead + 5).map(read => read.after), [500]);
+    assert.deepEqual(transcriptReads.slice(beforeLongRead + 25).map(read => read.after), [2500]);
     // The POST may have started the run. Missing evidence must not release its claim.
     commentErrors.set(310, 404);
     await tick();

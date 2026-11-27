@@ -109,8 +109,8 @@ export class Fctl {
       }
       if (response.has_more !== true || response.events.length === 0) return incomplete();
     }
-    if (Date.now() - at < 300_000) checkpoint({after, ordinal, previousAssistant, terminalResult});
-    return incomplete();
+    checkpoint({after, ordinal, previousAssistant, terminalResult});
+    return "recovery-pending" as const;
   }
 
   async currentReview(pr: number, head: string): Promise<Json> {

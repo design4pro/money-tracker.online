@@ -15,6 +15,7 @@ import {activeRetroSchedule, RETRO_CRON, RETRO_OBJECT, weeklyEnd, weeklyReport} 
 import {bearer} from "./signatures";
 
 const WAIT = 60_000;
+const RECOVERY_WAIT = 1_000;
 const DAY = 24 * 60 * 60_000;
 const SUPERSEDED = "release-superseded-without-production-smoke";
 const PENDING_PRODUCTION = "phase='blocked' AND json_extract(state,'$.reason')=? AND json_extract(state,'$.productionVerification') IS NOT NULL";
@@ -235,9 +236,16 @@ export class Factory extends DurableObject<Env> {
       `${PENDING_PRODUCTION} AND due<=? ORDER BY due,issue LIMIT 1`,
       SUPERSEDED, now,
     );
+    let recoveryDue = Infinity;
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
         const result = await this.advance(ticket, fctl, github);
+        if (result === "recovery-pending") {
+          const due = Date.now() + RECOVERY_WAIT;
+          this.ticket(ticket, {due});
+          recoveryDue = Math.min(recoveryDue, due);
+          continue;
+        }
         if (result !== "pending" && ticket.phase === "blocked" && ticket.productionVerification) {
           const current = this.tickets("issue=?", ticket.issue)[0];
           if (current.productionVerification === ticket.productionVerification) {
@@ -285,7 +293,7 @@ export class Factory extends DurableObject<Env> {
     ).one().due;
     if (productionDue !== null || pending.pending || bootstrap.length) {
       const regularDue = pending.pending || bootstrap.length ? Date.now() + WAIT : Infinity;
-      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, productionDue ?? Infinity)));
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, recoveryDue, productionDue ?? Infinity)));
     }
     // Leave one watchdog pass when an ingress may have interleaved with the pump.
     else if (now - 120_000 < Number(this.sql.exec("SELECT MAX(at) AS newest FROM delivery").one().newest)) {
@@ -400,6 +408,7 @@ export class Factory extends DurableObject<Env> {
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (finish.at < Number(session.created_at)) return this.block(ticket, "triage-result");
     const result = await this.finishResult(fctl, finish);
+    if (result === "recovery-pending") return result;
     if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
@@ -474,6 +483,7 @@ export class Factory extends DurableObject<Env> {
         }
         if (finish.at < Number(session.created_at)) return this.block(ticket, `${stage}-result`, stage === "plan");
         const result = await this.finishResult(fctl, finish);
+        if (result === "recovery-pending") return result;
         if (result?.stage !== stage || result.issue !== issue) {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
