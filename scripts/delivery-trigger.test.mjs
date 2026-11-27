@@ -26,6 +26,14 @@ test('Delivery awaits completed main CI and rejected events cannot enter the rel
   assert.match(concurrency, /'pilot-delivery' \|\| format\('pilot-delivery-ignored-\{0\}', github.run_id\)/);
 });
 
+test('Production delivery requires repository opt-in after staging and uses the production environment', () => {
+  const staging = workflow.split('\n  deploy-staging:')[1].split('\n  deploy-production:')[0];
+  const production = workflow.split('\n  deploy-production:')[1];
+  assert.doesNotMatch(workflow.split('\n  deploy-production:')[0], /PRODUCTION_DELIVERY_ENABLED/);
+  assert.match(staging, /\n    needs: verify-main\n    environment: staging\n/);
+  assert.match(production, /\n    if: >-\n      github\.ref == 'refs\/heads\/main' && github\.ref_protected &&\n      vars\.PRODUCTION_DELIVERY_ENABLED == 'true'\n    needs: deploy-staging\n    environment: production\n/);
+});
+
 test('Delivery preflight binds automatic completion and manual retry to exact successful CI', () => {
   const directory = mkdtempSync(join(tmpdir(), 'delivery-trigger-'));
   const eventPath = join(directory, 'event.json');
