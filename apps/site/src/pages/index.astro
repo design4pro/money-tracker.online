@@ -1,0 +1,188 @@
+---
+import { env } from "cloudflare:workers";
+import {
+  getSeoMeta,
+  getSiteSettings,
+} from "emdash";
+import { createPublicPageContext } from "emdash/page";
+import { EmDashHead, Image } from "emdash/ui";
+import "@fontsource-variable/dm-sans";
+import "@fontsource/instrument-serif";
+import "../styles/home.css";
+import { publishedHome } from "../home.ts";
+import { homeHeroKey, homeHeroPath } from "../home-hero.ts";
+import { loadPublishedHome } from "../home-query.ts";
+
+const result = await loadPublishedHome();
+const { entry } = result;
+const home = publishedHome(result);
+const hero = home?.hero_image;
+const heroAlt = home?.hero_image_alt || hero?.alt || "";
+if (!home) {
+  Astro.response.status = 503;
+  Astro.response.headers.set("Cache-Control", "no-store");
+}
+
+const brand = "Money Tracker";
+const settings = home ? await getSiteSettings() : null;
+const seo =
+  home && entry
+    ? getSeoMeta(entry, {
+        siteTitle: brand,
+        siteUrl: env.EMDASH_SITE_URL ?? Astro.url.origin,
+        path: "/",
+      })
+    : null;
+const title = seo?.ogTitle === "Home" ? brand : (seo?.title ?? brand);
+const page = home
+  ? createPublicPageContext({
+      Astro,
+      kind: "content",
+      title,
+      pageTitle: seo?.ogTitle === "Home" ? brand : (seo?.ogTitle ?? brand),
+      description: seo?.description || home.seo_description,
+      canonical: seo?.canonical,
+      siteName: settings?.title || brand,
+      content: { collection: "landing", id: home.id, slug: home.slug },
+    })
+  : null;
+
+const app = new URL(env.APP_ORIGIN ?? "https://app.money-tracker.online")
+  .origin;
+const sourceSha: string = env.SOURCE_SHA ?? "local";
+const sourceUrl = /^[a-f0-9]{40}$/.test(sourceSha)
+  ? `https://github.com/design4pro/money-tracker.online/tree/${sourceSha}`
+  : null;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f5ec" />
+    <title>{title}</title>
+    {page ? <EmDashHead page={page} /> : <meta name="robots" content="noindex" />}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="shell site-header">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">↗</span>
+        {brand}
+      </a>
+      {home && (
+        <>
+          <nav aria-label="Main navigation">
+            <a href="#features">{home.nav_features}</a>
+            <a href="#plans">{home.nav_plans}</a>
+            <a href="#faq">{home.nav_faq}</a>
+          </nav>
+          <a class="header-signin" href={`${app}/login`}>{home.signin_label}<span aria-hidden="true">↗</span></a>
+        </>
+      )}
+    </header>
+
+    {home ? (
+      <main id="main" class="shell">
+        <section class="hero" aria-labelledby="hero-heading">
+          <div class="hero-copy">
+            <p class="eyebrow"><span></span>{home.hero_kicker}</p>
+            <h1 id="hero-heading">{home.hero_title}</h1>
+            <p class="hero-description">{home.hero_body}</p>
+            <a class="button" href={`${app}/register`}>
+              {home.register_label}<span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          {hero ? (
+            <div class="hero-media">
+              {homeHeroKey(hero) ? (
+                <img src={homeHeroPath} alt={heroAlt} width={hero.width} height={hero.height} loading="eager" />
+              ) : (
+                <Image image={hero} alt={heroAlt} loading="eager" />
+              )}
+            </div>
+          ) : (
+            <div class="hero-art" aria-hidden="true">
+              <div class="orbit orbit-outer"></div>
+              <div class="orbit orbit-inner"></div>
+              <div class="ledger ledger-back"></div>
+              <div class="ledger ledger-front">
+                <div class="ledger-lines"></div>
+                <div class="ledger-chart"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+              <span class="token token-plus">+</span>
+              <span class="token token-minus">−</span>
+            </div>
+          )}
+        </section>
+
+        <section class="features section" id="features" aria-labelledby="features-heading">
+          <p class="eyebrow"><span></span>{home.nav_features}</p>
+          <h2 id="features-heading">{home.features_title}</h2>
+          <div class="features-grid">
+            {[
+              { icon: "±", title: home.feature_one_title, body: home.feature_one_body },
+              { icon: "↗", title: home.feature_two_title, body: home.feature_two_body },
+              { icon: "≡", title: home.feature_three_title, body: home.feature_three_body },
+            ].map(({ icon, title, body }) => (
+              <article>
+                <span class="feature-icon" aria-hidden="true">{icon}</span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section class="plans section" id="plans" aria-labelledby="plans-heading">
+          <div class="plans-copy">
+            <p class="eyebrow"><span></span>{home.nav_plans}</p>
+            <h2 id="plans-heading">{home.plans_title}</h2>
+            <p class="plans-intro">{home.plans_body}</p>
+            <a class="button" href={`${app}/billing`}>
+              {home.billing_label}<span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="plan-list">
+            {[
+              { title: home.monthly_title, body: home.monthly_body },
+              { title: home.yearly_title, body: home.yearly_body },
+            ].map(({ title, body }) => (
+              <article><h3>{title}</h3><p>{body}</p></article>
+            ))}
+          </div>
+        </section>
+
+        <section class="faq section" id="faq" aria-labelledby="faq-heading">
+          <div>
+            <p class="eyebrow"><span></span>{home.nav_faq}</p>
+            <h2 id="faq-heading">{home.faq_title}</h2>
+          </div>
+          <div class="faq-list">
+            {[
+              { question: home.faq_one_question, answer: home.faq_one_answer },
+              { question: home.faq_two_question, answer: home.faq_two_answer },
+              { question: home.faq_three_question, answer: home.faq_three_answer },
+            ].map(({ question, answer }) => (
+              <details>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      </main>
+    ) : (
+      <main id="main" class="shell unavailable">
+        <h1>Money Tracker</h1>
+        <p>The homepage is currently unavailable. Please try again later.</p>
+      </main>
+    )}
+
+    <footer class="shell site-footer">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↗</span>{brand}</a>
+      {sourceUrl ? <a class="source" href={sourceUrl}>Source <code>{sourceSha.slice(0, 12)}</code></a> : <span class="source">Local build</span>}
+    </footer>
+  </body>
+</html>

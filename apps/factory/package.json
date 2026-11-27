@@ -1,0 +1,25 @@
+{
+  "name": "@money-tracker/factory",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "tsc --noEmit && oxlint src scripts test",
+    "build": "wrangler deploy --env staging --dry-run --outdir dist",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "schedules": "node scripts/reconcile-schedules.mjs"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261125.1",
+    "esbuild": "0.28.2",
+    "miniflare": "4.20260730.0",
+    "oxlint": "1.95.0",
+    "typescript": "6.0.3",
+    "wrangler": "4.168.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "private": true
+}
