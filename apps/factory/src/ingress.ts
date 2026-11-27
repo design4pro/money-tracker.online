@@ -78,7 +78,7 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
     const at = Date.parse(String(payload.timestamp));
     if (["session.finished", "session.failed", "session.stopped", "session.question"].includes(String(payload.type)) &&
         identifier(session.id, "ses") && identifier(schedule, "sch") && session.started_by === "schedule" &&
-        [env.TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID, env.IMPLEMENT_SCHEDULE_ID].includes(schedule) && Number.isFinite(at)) {
+        [env.TRIAGE_SCHEDULE_ID, env.MAINTAINER_TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID, env.IMPLEMENT_SCHEDULE_ID].includes(schedule) && Number.isFinite(at)) {
       return {id: `fctl:${payload.id}`, event: {kind: "finish", session: session.id, schedule, at,
         result: payload.type === "session.finished" ? parseResult(data.message) : undefined}};
     }

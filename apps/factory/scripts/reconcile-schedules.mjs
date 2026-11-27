@@ -22,10 +22,10 @@ function call(args, json = true) {
 if (call(["--version"], false) !== "fctl 0.39.0") throw new Error("Use the fctl 0.39.0 CLI.");
 
 const repo = "design4pro/money-tracker.online";
-const triageLabels = ["factory:parity", "type: feature"];
 const profiles = [
   {key: "PARITY", access: "comment", cron: "0 9 * * 1"},
   {key: "TRIAGE", access: "triage", event: true},
+  {key: "MAINTAINER_TRIAGE", access: "triage"},
   {key: "PLAN", access: "triage"},
   {key: "IMPLEMENT", access: "push"},
   {key: "OPS", access: "read"},
@@ -42,7 +42,7 @@ if (current.unheard?.some(event => event.kind === "issue_opened")) {
 const ids = {};
 const existing = [];
 for (const profile of profiles) {
-  const short = profile.key.toLowerCase();
+  const short = profile.key.toLowerCase().replaceAll("_", "-");
   const name = `money-tracker-online-factory-${short}-v1`;
   const path = fileURLToPath(new URL(`../profiles/v1/${short}.md`, import.meta.url));
   const prompt = readFileSync(path, "utf8").trim();
@@ -50,13 +50,12 @@ for (const profile of profiles) {
   if (found.length > 1) throw new Error(`Resolve duplicate schedules named ${name} before setup.`);
   const schedule = found[0];
   const when = profile.cron ? ["--cron", profile.cron] : profile.event ?
-    ["--on", "issue-opened", "--repo", repo, "--label", triageLabels.join(","), "--by", "writers", "--max-per-hour", "3", "--max-per-day", "10"] :
+    ["--on", "issue-opened", "--repo", repo, "--label", "factory:parity", "--by", "agents", "--max-per-hour", "3", "--max-per-day", "10"] :
     ["--when-asked"];
   const flags = ["--task-file", path, "--agent", "codex", "--base", "main", "--github", profile.access, "--tz", "Europe/Warsaw", ...when];
-  const expectedEvent = profile.event && schedule?.event?.kind === "issue_opened" && schedule.event.by === "writers" &&
+  const expectedEvent = profile.event && schedule?.event?.kind === "issue_opened" && schedule.event.by === "agents" &&
     Array.isArray(schedule.event.repos) && schedule.event.repos.length === 1 && schedule.event.repos[0] === repo &&
-    Array.isArray(schedule.event.labels) && schedule.event.labels.length === triageLabels.length &&
-    triageLabels.every(label => schedule.event.labels.includes(label)) &&
+    Array.isArray(schedule.event.labels) && schedule.event.labels.length === 1 && schedule.event.labels[0] === "factory:parity" &&
     !schedule.event.branches?.length && schedule.event.max_per_hour === 3 && schedule.event.max_per_day === 10;
   const drift = schedule && (schedule.prompt?.trim() !== prompt || schedule.agent_kind !== "codex" || schedule.base_branch !== "main" ||
     schedule.github_access !== profile.access || schedule.timezone !== "Europe/Warsaw" || (schedule.cron ?? undefined) !== profile.cron ||

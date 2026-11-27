@@ -14,6 +14,7 @@ export interface Env {
   FCTL_ACCESS_CLIENT_ID?: string;
   FCTL_ACCESS_CLIENT_SECRET?: string;
   TRIAGE_SCHEDULE_ID: string;
+  MAINTAINER_TRIAGE_SCHEDULE_ID?: string;
   PLAN_SCHEDULE_ID: string;
   IMPLEMENT_SCHEDULE_ID: string;
   OPS_SCHEDULE_ID: string;

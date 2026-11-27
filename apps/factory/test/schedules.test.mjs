@@ -6,7 +6,7 @@ import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {test} from "node:test";
 
-test("reconciliation updates paused triage and Retro in place and preserves native Monday parity", async () => {
+test("reconciliation adds paused maintainer triage and preserves native parity schedules", async () => {
   const directory = await mkdtemp(join(tmpdir(), "pilot-schedules-"));
   try {
     const profiles = [
@@ -32,7 +32,10 @@ const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + "\\n");
 if (args[0] === "--version") console.log("fctl 0.39.0");
 else if (args[0] === "schedules" && args[1] === "list") console.log(${JSON.stringify(JSON.stringify({schedules}))});
-else if (args[0] === "schedules" && args[1] === "edit" && ["sch_triage", "sch_retro"].includes(args[2])) console.log(JSON.stringify({
+else if (args[0] === "schedules" && args[1] === "add" && args[2] === "money-tracker-online-factory-maintainer-triage-v1") console.log(JSON.stringify({
+  id: "sch_MaintainerTriage", project_id: "prj_Synthetic", enabled: false,
+}));
+else if (args[0] === "schedules" && args[1] === "edit" && args[2] === "sch_retro") console.log(JSON.stringify({
   id: args[2], project_id: "prj_Synthetic", enabled: false,
 }));
 else process.exitCode = 1;
@@ -47,11 +50,11 @@ else process.exitCode = 1;
     assert.equal(ids.PARITY_SCHEDULE_ID, "sch_parity");
     const calls = (await readFile(log, "utf8")).trim().split("\n").map(line => JSON.parse(line));
     assert.equal(calls.length, 4);
-    assert.deepEqual(calls[2].slice(0, 3), ["schedules", "edit", "sch_triage"]);
-    assert.deepEqual(calls[2].slice(calls[2].indexOf("--on"), -3), [
-      "--on", "issue-opened", "--repo", "design4pro/money-tracker.online",
-      "--label", "factory:parity,type: feature", "--by", "writers", "--max-per-hour", "3", "--max-per-day", "10",
-    ]);
+    assert.equal(ids.MAINTAINER_TRIAGE_SCHEDULE_ID, "sch_MaintainerTriage");
+    assert.deepEqual(calls[2].slice(0, 3), ["schedules", "add", "money-tracker-online-factory-maintainer-triage-v1"]);
+    assert.ok(calls[2].includes("--when-asked"));
+    assert.ok(calls[2].includes("--paused"));
+    assert.ok(!calls[2].includes("--on"));
     assert.equal(calls[2][calls[2].indexOf("--github") + 1], "triage");
     assert.deepEqual(calls[3].slice(0, 3), ["schedules", "edit", "sch_retro"]);
     assert.ok(calls[3].includes("--when-asked"));

@@ -340,27 +340,44 @@ export class Factory extends DurableObject<Env> {
   }
 
   private async triage(ticket: Ticket, fctl: Fctl, github: Github) {
-    if (Date.now() - ticket.created > DAY) return this.block(ticket, "native-triage-timeout");
     const {env} = this;
-    if (!identifier(env.TRIAGE_SCHEDULE_ID, "sch")) return this.block(ticket, "triage-schedule-identity");
+    const {maintainer} = ticket;
+    if (Date.now() - ticket.created > DAY) return this.block(ticket, maintainer ? "maintainer-triage-timeout" : "native-triage-timeout");
+    const schedule = maintainer ? env.MAINTAINER_TRIAGE_SCHEDULE_ID : env.TRIAGE_SCHEDULE_ID;
+    if (!identifier(schedule, "sch") || maintainer && [env.TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID].includes(schedule)) {
+      return this.block(ticket, "triage-schedule-identity");
+    }
     const issue = await this.readIssue(github, ticket);
-    const evidence = issue && !ticket.maintainer ? issueEvidence(issue) : undefined;
-    if (ticket.maintainer) {
+    const evidence = issue && !maintainer ? issueEvidence(issue) : undefined;
+    let runId: string | undefined;
+    let sessionId: unknown;
+    if (maintainer) {
       if (!await this.matchesMaintainer(ticket, issue)) return this.block(ticket, "issue-evidence-changed");
+      const key = `maintainer-triage:${ticket.issue}`;
+      this.queue(key, schedule, "triage", {repo: env.REPO, issue: ticket.issue, provenance: "maintainer",
+        author_id: maintainer.id, actor: ticket.actor, issue_snapshot_sha256: maintainer.snapshot});
+      const queued = this.dispatches("key=?", key)[0];
+      if (queued.schedule !== schedule) return this.block(ticket, "triage-schedule-identity");
+      const dispatch = await this.dispatch(fctl, queued);
+      if (dispatch.state === "blocked") return this.block(ticket, dispatch.reason ?? "triage-dispatch-blocked");
+      if (dispatch.state !== "started") return this.ticket(ticket, {});
+      runId = dispatch.run;
+      sessionId = dispatch.session;
     } else {
       if (!issue || !evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
           record(issue.user).login !== ticket.actor) return this.block(ticket, "issue-evidence");
       if (this.tickets("feature=? AND issue<>?", evidence.feature, ticket.issue).length) return this.block(ticket, "duplicate-feature");
+      const runs = list((await fctl.runs(schedule)).runs).map(record);
+      const run = runs.find(row => nativeRun(row, schedule, String(record(row.session).id), env.REPO, ticket.issue, ticket.actor));
+      if (!run) return this.ticket(ticket, {});
+      runId = String(run.id);
+      sessionId = record(run.session).id;
     }
-    const runs = list((await fctl.runs(env.TRIAGE_SCHEDULE_ID)).runs).map(record);
-    const run = runs.find(row => nativeRun(row, env.TRIAGE_SCHEDULE_ID, String(record(row.session).id), env.REPO, ticket.issue, ticket.actor));
-    if (!run) return this.ticket(ticket, {});
-    const sessionId = record(run.session).id;
-    if (!identifier(sessionId, "ses")) return;
-    const finish = this.finish(sessionId, env.TRIAGE_SCHEDULE_ID);
+    if (!identifier(runId, "srn") || !identifier(sessionId, "ses")) return;
+    const finish = this.finish(sessionId, schedule);
     if (!finish) return this.ticket(ticket, {});
     const result = finish.result;
-    const session = await fctl.session(sessionId, env.TRIAGE_SCHEDULE_ID);
+    const session = await fctl.session(sessionId, schedule);
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
@@ -377,7 +394,7 @@ export class Factory extends DurableObject<Env> {
       }
       main = commit.sha;
     }
-    this.ticket(ticket, {phase: "ready", ...evidence, main, productionHistory: undefined, triageRun: String(run.id), triageSession: sessionId,
+    this.ticket(ticket, {phase: "ready", ...evidence, main, productionHistory: undefined, triageRun: runId, triageSession: sessionId,
       triageComment: result.comment, due: Date.now()});
   }
 

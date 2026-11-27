@@ -19,7 +19,7 @@ const ref = {owner: "design4pro", name: "money-tracker.online"};
 const env = {
   REPO: repo, REPO_ID: "100", FCTL_SERVER: "https://synthetic-fctl.invalid",
   FCTL_WORKSPACE_ID: "wsp_Mock", FCTL_PROJECT_ID: "prj_Mock", FCTL_ACCOUNT_ID: "usr_Mock",
-  TRIAGE_SCHEDULE_ID: "sch_Triage", PLAN_SCHEDULE_ID: "sch_Plan", IMPLEMENT_SCHEDULE_ID: "sch_Implement",
+  TRIAGE_SCHEDULE_ID: "sch_Triage", MAINTAINER_TRIAGE_SCHEDULE_ID: "sch_Maintainer", PLAN_SCHEDULE_ID: "sch_Plan", IMPLEMENT_SCHEDULE_ID: "sch_Implement",
   OPS_SCHEDULE_ID: "sch_Ops", FCTL_WEBHOOK_SECRET: `whsec_${key.toString("base64")}`, FCTL_TOKEN: "fake-pat",
   FCTL_OPS_TOKEN: "fake-read-pat", GITHUB_WEBHOOK_SECRET: "fake-webhook-key", OPS_TOKEN: "fake-monitor-key",
   GITHUB_APP_ID: "55", GITHUB_INSTALLATION_ID: "66", GITHUB_DISCOVERY_BOT_ID: "33", GITHUB_TRIAGE_BOT_ID: "33",
@@ -30,8 +30,8 @@ env.GITHUB_APP_PRIVATE_KEY = generateKeyPairSync("rsa", {modulusLength: 2048}).p
 let mf;
 let workerOptions;
 let serial = 0;
-const calls = {plan: 0, implement: 0, ops: 0, retroReads: 0, retroRuns: [], githubRequests: 0, prReads: 0, merges: [], closed: [], gates: []};
-const runs = {sch_Triage: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
+const calls = {maintainerTriage: 0, nativeTriageReads: 0, plan: 0, implement: 0, ops: 0, retroReads: 0, retroRuns: [], githubRequests: 0, prReads: 0, merges: [], closed: [], gates: []};
+const runs = {sch_Triage: [], sch_Maintainer: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
 const currentIssues = new Map();
 const issueErrors = new Map();
@@ -106,14 +106,23 @@ async function provider(req) {
         by: {id: env.FCTL_ACCOUNT_ID}, session: {id: "ses_Retro"}});
     }
     if (noun === "schedules") {
-      const access = {sch_Plan: "triage", sch_Implement: "push", sch_Ops: "read"}[id];
+      const access = {sch_Maintainer: "triage", sch_Plan: "triage", sch_Implement: "push", sch_Ops: "read"}[id];
       if (!part) return json({id, project_id: env.FCTL_PROJECT_ID, agent_kind: "codex", github_access: access, base_branch: "main", enabled: true});
-      if (method === "GET") return json({runs: id === "sch_Triage" && !native ? [] : runs[id]});
-      const sessionId = {sch_Plan: "ses_Plan", sch_Implement: "ses_Implement", sch_Ops: "ses_Ops"}[id];
+      if (method === "GET") {
+        if (id === "sch_Triage") calls.nativeTriageReads++;
+        return json({runs: id === "sch_Triage" && !native ? [] : runs[id]});
+      }
+      assert.notEqual(id, "sch_Triage", "native parity triage must never be token-dispatched");
+      const sessionId = id === "sch_Maintainer" ? `ses_Maintainer${JSON.parse(body.context).issue}` :
+        {sch_Plan: "ses_Plan", sch_Implement: "ses_Implement", sch_Ops: "ses_Ops"}[id];
       const run = {id: `srn_${sessionId.slice(4)}`, schedule_id: id, outcome: "started", trigger: "token",
         by: {id: env.FCTL_ACCOUNT_ID}, session: {id: sessionId}, at: Date.now()};
       runs[id].unshift(run);
       contexts.set(sessionId, body.context);
+      if (id === "sch_Maintainer") {
+        calls.maintainerTriage++;
+        if (sessionId === "ses_Maintainer31") return new Response(null, {status: 502});
+      }
       if (id === "sch_Plan") {
         calls.plan++;
         if (ambiguousMaintainerPlan || JSON.parse(body.context).provenance !== "maintainer") {
@@ -131,6 +140,7 @@ async function provider(req) {
       if (part === "events") return json({events: [{kind: "user_message", data: {
         text: `Task\n<context>\n${contexts.get(id)}\n</context>`,
       }}]});
+      if (id.startsWith("ses_Maintainer")) return json(session(id, "sch_Maintainer", "triage"));
       if (id.startsWith("ses_Triage")) return json(session(id, "sch_Triage", "triage"));
       if (id === "ses_Plan") return json(session(id, "sch_Plan", "triage"));
       if (id === "ses_Implement") return json(session(id, "sch_Implement", "push"));
@@ -615,17 +625,42 @@ test("signed maintainer intake plans and dispatches without production evidence"
       {issue: {...openedIssue, labels: [{name: "factory:parity"}]}},
       {issue: {...openedIssue, user: {...author, id: 82}}, sender: {...author, id: 82}},
     ]) assert.equal((await github({...opening, ...changes})).status, 403);
+    const outsider = {type: "User", id: 82, login: "unallowlisted-writer"};
+    for (const issue of [91, 92, 93]) {
+      assert.equal((await github({...opening, issue: {...openedIssue, number: issue, user: outsider}, sender: outsider})).status, 403);
+    }
+    await tick();
+    assert.deepEqual((await status()).tickets, []);
+    assert.equal(calls.maintainerTriage, initial.maintainerTriage);
+    assert.equal(calls.nativeTriageReads, initial.nativeTriageReads);
+    assert.deepEqual(runs.sch_Triage, []);
+
+    const changed = {...openedIssue, number: 90};
+    currentIssues.set(90, {...changed, title: "Changed after opening"});
+    assert.equal((await github({...opening, issue: changed})).status, 202);
+    await tick();
+    assert.equal((await find(90)).reason, "issue-evidence-changed");
+    assert.equal(calls.maintainerTriage, initial.maintainerTriage);
+
     currentIssues.set(number, openedIssue);
     assert.equal((await github(opening)).status, 202);
     assert.equal((await github(opening, "different-delivery")).status, 202);
     addComment(310, number, "triage");
-    await finish("sch_Triage", "ses_Triage31", {v: 1, stage: "triage", status: "ready", issue: number, comment: 310});
-    runs.sch_Triage.push(nativeRun(number, "other"), nativeRun(number, author.login, {repo: {...ref, owner: "other"}}));
+    const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 310};
+    await finish("sch_Triage", "ses_Maintainer31", triageResult);
+    await finish("sch_Maintainer", "ses_Unrelated", triageResult);
+    await tick();
     await tick();
     assert.equal((await find(number)).phase, "triage");
     assert.equal(calls.plan, initial.plan);
-
-    runs.sch_Triage.push(nativeRun(number, author.login));
+    assert.equal(calls.maintainerTriage, initial.maintainerTriage + 1);
+    assert.equal(calls.nativeTriageReads, initial.nativeTriageReads);
+    const snapshot = createHash("sha256").update(JSON.stringify([openedIssue.title, openedIssue.body, "type: feature"])).digest("hex");
+    const {invocation: triageInvocation, ...triageContext} = JSON.parse(contexts.get("ses_Maintainer31"));
+    assert.ok(triageInvocation);
+    assert.deepEqual(triageContext, {v: 1, provenance: "maintainer", repo, issue: number, actor: author.login,
+      author_id: author.id, issue_snapshot_sha256: snapshot});
+    await finish("sch_Maintainer", "ses_Maintainer31", triageResult);
     runs.sch_Plan = [];
     ambiguousMaintainerPlan = true;
     for (let step = 0; step < 3; step++) await tick();
@@ -637,7 +672,8 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.equal(calls.plan, initial.plan + 1);
     commentErrors.delete(310);
     ambiguousMaintainerPlan = false;
-    const snapshot = createHash("sha256").update(JSON.stringify([openedIssue.title, openedIssue.body, "type: feature"])).digest("hex");
+    assert.equal((await find(number)).triageRun, "srn_Maintainer31");
+    assert.equal((await find(number)).triageSession, "ses_Maintainer31");
     const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot};
     const {invocation: planInvocation, ...plan} = JSON.parse(contexts.get("ses_Plan"));
     assert.ok(planInvocation);
@@ -729,18 +765,14 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
       const current = {number, user, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
         title: "Pilot feature", body: null, labels: [{name: "type: feature"}]};
       currentIssues.set(number, current);
-      const sessionId = `ses_Triage${number}`;
-      runs.sch_Triage = [{
-        schedule_id: "sch_Triage", outcome: "started", trigger: "event", id: `srn_Triage${number}`, session: {id: sessionId},
-        event: {kind: "issue_opened", number, repo: ref, actor: user.login, url: `https://github.com/${repo}/issues/${number}`},
-      }];
+      const sessionId = `ses_Maintainer${number}`;
       for (const [id, stage] of [[400, "triage"], [401, "plan"]]) issueComments.set(id, {
         id, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`, body: `<!-- factory:${stage} v1 -->`,
       });
       mf = new Miniflare({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false"}});
       try {
         assert.equal((await github({action: "opened", issue: current, sender: user})).status, 202);
-        await finish("sch_Triage", sessionId, {v: 1, stage: "triage", status: "ready", issue: number, comment: 400});
+        await finish("sch_Maintainer", sessionId, {v: 1, stage: "triage", status: "ready", issue: number, comment: 400});
         await tick();
         await tick();
         assert.equal((await status()).tickets[0].phase, "plan");
