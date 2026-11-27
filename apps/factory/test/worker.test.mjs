@@ -35,6 +35,7 @@ const calls = {maintainerTriage: 0, nativeTriageReads: 0, plan: 0, implement: 0,
 const runs = {sch_Triage: [], sch_Maintainer: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
 const transcripts = new Map();
+const transcriptErrors = new Map();
 const sessionCreatedAt = new Map();
 const transcriptReads = [];
 const currentIssues = new Map();
@@ -149,6 +150,7 @@ async function provider(req) {
           transcriptReads.push({id, after});
           assert.equal(req.headers.get("authorization"), "Bearer fake-pat");
           assert.equal(searchParams.get("limit"), "100");
+          if (transcriptErrors.has(id)) return transcriptErrors.get(id)();
           const events = (transcripts.get(id) ?? []).filter(event => event.seq > after);
           return json({events: events.slice(0, 20), has_more: events.length > 20});
         }
@@ -712,9 +714,13 @@ test("signed maintainer intake plans and dispatches without production evidence"
       assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false,
         {at: at + index + 1, type})).status, 202);
     }
+    transcriptErrors.set("ses_Maintainer31", () => new Response(null, {status: 503}));
+    await tick();
+    transcriptErrors.delete("ses_Maintainer31");
+    assert.equal((await find(number)).failures, 1);
     await tick();
     assert.equal((await find(number)).phase, "triage");
-    assert((await status()).audit.some(entry => entry.subject === String(number) && entry.action === "provider-retry"));
+    assert.equal((await find(number)).failures, 2);
     transcripts.set("ses_Maintainer31", [
       ...events,
       ...completionEvents({...triageResult, comment: 999}, at + 8000).slice(-4)
@@ -782,6 +788,7 @@ test("signed maintainer intake plans and dispatches without production evidence"
   } finally {
     commentErrors.delete(310);
     transcripts.delete("ses_Maintainer31");
+    transcriptErrors.delete("ses_Maintainer31");
     ambiguousMaintainerPlan = false;
     await mf.dispose();
     mf = old;
@@ -803,6 +810,8 @@ test("only an omitted finish message can recover its own successful Codex turn",
       events[36].data = {...events[36].data, subtype: "error_during_execution", is_error: true};
       events.push(...later);
     }},
+    {name: "expired endpoint error", age: 301_000, error: () => new Response(null, {status: 503})},
+    {name: "expired malformed JSON", age: 301_000, error: () => new Response("invalid JSON")},
     {name: "expired incomplete sequence", age: 301_000, change: events => { events.splice(35, 1); }},
     {name: "idle after signed timestamp", change: (events, at) => { events[37].ts = at + 1; }},
     {name: "user text", change: events => { events[34].kind = "user_message"; }},
@@ -829,6 +838,7 @@ test("only an omitted finish message can recover its own successful Codex turn",
       const events = completionEvents({v: 1, stage: "triage", issue: number, status: "ready", comment}, at);
       scenario.change?.(events, at);
       transcripts.set(id, events);
+      if (scenario.error) transcriptErrors.set(id, scenario.error);
       const beforeReads = transcriptReads.length;
       assert.equal((await github({action: "opened", issue, sender: author})).status, 202);
       assert.equal((await finish("sch_Maintainer", id, undefined, 0, false,
@@ -838,13 +848,14 @@ test("only an omitted finish message can recover its own successful Codex turn",
       const ticket = (await status()).tickets.find(entry => entry.issue === number);
       assert.equal(ticket.reason, "triage-result", scenario.name);
       assert.equal(calls.plan, initialPlans, scenario.name);
-      assert.equal(transcriptReads.length - beforeReads, scenario.change ? 2 : 0, scenario.name);
+      assert.equal(transcriptReads.length - beforeReads, scenario.error ? 1 : scenario.change ? 2 : 0, scenario.name);
     }
   } finally {
     for (const [index] of cases.entries()) {
       currentIssues.delete(100 + index);
       issueComments.delete(600 + index);
       transcripts.delete(`ses_Maintainer${100 + index}`);
+      transcriptErrors.delete(`ses_Maintainer${100 + index}`);
       sessionCreatedAt.delete(`ses_Maintainer${100 + index}`);
     }
     await mf.dispose();

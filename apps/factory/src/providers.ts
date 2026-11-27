@@ -75,7 +75,12 @@ export class Fctl {
     let previous: Json | undefined;
     let result: ReturnType<typeof parseResult>;
     for (let page = 0; page < 5; page++) {
-      const response = record(await this.api(`/sessions/${session}/events?after=${after}&limit=100`));
+      let response: Json;
+      try {
+        response = record(await this.api(`/sessions/${session}/events?after=${after}&limit=100`));
+      } catch {
+        return incomplete();
+      }
       if (!Array.isArray(response.events) || response.events.length > 100) return incomplete();
       for (const event of response.events.map(record)) {
         if (!integer(event.seq) || event.seq !== after + 1) return incomplete();
