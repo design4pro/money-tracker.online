@@ -439,7 +439,11 @@ export class Factory extends DurableObject<Env> {
         const stage = ticket.phase;
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
-        const dispatch = await this.dispatch(fctl, current, ticket.maintainer
+        // Reconciliation must use the exact context sent in the original POST.
+        const pending = ticket.maintainer && current.state === "queued"
+          ? {...current, context: JSON.stringify({...record(JSON.parse(current.context)), ticket_bot_id: env.GITHUB_TRIAGE_BOT_ID})}
+          : current;
+        const dispatch = await this.dispatch(fctl, pending, ticket.maintainer
           ? () => this.matchesDispatchEvidence(github, ticket, stage)
           : undefined);
         if (dispatch.state === "blocked") {

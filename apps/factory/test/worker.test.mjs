@@ -689,7 +689,7 @@ test("signed maintainer intake plans and dispatches without production evidence"
     ambiguousMaintainerPlan = false;
     assert.equal((await find(number)).triageRun, "srn_Maintainer31");
     assert.equal((await find(number)).triageSession, "ses_Maintainer31");
-    const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot};
+    const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot, ticket_bot_id: env.GITHUB_TRIAGE_BOT_ID};
     const {invocation: planInvocation, ...plan} = JSON.parse(contexts.get("ses_Plan"));
     assert.ok(planInvocation);
     assert.deepEqual(plan, {v: 1, ...context, triage_comment: 310});
