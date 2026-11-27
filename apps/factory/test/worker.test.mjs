@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {createHash, createHmac, generateKeyPairSync} from "node:crypto";
 import {after, before, test} from "node:test";
+import {setTimeout as delay} from "node:timers/promises";
 import {build} from "esbuild";
 import {sendAlert} from "../../../scripts/monitor.mjs";
 import {Miniflare} from "miniflare";
@@ -554,11 +555,17 @@ test("weekly digest stops at the sampled entry limit", async () => {
   const instance = new Miniflare({...workerOptions, bindings: {
     ...env, RETRO_SCHEDULE_ID: "sch_Retro", RETRO_ENABLED: "true",
   }});
+  const runBaseline = calls.retroRuns.length;
   try {
     assert.equal((await instance.dispatchFetch(`https://factory.invalid/test/weekly?at=${weekEnd}`)).status, 204);
     assert.equal((await instance.dispatchFetch("https://factory.invalid/test/weekly-pump")).status, 204);
-    assert.equal(calls.retroRuns.length, 2);
-    const {report} = calls.retroRuns.at(-1);
+    // A scheduled alarm may already be running when the explicit pump returns.
+    const deadline = performance.now() + 5_000;
+    while (calls.retroRuns.length === runBaseline && performance.now() < deadline) {
+      await delay(10);
+    }
+    assert.equal(calls.retroRuns.length, runBaseline + 1, "expected this week's dispatch to reach fctl");
+    const {report} = calls.retroRuns[runBaseline];
     assert.equal(report.entries.length, 24);
     assert.equal(report.sampleLimited, true);
   } finally {
