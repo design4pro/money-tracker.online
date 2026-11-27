@@ -34,6 +34,7 @@ const calls = {plan: 0, implement: 0, ops: 0, retroReads: 0, retroRuns: [], gith
 const runs = {sch_Triage: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
 const currentIssues = new Map();
+const issueErrors = new Map();
 const issueComments = new Map();
 let productionAvailable = true;
 let productionLookups = 0;
@@ -144,6 +145,8 @@ async function provider(req) {
     if (/^\/issues\/\d+$/.test(path)) {
       if (method === "PATCH") calls.closed.push(path);
       const number = Number(path.split("/").at(-1));
+      const status = issueErrors.get(number);
+      if (status) return new Response(null, {status});
       return json(currentIssues.get(number) ?? issue(number));
     }
     if (path.startsWith("/issues/comments/")) {
@@ -689,9 +692,11 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
     {changes: changedBody, releaseReason: "release-issue-evidence-changed"},
     {changes: removedClassification, releaseReason: "release-issue-evidence-changed"},
     {changes: wrongAuthor, releaseReason: "release-issue-identity"},
+    {releaseReason: "release-issue-missing", issueStatus: 404},
+    {releaseReason: "release-issue-missing", issueStatus: 410},
   ];
   try {
-    for (const [index, {changes, releaseReason}] of cases.entries()) {
+    for (const [index, {changes, releaseReason, issueStatus}] of cases.entries()) {
       const initial = {implement: calls.implement, closed: calls.closed.length};
       const number = 40 + index;
       const current = {number, user, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
@@ -726,6 +731,16 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
           assert.equal((await status()).tickets[0].phase, "pr");
         }
         currentIssues.set(number, {...current, ...changes});
+        if (issueStatus) {
+          issueErrors.set(number, 503);
+          for (let step = 0; step < 4; step++) await tick();
+          const retry = await status();
+          assert.equal(retry.tickets[0].phase, "release");
+          assert.ok(retry.tickets[0].failures > 0);
+          assert.deepEqual(retry.slot, [{issue: number}]);
+          assert.equal(calls.closed.length, initial.closed);
+          issueErrors.set(number, issueStatus);
+        }
         for (let step = 0; step < 4; step++) await tick();
         const state = await status();
         assert.equal(state.tickets[0].reason, releaseReason ?? "issue-evidence-changed");

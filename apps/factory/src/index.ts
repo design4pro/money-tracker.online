@@ -1,6 +1,6 @@
 import {DurableObject} from "cloudflare:workers";
 import {fctlRepo, identifier, integer, list, nativeRun, record, sha, trustedHuman} from "./contracts";
-import type {Env, Result} from "./contracts";
+import type {Env, Json, Result} from "./contracts";
 import {advanceDispatch} from "./dispatch";
 import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
@@ -471,10 +471,19 @@ export class Factory extends DurableObject<Env> {
         }
         return;
       }
-      const issue = record(await github.api(`/issues/${ticket.issue}`));
+      const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined};
+      let issue: Json;
+      try {
+        issue = record(await github.api(`/issues/${ticket.issue}`));
+      } catch (error) {
+        // The deployment check has already authenticated this repository installation.
+        if (ticket.maintainer && error instanceof ProviderError && [404, 410].includes(error.status)) {
+          return this.block(release, "release-issue-missing", true);
+        }
+        throw error;
+      }
       if (ticket.maintainer) {
         // Release verifies the recorded author, while intake and dispatch consult the current allowlist.
-        const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined};
         if (!maintainerIdentity(issue, this.env, ticket.issue, ticket.maintainer.id)) {
           return this.block(release, "release-issue-identity", true);
         }
