@@ -13,6 +13,7 @@ const merge = "c".repeat(40);
 const base = "d".repeat(40);
 const candidate = "e".repeat(40);
 const descendant = "f".repeat(40);
+const stagingFeature = "ledger-transaction-direction-filter";
 const upstream = "2aae986ff5ad1da1dd8d967498b3b32d6ded413d";
 const key = Buffer.from("synthetic webhook key for replay tests");
 const discovery = {type: "Bot", id: 33, login: "factory-test[bot]"};
@@ -93,7 +94,7 @@ function stagingIssue(number) {
   return {...issue(number), title: "Filter ledger transactions by direction",
     repository_url: `https://api.github.com/repos/${repo}`,
     labels: [{name: "factory:staging-ui"}, {name: "type: feature"}],
-    body: issue(number).body.replace("factory:parity", "factory:staging-ui")};
+    body: `<!-- factory:staging-ui v1 feature_id=${stagingFeature} upstream=v0.34.3@${upstream} deployed=${head} -->`};
 }
 
 function stagingRun(number, actor = discovery.login) {
@@ -1052,6 +1053,7 @@ test("staging intake rejects conflicting classifications, unbound evidence and i
     assert.equal((await open({...original, labels: [...original.labels, {name: "factory:parity"}]})).status, 403);
     assert.equal((await open({...original, body: original.body + "\n" + original.body})).status, 403);
     assert.equal((await open({...original, body: original.body.replace(upstream, otherHead)})).status, 403);
+    assert.equal((await open({...original, body: original.body.replace(stagingFeature, "unapproved-feature")})).status, 403);
     const lookups = productionLookups;
     const stageLookups = stagingLookups;
     native = true;
@@ -1385,7 +1387,7 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
         const {v, invocation, ...context} = JSON.parse(contexts.get(session));
         assert.equal(v, 1);
         assert.ok(invocation);
-        assert.deepEqual(context, {repo, issue: number, provenance: "staging-ui", feature_id: `feature-${number}`,
+        assert.deepEqual(context, {repo, issue: number, provenance: "staging-ui", feature_id: stagingFeature,
           deployed_sha: head, author_id: discovery.id, actor: discovery.login, issue_snapshot_sha256: snapshot,
           [field]: comment, ticket_bot_id: "33"});
       }
