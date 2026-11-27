@@ -34,6 +34,8 @@ The build is a Wrangler dry run. Operators deploy with `npm run deploy:staging` 
 
 ## Maintainer intake rollout
 
+The maintainer profiles read raw issue and comment evidence from the anonymous public GitHub REST API with redirects disabled. Confirm `GITHUB_TRIAGE_BOT_ID` matches the fctl ticket bot ID in Plan and Implement. To roll out profile edits after merge, pause the affected schedules, reconcile their prompts with the existing IDs, then resume the intended schedules.
+
 1. Reconcile schedules without `--enable`. Confirm the existing `TRIAGE_SCHEDULE_ID` still points to native `issue-opened --by agents` with `factory:parity` and limits of 3 per hour and 10 per day. Bind the new paused `money-tracker-online-factory-maintainer-triage-v1` ID as `MAINTAINER_TRIAGE_SCHEDULE_ID` in the matching Worker environment. Confirm it is when-asked with Codex, triage access and base `main`. Set `HUMAN_REVIEWER_IDS` to the reviewed numeric IDs that can initiate feature work and approve sensitive PRs. After review and merge, deploy the approved Worker revision through the operator's normal process and confirm its exact source SHA at `/health`.
 2. With production off, explicitly resume Maintainer Triage, Plan and Implement by ID. Ops can also be resumed if the read-only monitor path is configured. Leave Parity discovery and native parity Triage paused until exact production deployment evidence is available. Retro can remain paused until its separate report path is verified. The reconciler's `--enable` resumes all existing schedules, so use individual resumes for this rollout.
 
