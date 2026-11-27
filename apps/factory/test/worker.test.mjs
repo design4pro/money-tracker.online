@@ -91,9 +91,9 @@ function issue(number) {
 function session(id, schedule, access) {
   return {id, project_id: env.FCTL_PROJECT_ID, workspace: {id: env.FCTL_WORKSPACE_ID}, schedule: {id: schedule},
     agent_kind: "codex", github_access: access, created_at: sessionCreatedAt.get(id) ?? Date.now() - 10_000, branch: "codex/pilot",
-    ...sessionState.get(id),
     pull_requests: access === "push" ? [{repo: ref, number: 23, checks: {sha: revision,
-      review: {state: "passed", project_id: env.FCTL_PROJECT_ID, findings: 0, still_open: 0, session_id: "ses_Review"}}}] : []};
+      review: {state: "passed", project_id: env.FCTL_PROJECT_ID, findings: 0, still_open: 0, session_id: "ses_Review"}}}] : [],
+    ...sessionState.get(id)};
 }
 
 async function provider(req) {
@@ -238,6 +238,10 @@ async function provider(req) {
         head: {sha: next, ref: "codex/pilot", repo: {id: 100}}, changed_files: 1,
         body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`});
     }
+    if (path === "/pulls/25") return json({
+      number: 25, base: {ref: "main", repo: {id: 100}}, head: {sha: revision, ref: "codex/pilot", repo: {id: 100}},
+      body: `<!-- factory:implementation v1 issue=${linkedIssue + 1} session=ses_Implement -->`,
+    });
     if (path === "/pulls/23/files") return json([{filename: changedPath, status: "modified"}]);
     if (path === "/pulls/23/reviews") return json(approvedHead ? [{
       id: 45, user: {id: 81, type: "User"}, state: "APPROVED", commit_id: approvedHead, submitted_at: new Date().toISOString(),
@@ -1119,17 +1123,29 @@ async function stagingRelease(productionConclusion, recovery) {
         assert.equal((await find()).phase, "implement");
         assert.equal(calls.merges.length, initial.merges);
         assert.equal(continuations.length, before + 1);
-        const newerAt = at + 8000;
-        transcripts.set(id, [...restarted, ...completionEvents(result, newerAt).slice(-4)
-          .map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
-        sessionState.set(id, ownedSession("idle", undefined, 2));
-        await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 2});
+        const wrongPRAt = at + 8000;
+        const inlineWrongPRAt = wrongPRAt + 8000;
+        const newerAt = inlineWrongPRAt + 8000;
+        const wrongPR = {...result, pr: 24};
+        const wrongMarker = {...result, pr: 25};
+        const turns = [[wrongPR, wrongPRAt], [wrongMarker, inlineWrongPRAt], [result, newerAt]];
+        const later = turns.flatMap(([value, time]) => completionEvents(value, time).slice(-4));
+        transcripts.set(id, [...restarted, ...later.map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
+        const links = session(id, "sch_Implement", "push").pull_requests;
+        sessionState.set(id, {...ownedSession("idle", undefined, 4), pull_requests: [...links, {repo: ref, number: 25}]});
+        await finish("sch_Implement", id, undefined, 0, false, {at: wrongPRAt, turns: 2});
+        await finish("sch_Implement", id, wrongMarker, 0, false, {at: inlineWrongPRAt, turns: 3});
+        await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 4});
+        for (let step = 0; step < 3 && (await find()).reason !== "credential-recovery-awaiting-pr-link"; step++) await tick();
+        assert.equal((await find()).phase, "implement");
+        assert.equal((await find()).reason, "credential-recovery-awaiting-pr-link");
       }
     } else {
       await finish("sch_Implement", id, result);
     }
     for (let step = 0; step < 8 && (await find())?.phase !== "pr"; step++) await tick();
     assert.equal((await find())?.phase, "pr", JSON.stringify(await status()));
+    assert.equal((await find()).pr, 23);
     assert.equal(calls.merges.length, initial.merges);
 
     for (const changes of [{FCTL_REVIEW_TOKEN: ""}, {FCTL_REVIEW_TOKEN: env.FCTL_TOKEN},
@@ -1260,8 +1276,13 @@ test("native refresh to idle prompts once after the signed boundary and leaves o
     assert.equal(transcriptReads.length, reads + 6, "the exact interruption boundary is checkpointed");
 
     sessionState.set(planId, ownedSession("paused", "Waiting for the ChatGPT plan usage limit to reset"));
-    await finish("sch_Maintainer", id, {v: 1, stage: "triage", status: "ready", issue: number, comment: 510},
-      0, false, {at: at + 8000, turns: 2});
+    const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 510};
+    commentErrors.set(509, 503);
+    await finish("sch_Maintainer", id, {...triageResult, comment: 509}, 0, false, {at: at + 8000, turns: 2});
+    await finish("sch_Maintainer", id, triageResult, 0, false, {at: at + 16_000, turns: 3});
+    await tick();
+    assert.equal((await find()).phase, "triage");
+    assert.equal((await find()).reason, "credential-recovery-evidence-retry");
     for (let step = 0; step < 5 && (await find()).reason !== "session-usage-limit"; step++) await tick();
     assert.equal((await find()).phase, "plan");
     assert.equal((await find()).reason, "session-usage-limit");
@@ -1290,6 +1311,7 @@ test("native refresh to idle prompts once after the signed boundary and leaves o
   } finally {
     currentIssues.delete(number);
     issueComments.delete(510);
+    commentErrors.delete(509);
     commentErrors.delete(510);
     sessionState.delete(id);
     sessionState.delete(planId);

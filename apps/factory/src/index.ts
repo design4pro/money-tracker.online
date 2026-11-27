@@ -1,6 +1,6 @@
 import {DurableObject} from "cloudflare:workers";
 import {fctlRepo, identifier, integer, list, nativeRun, record, sha, trustedHuman} from "./contracts";
-import type {DeliveryTarget, Env, Json} from "./contracts";
+import type {DeliveryTarget, Env, Json, Result} from "./contracts";
 import {advanceDispatch} from "./dispatch";
 import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
@@ -38,7 +38,7 @@ type Ticket = {
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
   pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch; stagingHistory?: DeploymentSearch;
 };
-type Finish = Extract<Ingress, {kind: "finish"}> & {recovery?: RecoveryProgress};
+type Finish = Extract<Ingress, {kind: "finish"}> & {recovery?: RecoveryProgress; verifiedResult?: Result};
 
 export default {
   fetch(request, env) {
@@ -65,7 +65,7 @@ export class Factory extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS result (session TEXT PRIMARY KEY, at INTEGER NOT NULL, issue INTEGER, state TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS result_issue ON result(issue);
       CREATE TABLE IF NOT EXISTS recovery_finish (
-        session TEXT NOT NULL, schedule TEXT NOT NULL, at INTEGER NOT NULL, state TEXT NOT NULL,
+        session TEXT NOT NULL, schedule TEXT NOT NULL, at INTEGER NOT NULL, due INTEGER NOT NULL, state TEXT NOT NULL,
         PRIMARY KEY(session,schedule,at)
       );
       CREATE TABLE IF NOT EXISTS dispatch (key TEXT PRIMARY KEY, state TEXT NOT NULL, due INTEGER NOT NULL, payload TEXT NOT NULL);
@@ -103,8 +103,8 @@ export class Factory extends DurableObject<Env> {
         if (active) {
           // An explicit mismatch cannot supersede a signed turn candidate.
           if (event.result && (event.result.issue !== active.issue || event.result.stage !== active.phase)) return;
-          if (event.completedTurns) {
-            this.sql.exec("INSERT OR IGNORE INTO recovery_finish VALUES (?, ?, ?, ?)",
+          if (event.completedTurns || event.result && event.result.status !== "blocked") {
+            this.sql.exec("INSERT OR IGNORE INTO recovery_finish VALUES (?, ?, ?, 0, ?)",
               event.session, event.schedule, event.at, JSON.stringify(event));
             return;
           }
@@ -222,11 +222,13 @@ export class Factory extends DurableObject<Env> {
 
   private recoveryFinish(session: string, schedule: string): Finish | undefined {
     const row = this.sql.exec<{state: string}>(
-      "SELECT state FROM recovery_finish WHERE session=? AND schedule=? ORDER BY at LIMIT 1", session, schedule).toArray()[0];
+      "SELECT state FROM recovery_finish WHERE session=? AND schedule=? AND due<=? ORDER BY at LIMIT 1",
+      session, schedule, Date.now()).toArray()[0];
     return row ? JSON.parse(row.state) as Finish : undefined;
   }
 
   private finishResult(fctl: Fctl, finish: Finish, queued: boolean) {
+    if (queued && finish.verifiedResult) return finish.verifiedResult;
     if (!finish.completedTurns) return finish.result;
     return fctl.resultAt(finish.session, finish.at, finish.completedTurns, finish.recovery, progress => {
       // The normal path can be superseded during a transcript read.
@@ -236,13 +238,19 @@ export class Factory extends DurableObject<Env> {
     });
   }
 
-  private recoveryWait(ticket: Ticket, reason?: string) {
+  private recoveryWait(ticket: Ticket, reason = ticket.reason, moreCandidates = false) {
     if (reason && ticket.reason !== reason) this.audit(String(ticket.issue), reason);
-    this.ticket(ticket, reason ? {reason} : {});
+    this.ticket(ticket, moreCandidates ? {reason, due: Date.now() + RECOVERY_WAIT, recoveryPending: true} : {reason});
     return "waiting" as const;
   }
 
-  private async stageResult(ticket: Ticket, fctl: Fctl, stage: Stage, run: string, schedule: string,
+  private deferRecoveryFinish(ticket: Ticket, candidate: Finish, reason: string, parsed?: Result) {
+    this.sql.exec(`UPDATE recovery_finish SET due=?,state=json_patch(state,json(?)) WHERE session=? AND schedule=? AND at=?`,
+      Date.now() + WAIT, JSON.stringify(parsed ? {verifiedResult: parsed} : {}), candidate.session, candidate.schedule, candidate.at);
+    return this.recoveryWait(ticket, reason, !!this.recoveryFinish(candidate.session, candidate.schedule));
+  }
+
+  private async stageResult(ticket: Ticket, fctl: Fctl, github: Github, stage: Stage, run: string, schedule: string,
     session: Json, finish: Finish | undefined, verify: () => Promise<boolean>, parity?: ReturnType<typeof issueEvidence>) {
     const id = String(session.id);
     const reservation = ticket.credentialRecovery;
@@ -256,7 +264,15 @@ export class Factory extends DurableObject<Env> {
     const inline = finish?.result && eligible(finish);
     const selected = reservation ? inline ? finish : candidate : finish;
     if (!reservation && finish && !eligible(finish)) return;
-    const result = selected && eligible(selected) ? await this.finishResult(fctl, selected, selected === candidate) : undefined;
+    let result: Awaited<ReturnType<Fctl["resultAt"]>>;
+    try {
+      result = selected && eligible(selected) ? await this.finishResult(fctl, selected, selected === candidate) : undefined;
+    } catch (error) {
+      if (!candidate || selected !== candidate) throw error;
+      const reason = reservation && Date.now() >= reservation.reservedAt + CREDENTIAL_WAIT
+        ? "credential-recovery-transcript-unavailable-operator" : "credential-recovery-transcript-retry";
+      return this.deferRecoveryFinish(ticket, candidate, reason);
+    }
     // A newer inline finish can arrive while a candidate's transcript is being read.
     if (this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
     if (result === "recovery-pending") return result;
@@ -265,10 +281,25 @@ export class Factory extends DurableObject<Env> {
     if (!reservation && finish && interrupted === undefined) return parsed;
 
     if (reservation && parsed?.stage === stage && parsed.issue === ticket.issue) {
-      if (parsed.status !== "blocked" && !await verify()) {
-        return this.recoveryWait(ticket, "credential-recovery-evidence-changed-operator");
+      let reason: string | undefined;
+      const expired = Date.now() >= reservation.reservedAt + CREDENTIAL_WAIT;
+      if (parsed.status !== "blocked") {
+        try {
+          if (!await verify()) reason = "credential-recovery-evidence-changed-operator";
+          else if (parsed.status === "implemented" && !await this.recoveryPR(github, ticket, session, parsed.pr)) {
+            reason = expired ? "credential-recovery-pr-link-operator" : "credential-recovery-awaiting-pr-link";
+          } else if ((parsed.stage === "triage" || parsed.stage === "plan") &&
+              !await this.checkComment(github, ticket.issue, parsed.stage, parsed.comment)) {
+            reason = expired ? "credential-recovery-comment-operator" : "credential-recovery-awaiting-comment";
+          }
+        } catch {
+          reason = expired ? "credential-recovery-evidence-unavailable-operator" : "credential-recovery-evidence-retry";
+        }
       }
-      return this.finish(id, schedule)?.at === finish?.at ? parsed : "recovery-pending" as const;
+      if (this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
+      if (!reason) return parsed;
+      return candidate && selected === candidate ? this.deferRecoveryFinish(ticket, candidate, reason, parsed) :
+        this.recoveryWait(ticket, reason);
     }
     if (reservation && candidate && selected === candidate) {
       const more = this.ctx.storage.transactionSync(() => {
@@ -471,6 +502,26 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
+  private sessionHasPR(session: Json, pr: number): boolean {
+    return list(session.pull_requests).map(record).some(link => link.number === pr && fctlRepo(link.repo) === this.env.REPO);
+  }
+
+  private implementationLink(pr: Json, ticket: Ticket, session: Json): boolean {
+    const branch = record(pr.head).ref;
+    return typeof branch === "string" && branch !== "" && session.branch === branch &&
+      linked(pr.body, ticket.issue, String(session.id));
+  }
+
+  private async recoveryPR(github: Github, ticket: Ticket, session: Json, number: number): Promise<boolean> {
+    if (!this.sessionHasPR(session, number)) return false;
+    const pr = await this.readEvidence(github, `/pulls/${number}`);
+    if (!pr || pr.number !== number) return false;
+    const head = record(pr.head);
+    const base = record(pr.base);
+    return sha(head.sha) && base.ref === "main" && String(record(head.repo).id) === this.env.REPO_ID &&
+      String(record(base.repo).id) === this.env.REPO_ID && this.implementationLink(pr, ticket, session);
+  }
+
   private async checkComment(github: Github, issue: number, stage: "triage" | "plan", id?: number): Promise<boolean> {
     if (!integer(id)) return false;
     const comment = await this.readEvidence(github, `/issues/comments/${id}`);
@@ -588,7 +639,7 @@ export class Factory extends DurableObject<Env> {
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") {
       return finish ? this.block(ticket, "triage-session-identity") : this.ticket(ticket, {});
     }
-    const result = await this.stageResult(ticket, fctl, "triage", runId, schedule, session, finish, async () => {
+    const result = await this.stageResult(ticket, fctl, github, "triage", runId, schedule, session, finish, async () => {
       const current = await this.readIssue(github, ticket);
       if (maintainer) return this.matchesMaintainer(ticket, current);
       const parity = current && issueEvidence(current);
@@ -598,7 +649,7 @@ export class Factory extends DurableObject<Env> {
     }, evidence);
     if (result === "waiting" || result === "recovery-pending") return result;
     if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
-        !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
+        !ticket.credentialRecovery && !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
     if (evidence) {
       const verified = await this.verifyDeployment(ticket, github, evidence.deployed);
@@ -668,7 +719,7 @@ export class Factory extends DurableObject<Env> {
         if (session.id !== dispatch.session || session.agent_kind !== "codex" || session.github_access !== dispatch.access) {
           return finish ? this.block(ticket, "dispatch-session-identity", stage === "plan") : this.ticket(ticket, {});
         }
-        const result = await this.stageResult(ticket, fctl, stage, String(dispatch.run), dispatch.schedule, session, finish, async () => {
+        const result = await this.stageResult(ticket, fctl, github, stage, String(dispatch.run), dispatch.schedule, session, finish, async () => {
           if (ticket.maintainer) return this.matchesDispatchEvidence(github, ticket, stage);
           const current = await this.readIssue(github, ticket);
           const evidence = current && issueEvidence(current);
@@ -691,13 +742,13 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (stage === "plan") {
-          if (result.status !== "planned" || !await this.checkComment(github, issue, "plan", result.comment)) {
+          if (result.status !== "planned" || !ticket.credentialRecovery && !await this.checkComment(github, issue, "plan", result.comment)) {
             return this.block(ticket, "plan-comment", true);
           }
           this.ticket(ticket, {phase: "planned", planComment: result.comment, due: Date.now()});
         } else {
           if (result.status !== "implemented") return this.block(ticket, "implementation-pr-missing");
-          if (!list(session.pull_requests).map(record).some(pr => pr.number === result.pr && fctlRepo(pr.repo) === env.REPO)) {
+          if (!this.sessionHasPR(session, result.pr)) {
             return this.ticket(ticket, {});
           }
           this.ticket(ticket, {phase: "pr", pr: result.pr, due: Date.now()});
@@ -720,12 +771,9 @@ export class Factory extends DurableObject<Env> {
     if (pr.number !== number || !sha(currentHead) || record(pr.base).ref !== "main") return;
     const session = dispatch?.session ? await fctl.session(dispatch.session, dispatch.schedule) : undefined;
     // The PR phase records the PR named by the authenticated implementation completion.
-    const branch = record(pr.head).ref;
     const relation = !ticket || (dispatch?.state === "started" && dispatch.schedule === this.env.IMPLEMENT_SCHEDULE_ID &&
       !!session && session.id === dispatch.session && session.agent_kind === "codex" && session.github_access === "push" &&
-      typeof branch === "string" && branch !== "" && session.branch === branch &&
-      linked(pr.body, ticket.issue, String(session.id)) &&
-      list(session.pull_requests).map(record).some(p => p.number === number && fctlRepo(p.repo) === this.env.REPO));
+      this.implementationLink(pr, ticket, session) && this.sessionHasPR(session, number));
     if (pr.merged === true) {
       if (!ticket) return;
       if (!relation || !sha(pr.merge_commit_sha) || String(record(record(pr.base).repo).id) !== this.env.REPO_ID ||
