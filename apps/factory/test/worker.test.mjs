@@ -1093,20 +1093,20 @@ test("staging intake rejects conflicting classifications, unbound evidence and i
 });
 
 test("staging retains an independently linked PR after a late issue edit and closes after exact staging smoke",
-  () => stagingRelease("skipped", undefined, true));
+  () => stagingRelease("skipped", undefined, "staging-ui"));
 
 test("staging retains an independently linked PR from credential recovery after a late issue edit",
-  () => stagingRelease("skipped", "restart", true));
+  () => stagingRelease("skipped", "restart", "staging-ui"));
 
 test("staging pre-work evidence blocks release the slot only with no linked PR and an independently verified mismatch", async () => {
   for (const scenario of [{changed: true}, {changed: false}]) {
-    await stagingRelease("skipped", undefined, true, scenario);
+    await stagingRelease("skipped", undefined, "staging-ui", scenario);
   }
 });
 
 test("a newer signed staging completion supersedes a pre-work block during corroboration", async () => {
   for (const mode of [{}, {omitted: true}, {recovery: true, omitted: true}, {recovery: true, deferred: true}]) {
-    await stagingRelease("skipped", undefined, true, {changed: true, superseded: true, ...mode});
+    await stagingRelease("skipped", undefined, "staging-ui", {changed: true, superseded: true, ...mode});
   }
 });
 
@@ -1118,20 +1118,25 @@ test("staging retains its slot when the refreshed session cannot corroborate the
     {...ownedSession("idle", undefined, 1), stats: {}},
     {...ownedSession("idle", undefined, 1), status: undefined},
   ]) {
-    await stagingRelease("skipped", undefined, true, {changed: true, nextSession});
+    await stagingRelease("skipped", undefined, "staging-ui", {changed: true, nextSession});
   }
 });
 
 test("staging waits for a signed implementation finish when the PR is already visible", async () => {
   for (const recovery of [false, true]) {
-    await stagingRelease("skipped", undefined, true, {changed: true, linked: true, recovery});
+    await stagingRelease("skipped", undefined, "staging-ui", {changed: true, linked: true, recovery});
   }
 });
 
-async function stagingRelease(productionConclusion, recovery, staging = false, preWork) {
+test("verified staging smoke releases a legacy parity slot when staging classification prevents closure",
+  () => stagingRelease("skipped", undefined, "parity"));
+
+async function stagingRelease(productionConclusion, recovery, provenance = "maintainer", preWork) {
   const number = 41;
-  const author = staging ? discovery : {type: "User", id: 81, login: "maintainer"};
-  const openedIssue = staging ? stagingIssue(number) : {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+  const staging = provenance === "staging-ui";
+  const parity = provenance === "parity";
+  const author = staging || parity ? discovery : {type: "User", id: 81, login: "maintainer"};
+  const openedIssue = staging ? stagingIssue(number) : parity ? issue(number) : {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
     title: "Adjust a pilot feature", body: "Acceptance criteria", labels: [{name: "type: feature"}]};
   const old = mf;
   const bindings = {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false", DELIVERY_TARGET: "staging", SOURCE_SHA: head,
@@ -1144,6 +1149,8 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
   const configure = changes => mf.setOptions({...workerOptions, bindings: {...bindings, MERGE_ENABLED: "true", ...changes}});
   const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR};
   const previousRuns = runs.sch_Triage;
+  const previousPlanRuns = runs.sch_Plan;
+  if (parity) runs.sch_Plan = [];
   try {
     currentIssues.set(number, openedIssue);
     for (const [id, stage] of [[410, "triage"], [411, "plan"]]) {
@@ -1174,6 +1181,10 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
       await tick();
       assert.equal((await find()).phase, "triage");
       runs.sch_Triage = [stagingRun(number)];
+    } else if (parity) {
+      native = true;
+      runs.sch_Triage = [stagingRun(number)];
+      await finish("sch_Triage", `ses_TriageStaging${number}`, triageResult);
     } else {
       await finish("sch_Maintainer", "ses_Maintainer41", triageResult);
     }
@@ -1440,6 +1451,22 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
     await tick();
     assert.deepEqual(calls.merges.slice(initial.merges), [head]);
 
+    if (parity) {
+      assert.ok(productionLookups > initialProduction, "legacy parity intake still requires production evidence");
+      currentIssues.set(number, {...openedIssue, labels: [...openedIssue.labels, {name: "factory:staging-ui"}]});
+      stagingProof = {job: {steps: []}};
+      await tick();
+      assert.equal((await find()).phase, "release");
+      assert.deepEqual((await status()).slot, [{issue: number}]);
+      stagingProof = {};
+      await tick();
+      assert.equal((await find()).reason, "release-issue-evidence-changed");
+      assert.equal((await find()).merge, merge);
+      assert.deepEqual((await status()).slot, []);
+      assert.equal(calls.closed.length, initial.closed);
+      return;
+    }
+
     for (const proof of [
       {check: {head_sha: descendant}},
       {attempt: {head_sha: descendant}},
@@ -1481,6 +1508,7 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
   } finally {
     ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR} = saved);
     runs.sch_Triage = previousRuns;
+    if (parity) runs.sch_Plan = previousPlanRuns;
     transcripts.delete(`ses_TriageStaging${number}`);
     issueReads.delete(number);
     splitReview = stagingProof = approvedHead = undefined;

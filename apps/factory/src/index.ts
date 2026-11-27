@@ -888,7 +888,9 @@ export class Factory extends DurableObject<Env> {
         if (!await this.matchesStaging(ticket, issue, true)) {
           return this.block(release, "release-issue-evidence-changed", true);
         }
-      } else if (hasStagingClassification(issue) || issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
+      } else if (hasStagingClassification(issue)) {
+        return this.block(release, "release-issue-evidence-changed", true);
+      } else if (issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
         return this.block(ticket, "release-issue-identity");
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});
