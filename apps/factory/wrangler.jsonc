@@ -12,7 +12,11 @@
     "staging": {
       "name": "money-tracker-factory-staging",
       "durable_objects": {"bindings": [{"name": "FACTORY", "class_name": "Factory"}]},
-      "vars": {"REPO": "design4pro/money-tracker.online"}
+      "vars": {
+        "REPO": "design4pro/money-tracker.online",
+        "DELIVERY_TARGET": "staging",
+        "DELIVERY_STAGING_SMOKE_STEP": "Deploy and verify staging"
+      }
     },
     "production": {
       "name": "money-tracker-factory-production",

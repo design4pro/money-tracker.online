@@ -57,12 +57,19 @@ let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
 let priorAttemptHead = merge;
+let priorAttemptConclusion = "success";
 let manualProof = false;
 let missingJobLookups = 0;
 let goneAttemptLookups = 0;
 const deliveryPages = [];
 let failProductionJobs = false;
 let onProductionJobs;
+const reviewProject = "prj_Native";
+let splitReview;
+let stagingProof;
+let approvedHead;
+let changedPath = "apps/app/src/ui/view.css";
+let stagingLookups = 0;
 const weekMs = 7 * 24 * 60 * 60 * 1000;
 const epochFriday = Date.UTC(2020, 0, 3, 9);
 const weekEnd = epochFriday + Math.floor((Date.now() - epochFriday) / weekMs) * weekMs;
@@ -167,12 +174,23 @@ async function provider(req) {
       if (id === "ses_Implement") {
         const implementation = session(id, "sch_Implement", "push");
         // fctl 0.39 omits pull_requests when the session has none.
+        assert.equal(req.headers.get("authorization"), "Bearer fake-pat");
         if (!implementationHasPR) delete implementation.pull_requests;
+        else if (splitReview) implementation.pull_requests[0].checks = {sha: revision, passed: 2, failed: 0};
         return json(implementation);
       }
     }
-    if (noun === "projects" && part === "reviews") return json({reviews: [{repo: ref, number: 23, head_sha: revision,
-      state: "passed", findings: 0, still_open: 0, session_id: "ses_Review", opened_by: {id: "ses_Implement"}}]});
+    if (noun === "projects" && part === "reviews") {
+      assert.equal(method, "GET");
+      if (splitReview && id !== reviewProject) return new Response(null, {status: 404});
+      assert.equal(id, splitReview ? reviewProject : env.FCTL_PROJECT_ID);
+      if (req.headers.get("authorization") !== (splitReview ? "Bearer fake-review-pat" : "Bearer fake-pat")) {
+        return new Response(null, {status: 403});
+      }
+      return json({reviews: [{repo: ref, number: 23, head_sha: revision,
+        state: "passed", findings: 0, still_open: 0, session_id: "ses_Review",
+        ...(splitReview?.record ?? {opened_by: {id: "ses_Implement"}})}]});
+    }
   }
   if (hostname === "api.github.com") {
     calls.githubRequests++;
@@ -209,8 +227,12 @@ async function provider(req) {
         head: {sha: next, ref: "codex/pilot", repo: {id: 100}}, changed_files: 1,
         body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`});
     }
-    if (path === "/pulls/23/files") return json([{filename: "apps/app/src/ui/view.css", status: "modified"}]);
+    if (path === "/pulls/23/files") return json([{filename: changedPath, status: "modified"}]);
+    if (path === "/pulls/23/reviews") return json(approvedHead ? [{
+      id: 45, user: {id: 81, type: "User"}, state: "APPROVED", commit_id: approvedHead, submitted_at: new Date().toISOString(),
+    }] : []);
     if (path === "/pulls/23/merge") {
+      assert.equal(body.merge_method, "squash");
       calls.merges.push(body.sha);
       implemented = true;
       mainHead = merge;
@@ -225,6 +247,14 @@ async function provider(req) {
     if (path.endsWith("/check-runs")) {
       const sha = path.split("/")[2];
       const name = searchParams.get("check_name");
+      if (name === "deploy-staging") {
+        stagingLookups++;
+        assert.equal(sha, merge);
+        assert.equal(searchParams.get("filter"), "all");
+        return json({total_count: 1, check_runs: [{name, head_sha: sha, status: "completed", conclusion: "success",
+          app: {id: 77, slug: "github-actions"}, details_url: `https://github.com/${repo}/actions/runs/5/job/505`,
+          ...stagingProof.check}]});
+      }
       if (name === "deploy-production") {
         productionLookups++;
         if (!productionAvailable) return json({total_count: 0, check_runs: []});
@@ -252,11 +282,31 @@ async function provider(req) {
         return json({total_count: checks.length, check_runs: checks.slice((page - 1) * 100, page * 100)});
       }
       const projected = {
-        verify: sha === candidate ? [{name, head_sha: sha, app: {id: 77, slug: "github-actions"}, status: "completed", conclusion: "success"}] : [],
-        "fctl review": [{name, head_sha: sha, app: {id: 88}, status: "completed", conclusion}],
+        verify: sha === (splitReview ? revision : candidate) ? [{name, head_sha: sha, app: {id: 77, slug: "github-actions"}, status: "completed", conclusion: "success"}] : [],
+        "fctl review": [{name, head_sha: sha, app: {id: 88}, status: "completed", conclusion,
+          details_url: `${env.FCTL_SERVER}/s/ses_Review`, ...splitReview?.check}],
       }[name] ?? [];
       return json({total_count: projected.length, check_runs: projected});
     }
+    if (path === "/actions/workflows/ci.yml/runs") {
+      assert.ok(splitReview);
+      assert.equal(searchParams.get("event"), "pull_request");
+      assert.equal(searchParams.get("head_sha"), revision);
+      return json({workflow_runs: [{head_sha: revision, status: "completed", conclusion: "success",
+        pull_requests: [{number: 23, head: {sha: revision}, base: {sha: base}}]}]});
+    }
+    const stagingJob = {id: 505, run_id: 5, run_attempt: 2, name: "deploy-staging", head_branch: "main",
+      head_sha: merge, status: "completed", conclusion: "success"};
+    if (path === "/actions/jobs/505") return json(stagingJob);
+    if (path === "/actions/runs/5/attempts/2") return json({
+      id: 5, run_attempt: 2, head_sha: merge, head_branch: "main", status: "completed", conclusion: "success",
+      event: "workflow_run", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100},
+      ...stagingProof.attempt,
+    });
+    if (path === "/actions/runs/5/attempts/2/jobs") return json({total_count: 2, jobs: [
+      {...stagingJob, steps: [{name: "Deploy and verify staging", conclusion: "success"}], ...stagingProof.job},
+      {...stagingJob, id: 506, name: "deploy-production", conclusion: stagingProof.productionConclusion ?? "skipped"},
+    ]});
     if (path.startsWith("/actions/jobs/")) {
       const id = Number(path.split("/").at(-1));
       assert.ok([101, 202, 404, 1000, 1001, 1002, 1003, 1004].includes(id), "only successful candidates may be loaded");
@@ -275,7 +325,7 @@ async function provider(req) {
         return new Response(null, {status: 410});
       }
       return json({id, run_attempt: 1, head_sha: id === 1 ? head : id === 2 ? priorAttemptHead : merge,
-        status: "completed", conclusion: "success", head_branch: "main", event: id === 1 ? "push" : id === 4 ? "workflow_dispatch" : "workflow_run",
+        status: "completed", conclusion: id === 2 ? priorAttemptConclusion : "success", head_branch: "main", event: id === 1 ? "push" : id === 4 ? "workflow_dispatch" : "workflow_run",
         path: id < 10 ? ".github/workflows/delivery.yml" : ".github/workflows/other.yml",
         repository: {id: 100}, head_repository: {id: 100}});
     }
@@ -285,7 +335,9 @@ async function provider(req) {
       const commit = path.includes("/runs/1/") ? head : merge;
       const conclusion = path.includes("/runs/2/") ? smoke : "success";
       if (path.includes("/runs/2/")) await onProductionJobs?.();
-      return json({total_count: 1, jobs: [{name: "deploy-production", head_sha: commit, conclusion: "success",
+      const run = Number(path.split("/")[3]);
+      return json({total_count: 1, jobs: [{id: run * 101, run_id: run, run_attempt: 1, head_branch: "main",
+        name: "deploy-production", head_sha: commit, status: "completed", conclusion: "success",
         steps: [{name: "Production smoke", conclusion}]}]});
     }
     if (path === `/compare/${merge}...${descendant}`) return json({status: "ahead", merge_base_commit: {sha: merge}});
@@ -444,6 +496,11 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "release");
   assert.deepEqual(calls.closed, []);
   priorAttemptHead = merge;
+  priorAttemptConclusion = "failure";
+  await tick();
+  assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "release");
+  assert.deepEqual(calls.closed, []);
+  priorAttemptConclusion = "success";
   smoke = "failure";
   mainHead = descendant;
   await tick();
@@ -825,6 +882,131 @@ test("signed maintainer intake plans and dispatches without production evidence"
     linkedIssue = 1;
   }
 });
+
+test("existing staging ticket joins split review and closes after exact smoke with production skipped",
+  () => stagingRelease("skipped"));
+
+test("late staging proof wakes and closes a superseded ticket when production fails",
+  () => stagingRelease("failure"));
+
+async function stagingRelease(productionConclusion) {
+  const number = 41;
+  const author = {type: "User", id: 81, login: "maintainer"};
+  const openedIssue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+    title: "Adjust a pilot feature", body: "Acceptance criteria", labels: [{name: "type: feature"}]};
+  const old = mf;
+  const bindings = {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false", DELIVERY_TARGET: "staging",
+    DELIVERY_STAGING_SMOKE_STEP: "Deploy and verify staging", FCTL_REVIEW_PROJECT_ID: reviewProject,
+    FCTL_REVIEW_TOKEN: "fake-review-pat"};
+  mf = new Miniflare({...workerOptions, bindings});
+  const initial = {...calls, merges: calls.merges.length, closed: calls.closed.length};
+  const initialProduction = productionLookups;
+  const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
+  const configure = changes => mf.setOptions({...workerOptions, bindings: {...bindings, MERGE_ENABLED: "true", ...changes}});
+  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase};
+  try {
+    currentIssues.set(number, openedIssue);
+    for (const [id, stage] of [[410, "triage"], [411, "plan"]]) {
+      issueComments.set(id, {id, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`,
+        body: `<!-- factory:${stage} v1 -->\nEvidence`});
+    }
+    mainHead = base;
+    candidateBase = base;
+    linkedIssue = number;
+    implemented = false;
+    revision = head;
+    conclusion = "success";
+    splitReview = {record: {}};
+    await github({action: "opened", issue: openedIssue, sender: author});
+    await finish("sch_Maintainer", "ses_Maintainer41", {v: 1, stage: "triage", status: "ready", issue: number, comment: 410});
+    await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 411});
+    await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23});
+    for (let step = 0; step < 8 && (await find())?.phase !== "pr"; step++) await tick();
+    assert.equal((await find())?.phase, "pr", JSON.stringify(await status()));
+    assert.equal(calls.merges.length, initial.merges);
+
+    for (const changes of [{FCTL_REVIEW_TOKEN: ""}, {FCTL_REVIEW_TOKEN: env.FCTL_TOKEN},
+      {FCTL_REVIEW_PROJECT_ID: "prj_Wrong"}]) {
+      await configure(changes);
+      await tick();
+      assert.equal(calls.gates.at(-1).conclusion, "failure");
+    }
+    await configure({});
+    for (const evidence of [
+      {record: {head_sha: otherHead}}, {record: {project_id: "prj_Wrong"}}, {record: {findings: 1}}, {record: {still_open: 1}},
+      {check: {head_sha: otherHead}}, {check: {app: {id: 999}}},
+      {check: {details_url: "https://spoof.invalid/s/ses_Review"}},
+      {check: {details_url: `${env.FCTL_SERVER}/s/ses_Wrong`}},
+      {check: {details_url: `${env.FCTL_SERVER}/sessions/ses_Review`}},
+    ]) {
+      splitReview = {record: {}, ...evidence};
+      await tick();
+      assert.equal(calls.gates.at(-1).conclusion, "failure", JSON.stringify(evidence));
+      assert.equal(calls.merges.length, initial.merges);
+    }
+    splitReview = {record: {}};
+    linkedIssue = number + 1;
+    await tick();
+    assert.equal(calls.merges.length, initial.merges);
+    assert.equal(calls.gates.at(-1).conclusion, "failure");
+    linkedIssue = number;
+    changedPath = "apps/factory/src/index.ts";
+    approvedHead = otherHead;
+    await tick();
+    assert.equal(calls.merges.length, initial.merges);
+    assert.equal(calls.gates.at(-1).conclusion, "failure");
+    approvedHead = head;
+    await tick();
+    assert.deepEqual(calls.merges.slice(initial.merges), [head]);
+
+    for (const proof of [
+      {check: {head_sha: descendant}},
+      {attempt: {head_sha: descendant}},
+      {attempt: {run_attempt: 1}},
+      {job: {run_attempt: 1}},
+      {job: {id: 507}},
+      {job: {steps: []}},
+      {job: {steps: [{name: "Deploy and verify staging", conclusion: "failure"}]}},
+    ]) {
+      stagingProof = proof;
+      await tick();
+      assert.equal((await find()).phase, "release", JSON.stringify(proof));
+      assert.equal(calls.closed.length, initial.closed);
+    }
+
+    mainHead = descendant;
+    await tick();
+    assert.equal((await find()).reason, "release-superseded-without-staging-smoke");
+    assert.deepEqual((await status()).slot, []);
+    await tick();
+    assert.equal((await find()).productionVerification, undefined, "late proof requires a new webhook wakeup");
+    const beforeProof = stagingLookups;
+    const deliveryConclusion = productionConclusion === "skipped" ? "success" : "failure";
+    stagingProof = {productionConclusion, attempt: {conclusion: deliveryConclusion}};
+    const completion = {action: "completed", workflow_run: {
+      id: 5, run_attempt: 2, head_sha: merge, head_branch: "main", status: "completed",
+      conclusion: deliveryConclusion, path: ".github/workflows/delivery.yml",
+    }};
+    await github(completion, "staging-delivery", undefined, "workflow_run");
+    await github(completion, "duplicate-staging-delivery", undefined, "workflow_run");
+    await tick();
+    assert.equal(stagingLookups, beforeProof + 1);
+    assert.equal((await find()).phase, "closed");
+    assert.equal((await find()).merge, merge);
+    assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
+    assert.equal(calls.implement, initial.implement + 1);
+    assert.equal(productionLookups, initialProduction);
+  } finally {
+    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase} = saved);
+    splitReview = stagingProof = approvedHead = undefined;
+    changedPath = "apps/app/src/ui/view.css";
+    await mf.dispose();
+    mf = old;
+    currentIssues.delete(number);
+    issueComments.delete(410);
+    issueComments.delete(411);
+  }
+}
 
 test("only an omitted finish message can recover its own successful Codex turn", async () => {
   const old = mf;

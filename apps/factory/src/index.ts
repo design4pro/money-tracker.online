@@ -1,6 +1,6 @@
 import {DurableObject} from "cloudflare:workers";
 import {fctlRepo, identifier, integer, list, nativeRun, record, sha, trustedHuman} from "./contracts";
-import type {Env, Json} from "./contracts";
+import type {DeliveryTarget, Env, Json} from "./contracts";
 import {advanceDispatch} from "./dispatch";
 import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
@@ -17,8 +17,10 @@ import {bearer} from "./signatures";
 const WAIT = 60_000;
 const RECOVERY_WAIT = 1_000;
 const DAY = 24 * 60 * 60_000;
-const SUPERSEDED = "release-superseded-without-production-smoke";
-const PENDING_PRODUCTION = "phase='blocked' AND json_extract(state,'$.reason')=? AND json_extract(state,'$.productionVerification') IS NOT NULL";
+const PRODUCTION_SUPERSEDED = "release-superseded-without-production-smoke";
+const STAGING_SUPERSEDED = "release-superseded-without-staging-smoke";
+const SUPERSEDED_RELEASE = "phase='blocked' AND json_extract(state,'$.reason') IN (?,?)";
+const PENDING_RELEASE = `${SUPERSEDED_RELEASE} AND json_extract(state,'$.productionVerification') IS NOT NULL`;
 
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Ticket = {
@@ -26,7 +28,7 @@ type Ticket = {
   maintainer?: MaintainerIntake; main?: string;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
-  pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch;
+  pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch; stagingHistory?: DeploymentSearch;
 };
 type Finish = Extract<Ingress, {kind: "finish"}> & {recovery?: RecoveryProgress};
 
@@ -90,11 +92,11 @@ export class Factory extends DurableObject<Env> {
               json_type(excluded.state,'$.completedTurns') = 'integer' OR
               json_type(result.state,'$.completedTurns') IS NULL)))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
-      } else if (event.kind === "production") {
-        this.sql.exec(`UPDATE ticket SET due=?, state=json_set(json_remove(state,'$.productionHistory'),'$.due',?,'$.productionVerification',?)
-          WHERE (phase='release' OR (phase='blocked' AND json_extract(state,'$.reason')=?))
+      } else if (event.kind === "delivery") {
+        this.sql.exec(`UPDATE ticket SET due=?, state=json_set(json_remove(state,'$.productionHistory','$.stagingHistory'),'$.due',?,'$.productionVerification',?)
+          WHERE (phase='release' OR (${SUPERSEDED_RELEASE}))
             AND json_extract(state,'$.merge')=?`,
-          now, now, id, SUPERSEDED, event.head);
+          now, now, id, PRODUCTION_SUPERSEDED, STAGING_SUPERSEDED, event.head);
       } else if (event.kind === "alert") {
         this.queue(`ops:${event.key}`, this.env.OPS_SCHEDULE_ID, "read", {repo: this.env.REPO, code: event.code, head: event.head});
         this.audit(`ops:${event.key}`, "alert-accepted");
@@ -230,11 +232,11 @@ export class Factory extends DurableObject<Env> {
     const slot = this.sql.exec<{issue: number}>("SELECT issue FROM slot").toArray()[0];
     const active = slot ? this.tickets("issue=? AND due<=? AND phase!='blocked'", slot.issue, now)[0] :
       this.tickets("phase='ready' AND due<=? ORDER BY issue LIMIT 1", now)[0];
-    // Webhook wakeups can deliver late production evidence even after the
+    // Webhook wakeups can deliver late Delivery evidence even after the
     // superseded ticket released its slot.
     const superseded = this.tickets(
-      `${PENDING_PRODUCTION} AND due<=? ORDER BY due,issue LIMIT 1`,
-      SUPERSEDED, now,
+      `${PENDING_RELEASE} AND due<=? ORDER BY due,issue LIMIT 1`,
+      PRODUCTION_SUPERSEDED, STAGING_SUPERSEDED, now,
     );
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
@@ -285,16 +287,16 @@ export class Factory extends DurableObject<Env> {
       EXISTS(SELECT 1 FROM ticket WHERE phase NOT IN ('closed','blocked','ready') OR
         (phase='ready' AND NOT EXISTS(SELECT 1 FROM slot))) OR
       EXISTS(SELECT 1 FROM dispatch WHERE key LIKE 'ops:%' AND state IN ('queued','posting')) AS pending`).one();
-    const productionDue = this.sql.exec<{due: number | null}>(
-      `SELECT MIN(due) AS due FROM ticket WHERE ${PENDING_PRODUCTION}`, SUPERSEDED,
+    const releaseDue = this.sql.exec<{due: number | null}>(
+      `SELECT MIN(due) AS due FROM ticket WHERE ${PENDING_RELEASE}`, PRODUCTION_SUPERSEDED, STAGING_SUPERSEDED,
     ).one().due;
     const recoveryDue = this.sql.exec<{due: number | null}>(
       `SELECT MIN(due) AS due FROM ticket WHERE json_extract(state, '$.recoveryPending') = 1
         AND (phase='triage' OR (phase IN ('plan','implement') AND issue=(SELECT issue FROM slot)))`,
     ).one().due;
-    if (productionDue !== null || recoveryDue !== null || pending.pending || bootstrap.length) {
+    if (releaseDue !== null || recoveryDue !== null || pending.pending || bootstrap.length) {
       const regularDue = pending.pending || bootstrap.length ? Date.now() + WAIT : Infinity;
-      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, recoveryDue ?? Infinity, productionDue ?? Infinity)));
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, recoveryDue ?? Infinity, releaseDue ?? Infinity)));
     }
     // Leave one watchdog pass when an ingress may have interleaved with the pump.
     else if (now - 120_000 < Number(this.sql.exec("SELECT MAX(at) AS newest FROM delivery").one().newest)) {
@@ -318,20 +320,22 @@ export class Factory extends DurableObject<Env> {
       typeof comment.body === "string" && comment.body.startsWith(`<!-- factory:${stage} v1 -->`);
   }
 
-  private async verifyDeployment(ticket: Ticket, github: Github, head: string) {
-    const history = ticket.productionHistory?.head === head ? ticket.productionHistory : {head, page: 1};
+  private async verifyDeployment(ticket: Ticket, github: Github, head: string, target: DeliveryTarget = "production") {
+    const field = target === "staging" ? "stagingHistory" : "productionHistory";
+    const saved = ticket[field];
+    const history = saved?.head === head ? saved : {head, page: 1};
     let verified: boolean | undefined;
     try {
-      verified = await deployment(github, this.env, history);
+      verified = await deployment(github, this.env, history, target);
       return verified;
     } finally {
       const current = this.tickets("issue=?", ticket.issue)[0];
       if (current.productionVerification === ticket.productionVerification) {
         if (verified !== false) {
-          this.sql.exec("UPDATE ticket SET state=json_set(state,'$.productionHistory',json(?)) WHERE issue=?",
-            JSON.stringify(history), ticket.issue);
+          this.sql.exec("UPDATE ticket SET state=json_set(state,?,json(?)) WHERE issue=?",
+            `$.${field}`, JSON.stringify(history), ticket.issue);
         } else {
-          this.sql.exec("UPDATE ticket SET state=json_remove(state,'$.productionHistory') WHERE issue=?", ticket.issue);
+          this.sql.exec("UPDATE ticket SET state=json_remove(state,?) WHERE issue=?", `$.${field}`, ticket.issue);
         }
       }
     }
@@ -526,24 +530,32 @@ export class Factory extends DurableObject<Env> {
     const currentHead = record(pr.head).sha;
     if (pr.number !== number || !sha(currentHead) || record(pr.base).ref !== "main") return;
     const session = dispatch?.session ? await fctl.session(dispatch.session, dispatch.schedule) : undefined;
-    const relation = !ticket || (!!session?.id && session.branch === record(pr.head).ref &&
+    // The PR phase records the PR named by the authenticated implementation completion.
+    const branch = record(pr.head).ref;
+    const relation = !ticket || (dispatch?.state === "started" && dispatch.schedule === this.env.IMPLEMENT_SCHEDULE_ID &&
+      !!session && session.id === dispatch.session && session.agent_kind === "codex" && session.github_access === "push" &&
+      typeof branch === "string" && branch !== "" && session.branch === branch &&
       linked(pr.body, ticket.issue, String(session.id)) &&
       list(session.pull_requests).map(record).some(p => p.number === number && fctlRepo(p.repo) === this.env.REPO));
     if (pr.merged === true) {
       if (!ticket) return;
-      if (!relation || !sha(pr.merge_commit_sha) || String(record(record(pr.base).repo).id) !== this.env.REPO_ID) {
+      if (!relation || !sha(pr.merge_commit_sha) || String(record(record(pr.base).repo).id) !== this.env.REPO_ID ||
+          String(record(record(pr.head).repo).id) !== this.env.REPO_ID) {
         return this.block(ticket, "merged-pr-provenance");
       }
       const mergedAt = Date.parse(String(pr.merged_at));
       if (!Number.isFinite(mergedAt)) return this.block(ticket, "merge-timestamp");
-      if (ticket.phase === "pr") this.ticket(ticket, {phase: "release", merge: pr.merge_commit_sha, mergedAt, reason: "awaiting-production-smoke"});
-      const verified = await this.verifyDeployment(ticket, github, pr.merge_commit_sha);
+      const target = this.env.DELIVERY_TARGET ?? "production";
+      if (target !== "production" && target !== "staging") throw new Error("Invalid Delivery target");
+      if (ticket.phase === "pr") this.ticket(ticket, {phase: "release", merge: pr.merge_commit_sha, mergedAt,
+        reason: `awaiting-${target}-smoke`});
+      const verified = await this.verifyDeployment(ticket, github, pr.merge_commit_sha, target);
       if (!verified) {
         if (ticket.phase !== "blocked" && await github.mainAdvancedPast(pr.merge_commit_sha)) {
           const release = this.tickets("issue=?", ticket.issue)[0];
           // Establish a durable check even if Delivery's webhook preceded this transition.
           this.block({...release, productionVerification: release.productionVerification ?? crypto.randomUUID()},
-            SUPERSEDED, true);
+            target === "staging" ? STAGING_SUPERSEDED : PRODUCTION_SUPERSEDED, true);
         }
         if (verified === undefined) {
           const current = this.tickets("issue=?", ticket.issue)[0];
@@ -552,7 +564,7 @@ export class Factory extends DurableObject<Env> {
         }
         return;
       }
-      const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined};
+      const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined, stagingHistory: undefined};
       const issue = await this.readIssue(github, ticket);
       if (!issue) return this.block(release, "release-issue-missing", true);
       if (ticket.maintainer) {
@@ -568,7 +580,7 @@ export class Factory extends DurableObject<Env> {
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});
       this.ctx.storage.transactionSync(() => {
-        this.ticket(ticket, {phase: "closed", merge: pr.merge_commit_sha as string, mergedAt, productionVerification: undefined, productionHistory: undefined});
+        this.ticket(ticket, {phase: "closed", merge: pr.merge_commit_sha as string, mergedAt, productionVerification: undefined, productionHistory: undefined, stagingHistory: undefined});
         this.sql.exec("DELETE FROM slot WHERE issue=?", ticket.issue);
       });
       return;
@@ -581,12 +593,16 @@ export class Factory extends DurableObject<Env> {
     }
     if (ticket) this.ticket(ticket, {head: currentHead});
     if (this.env.MERGE_ENABLED !== "true") return;
-    const matches = relation && await gate(github, fctl, this.env, pr, number, session) && await github.hasNoClosingIssues(number);
+    const matches = relation && await gate(github, fctl, this.env, pr, number, !!ticket) && await github.hasNoClosingIssues(number);
     await github.setGate(currentHead, `factory-pr-${number}`, matches);
     if (!matches) return;
     const latest = record(await github.api(`/pulls/${number}`));
     if (record(latest.head).sha !== currentHead || latest.state !== "open" || latest.draft !== false ||
-        record(latest.base).ref !== "main" || latest.body !== pr.body || !await github.hasNoClosingIssues(number)) {
+        latest.mergeable !== true || latest.merge_commit_sha !== pr.merge_commit_sha ||
+        record(latest.base).ref !== "main" || record(latest.base).sha !== record(pr.base).sha ||
+        record(record(latest.base).repo).id !== record(record(pr.base).repo).id ||
+        record(record(latest.head).repo).id !== record(record(pr.head).repo).id ||
+        record(latest.head).ref !== record(pr.head).ref || latest.body !== pr.body || !await github.hasNoClosingIssues(number)) {
       await github.setGate(currentHead, `factory-pr-${number}`, false);
       return;
     }

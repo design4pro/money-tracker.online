@@ -7,7 +7,7 @@ import {bearer, digest, fctlSignature, githubSignature} from "./signatures";
 export type Ingress =
   | {kind: "issue"; issue: number; actor: string; maintainer?: MaintainerIntake}
   | {kind: "finish"; session: string; schedule: string; at: number; result?: Result; completedTurns?: number}
-  | {kind: "production"; head: string}
+  | {kind: "delivery"; head: string}
   | {kind: "alert"; key: string; code: string; head?: string}
   | {kind: "wake"};
 
@@ -103,8 +103,9 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
   if (type === "workflow_run" && payload.action === "completed") {
     const run = record(payload.workflow_run);
     if (run.path === ".github/workflows/delivery.yml" && run.head_branch === "main" &&
-        run.conclusion === "success" && sha(run.head_sha)) {
-      return {id, event: {kind: "production", head: run.head_sha}};
+        (run.conclusion === "success" || env.DELIVERY_TARGET === "staging" && run.status === "completed") &&
+        sha(run.head_sha)) {
+      return {id, event: {kind: "delivery", head: run.head_sha}};
     }
   }
   if (type === "issues" && payload.action === "opened" && !payload.pull_request && !payload.comment) {
