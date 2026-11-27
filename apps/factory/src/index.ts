@@ -1,6 +1,6 @@
 import {DurableObject} from "cloudflare:workers";
 import {fctlRepo, identifier, integer, list, nativeRun, record, sha, trustedHuman} from "./contracts";
-import type {Env, Json, Result} from "./contracts";
+import type {Env, Json} from "./contracts";
 import {advanceDispatch} from "./dispatch";
 import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
@@ -285,14 +285,14 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
-  private async checkComment(github: Github, issue: number, result: Result): Promise<boolean> {
-    if (!("comment" in result)) return false;
-    const comment = await this.readEvidence(github, `/issues/comments/${result.comment}`);
+  private async checkComment(github: Github, issue: number, stage: "triage" | "plan", id?: number): Promise<boolean> {
+    if (!integer(id)) return false;
+    const comment = await this.readEvidence(github, `/issues/comments/${id}`);
     if (!comment) return false;
     const author = record(comment.user);
-    return comment.id === result.comment && author.type === "Bot" && String(author.id) === this.env.GITHUB_TRIAGE_BOT_ID &&
+    return comment.id === id && author.type === "Bot" && String(author.id) === this.env.GITHUB_TRIAGE_BOT_ID &&
       comment.issue_url === `https://api.github.com/repos/${this.env.REPO}/issues/${issue}` &&
-      typeof comment.body === "string" && comment.body.startsWith(`<!-- factory:${result.stage} v1 -->`);
+      typeof comment.body === "string" && comment.body.startsWith(`<!-- factory:${stage} v1 -->`);
   }
 
   private async verifyDeployment(ticket: Ticket, github: Github, head: string) {
@@ -363,7 +363,7 @@ export class Factory extends DurableObject<Env> {
     const session = await fctl.session(sessionId, env.TRIAGE_SCHEDULE_ID);
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
-        !await this.checkComment(github, ticket.issue, result)) return this.block(ticket, "triage-result");
+        !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
     if (evidence) {
       const verified = await this.verifyDeployment(ticket, github, evidence.deployed);
@@ -417,7 +417,9 @@ export class Factory extends DurableObject<Env> {
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
         const dispatch = await this.dispatch(fctl, current, ticket.maintainer
-          ? async () => this.matchesMaintainer(ticket, await this.readIssue(github, ticket))
+          ? async () => await this.checkComment(github, issue,
+            stage === "plan" ? "triage" : "plan", stage === "plan" ? ticket.triageComment : ticket.planComment) &&
+            await this.matchesMaintainer(ticket, await this.readIssue(github, ticket))
           : undefined);
         if (dispatch.state === "blocked") {
           return this.block(ticket, dispatch.reason ?? "dispatch-blocked",
@@ -435,7 +437,7 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (stage === "plan") {
-          if (result.status !== "planned" || !await this.checkComment(github, issue, result)) {
+          if (result.status !== "planned" || !await this.checkComment(github, issue, "plan", result.comment)) {
             return this.block(ticket, "plan-comment", true);
           }
           this.ticket(ticket, {phase: "planned", planComment: result.comment, due: Date.now()});

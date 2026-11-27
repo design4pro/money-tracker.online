@@ -41,6 +41,7 @@ let productionAvailable = true;
 let productionLookups = 0;
 let linkedIssue = 1;
 let native = false;
+let ambiguousMaintainerPlan = false;
 let implemented = false;
 let changedHead = false;
 let readPr = 0;
@@ -115,7 +116,9 @@ async function provider(req) {
       contexts.set(sessionId, body.context);
       if (id === "sch_Plan") {
         calls.plan++;
-        if (JSON.parse(body.context).provenance !== "maintainer") return new Response(null, {status: 502});
+        if (ambiguousMaintainerPlan || JSON.parse(body.context).provenance !== "maintainer") {
+          return new Response(null, {status: 502});
+        }
       }
       if (id === "sch_Implement") calls.implement++;
       if (id === "sch_Ops") {
@@ -623,8 +626,17 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.equal(calls.plan, initial.plan);
 
     runs.sch_Triage.push(nativeRun(number, author.login));
-    for (let step = 0; step < 4; step++) await tick();
+    runs.sch_Plan = [];
+    ambiguousMaintainerPlan = true;
+    for (let step = 0; step < 3; step++) await tick();
     assert.equal(calls.plan, initial.plan + 1);
+    // The POST may have started the run. Missing evidence must not release its claim.
+    commentErrors.set(310, 404);
+    await tick();
+    assert.deepEqual((await status()).slot, [{issue: number}]);
+    assert.equal(calls.plan, initial.plan + 1);
+    commentErrors.delete(310);
+    ambiguousMaintainerPlan = false;
     const snapshot = createHash("sha256").update(JSON.stringify([openedIssue.title, openedIssue.body, "type: feature"])).digest("hex");
     const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot};
     const {invocation: planInvocation, ...plan} = JSON.parse(contexts.get("ses_Plan"));
@@ -673,6 +685,8 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.equal((await find(number)).phase, "closed");
     assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
   } finally {
+    commentErrors.delete(310);
+    ambiguousMaintainerPlan = false;
     await mf.dispose();
     mf = old;
     manualProof = false;
@@ -701,11 +715,17 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
     {issueStatus: 410},
     {commentStatus: 404},
     {commentStatus: 410},
+    {queuedImplementation: true, commentStatus: 404},
+    {queuedImplementation: true, commentStatus: 410},
+    {beforePlan: true, commentStatus: 404},
+    {beforePlan: true, invalidComment: true},
+    {queuedImplementation: true, invalidComment: true},
   ];
   try {
-    for (const [index, {changes, releaseReason, issueStatus, beforePlan, commentStatus}] of cases.entries()) {
+    for (const [index, {changes, releaseReason, issueStatus, beforePlan, commentStatus, queuedImplementation, invalidComment}] of cases.entries()) {
       const initial = {plan: calls.plan, implement: calls.implement, closed: calls.closed.length};
       const number = 40 + index;
+      const commentId = beforePlan ? 400 : 401;
       const current = {number, user, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
         title: "Pilot feature", body: null, labels: [{name: "type: feature"}]};
       currentIssues.set(number, current);
@@ -727,15 +747,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         if (!beforePlan) {
           await tick();
           await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 401});
-          if (commentStatus) {
-            commentErrors.set(401, 503);
-            await tick();
-            const retry = await status();
-            assert.equal(retry.tickets[0].phase, "plan");
-            assert.ok(retry.tickets[0].failures > 0);
-            assert.deepEqual(retry.slot, [{issue: number}]);
-            commentErrors.set(401, commentStatus);
-          } else {
+          if (!commentStatus || queuedImplementation) {
             await tick();
             await tick();
             assert.equal((await status()).tickets[0].phase, "implement");
@@ -753,6 +765,16 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
           assert.equal((await status()).tickets[0].phase, "pr");
         }
         currentIssues.set(number, {...current, ...changes});
+        if (commentStatus) {
+          commentErrors.set(commentId, 503);
+          await tick();
+          const retry = await status();
+          assert.equal(retry.tickets[0].phase, queuedImplementation ? "implement" : "plan");
+          assert.ok(retry.tickets[0].failures > 0);
+          assert.deepEqual(retry.slot, [{issue: number}]);
+          commentErrors.set(commentId, commentStatus);
+        }
+        if (invalidComment) issueComments.set(commentId, {...issueComments.get(commentId), body: "Invalid marker"});
         if (issueStatus) {
           issueErrors.set(number, 503);
           for (let step = 0; step < 4; step++) await tick();
@@ -765,7 +787,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         }
         for (let step = 0; step < 4; step++) await tick();
         const state = await status();
-        assert.equal(state.tickets[0].reason, releaseReason ?? (commentStatus ? "plan-comment" : "issue-evidence-changed"));
+        assert.equal(state.tickets[0].reason, releaseReason ?? (commentStatus && !beforePlan && !queuedImplementation ? "plan-comment" : "issue-evidence-changed"));
         assert.equal(state.tickets[0].phase, "blocked");
         assert.deepEqual(state.slot, []);
         assert.equal(calls.closed.length, initial.closed);
@@ -773,7 +795,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         assert.equal(calls.implement, initial.implement + Number(!!releaseReason));
         if (releaseReason) assert.equal(state.tickets[0].merge, merge);
       } finally {
-        commentErrors.delete(401);
+        commentErrors.delete(commentId);
         await mf.dispose();
       }
     }
