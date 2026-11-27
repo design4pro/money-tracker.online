@@ -382,10 +382,11 @@ export class Factory extends DurableObject<Env> {
     if (!identifier(runId, "srn") || !identifier(sessionId, "ses")) return;
     const finish = this.finish(sessionId, schedule);
     if (!finish) return this.ticket(ticket, {});
-    const result = finish.result;
     const session = await fctl.session(sessionId, schedule);
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
-    if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
+    if (finish.at < Number(session.created_at)) return this.block(ticket, "triage-result");
+    const result = finish.completedTurns ? await fctl.resultAt(sessionId, finish.at, finish.completedTurns) : finish.result;
+    if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
     if (evidence) {
@@ -457,8 +458,9 @@ export class Factory extends DurableObject<Env> {
         if (session.id !== dispatch.session || session.agent_kind !== "codex" || session.github_access !== dispatch.access) {
           return this.block(ticket, "dispatch-session-identity", stage === "plan");
         }
-        const result = finish.result;
-        if (finish.at < Number(session.created_at) || result?.stage !== stage || result.issue !== issue) {
+        if (finish.at < Number(session.created_at)) return this.block(ticket, `${stage}-result`, stage === "plan");
+        const result = finish.completedTurns ? await fctl.resultAt(dispatch.session, finish.at, finish.completedTurns) : finish.result;
+        if (result?.stage !== stage || result.issue !== issue) {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (result.status === "blocked") {

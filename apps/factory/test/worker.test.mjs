@@ -34,6 +34,8 @@ let serial = 0;
 const calls = {maintainerTriage: 0, nativeTriageReads: 0, plan: 0, implement: 0, ops: 0, retroReads: 0, retroRuns: [], githubRequests: 0, prReads: 0, merges: [], closed: [], gates: []};
 const runs = {sch_Triage: [], sch_Maintainer: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
+const transcripts = new Map();
+const transcriptReads = [];
 const currentIssues = new Map();
 const issueErrors = new Map();
 const issueComments = new Map();
@@ -140,9 +142,19 @@ async function provider(req) {
       return json(run);
     }
     if (noun === "sessions") {
-      if (part === "events") return json({events: [{kind: "user_message", data: {
-        text: `Task\n<context>\n${contexts.get(id)}\n</context>`,
-      }}]});
+      if (part === "events") {
+        if (searchParams.has("after")) {
+          const after = Number(searchParams.get("after"));
+          transcriptReads.push({id, after});
+          assert.equal(req.headers.get("authorization"), "Bearer fake-pat");
+          assert.equal(searchParams.get("limit"), "100");
+          const events = (transcripts.get(id) ?? []).filter(event => event.seq > after);
+          return json({events: events.slice(0, 20), has_more: events.length > 20});
+        }
+        return json({events: [{kind: "user_message", data: {
+          text: `Task\n<context>\n${contexts.get(id)}\n</context>`,
+        }}]});
+      }
       if (id.startsWith("ses_Maintainer")) return json(session(id, "sch_Maintainer", "triage"));
       if (id.startsWith("ses_Triage")) return json(session(id, "sch_Triage", "triage"));
       if (id === "ses_Plan" || id === "ses_PlanNext") return json(session(id, "sch_Plan", "triage"));
@@ -343,15 +355,28 @@ function github(payload, delivery, signature, event = "issues") {
       "x-hub-signature-256": signature ?? `sha256=${createHmac("sha256", env.GITHUB_WEBHOOK_SECRET).update(body).digest("hex")}`}});
 }
 
-function finish(schedule, session, result, age = 0, forged = false) {
+function finish(schedule, session, result, age = 0, forged = false, options = {}) {
   const id = `evt_${++serial}`;
   const timestamp = String(Math.floor(Date.now() / 1000) - age);
-  const body = JSON.stringify({id, type: "session.finished", timestamp: new Date(Date.now() + serial * 5).toISOString(),
+  const {at = Date.now() + serial * 5, type = "session.finished", turns, message = JSON.stringify(result)} = options;
+  const body = JSON.stringify({id, type, timestamp: new Date(at).toISOString(),
     project: {id: env.FCTL_PROJECT_ID}, workspace: {id: env.FCTL_WORKSPACE_ID},
-    data: {session: {id: session, schedule: {id: schedule}, started_by: "schedule"}, message: JSON.stringify(result)}});
+    data: {session: {id: session, schedule: {id: schedule}, started_by: "schedule", turns, updated_at: at - 4986}, message}});
   const signature = createHmac("sha256", forged ? "forged" : key).update(`${id}.${timestamp}.${body}`).digest("base64");
   return call("/webhooks/fctl", {method: "POST", body, headers: {"webhook-id": id, "webhook-timestamp": timestamp,
-    "webhook-signature": `v1,${signature}`, "fctl-event": "session.finished"}});
+    "webhook-signature": `v1,${signature}`, "fctl-event": type}});
+}
+
+function completionEvents(result, at) {
+  const idle = at - 5000;
+  return [
+    ...Array.from({length: 34}, (_, index) => ({seq: index + 1, ts: idle - 1000, kind: "log", data: {}})),
+    {seq: 35, ts: idle + 200, kind: "codex", data: {type: "assistant",
+      message: {content: [{type: "text", text: `${JSON.stringify(result)}\nFinished.`}]}}},
+    {seq: 36, ts: idle + 210, kind: "codex", data: {type: "system", subtype: "codex_usage"}},
+    {seq: 37, ts: idle + 220, kind: "codex", data: {type: "result", subtype: "success", is_error: false}},
+    {seq: 38, ts: idle, kind: "status", data: {status: "idle"}},
+  ];
 }
 
 const opened = number => ({action: "opened", issue: issue(number), sender: discovery});
@@ -662,8 +687,11 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.equal((await github(opening, "different-delivery")).status, 202);
     addComment(310, number, "triage");
     const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 310};
-    await finish("sch_Triage", "ses_Maintainer31", triageResult);
-    await finish("sch_Maintainer", "ses_Unrelated", triageResult);
+    const at = Date.now() + serial * 5 + 100;
+    const eventOptions = {at, turns: 1};
+    const beforeReads = transcriptReads.length;
+    await finish("sch_Triage", "ses_Maintainer31", undefined, 0, false, {...eventOptions, at: at - 1});
+    await finish("sch_Maintainer", "ses_Unrelated", undefined, 0, false, eventOptions);
     await tick();
     await tick();
     assert.equal((await find(number)).phase, "triage");
@@ -675,7 +703,18 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.ok(triageInvocation);
     assert.deepEqual(triageContext, {v: 1, provenance: "maintainer", repo, issue: number, actor: author.login,
       author_id: author.id, issue_snapshot_sha256: snapshot});
-    await finish("sch_Maintainer", "ses_Maintainer31", triageResult);
+    assert.equal(transcriptReads.length, beforeReads);
+    const events = completionEvents(triageResult, at);
+    transcripts.set("ses_Maintainer31", events.slice(0, -1));
+    assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false, eventOptions)).status, 202);
+    await tick();
+    assert.equal((await find(number)).phase, "triage");
+    assert((await status()).audit.some(entry => entry.subject === String(number) && entry.action === "provider-retry"));
+    transcripts.set("ses_Maintainer31", [
+      ...events,
+      ...completionEvents({...triageResult, comment: 999}, at + 8000).slice(-4)
+        .map(event => ({...event, seq: event.seq + 4})),
+    ]);
     runs.sch_Plan = [];
     ambiguousMaintainerPlan = true;
     for (let step = 0; step < 3; step++) await tick();
@@ -737,11 +776,71 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
   } finally {
     commentErrors.delete(310);
+    transcripts.delete("ses_Maintainer31");
     ambiguousMaintainerPlan = false;
     await mf.dispose();
     mf = old;
     manualProof = false;
     linkedIssue = 1;
+  }
+});
+
+test("only an omitted finish message can recover its own successful Codex turn", async () => {
+  const old = mf;
+  const author = {type: "User", id: 81, login: "maintainer"};
+  const cases = [
+    {name: "provided null message", options: {message: null}},
+    {name: "provided malformed message", options: {message: "not JSON"}},
+    {name: "missing ordinal", options: {turns: undefined}},
+    ...["failed", "stopped", "question"].map(type => ({name: type, options: {type: `session.${type}`}})),
+    {name: "error terminal with a later valid turn", change: events => {
+      const later = events.slice(-4).map(event => ({...event, seq: event.seq + 4, ts: event.ts + 1000}));
+      events[36].data = {...events[36].data, subtype: "error_during_execution", is_error: true};
+      events.push(...later);
+    }},
+    {name: "idle after signed timestamp", change: (events, at) => { events[37].ts = at + 1; }},
+    {name: "user text", change: events => { events[34].kind = "user_message"; }},
+    {name: "tool text", change: events => { events[34].data.message.content[0].type = "tool_result"; }},
+    {name: "idle belongs to a later turn", change: events => {
+      events[37] = {seq: 38, ts: events[37].ts, kind: "user_message", data: {}};
+      events.push({seq: 39, ts: events[37].ts + 1, kind: "status", data: {status: "idle"}});
+    }},
+  ];
+  mf = new Miniflare({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false"}});
+  const initialPlans = calls.plan;
+  try {
+    for (const [index, scenario] of cases.entries()) {
+      const number = 100 + index;
+      const id = `ses_Maintainer${number}`;
+      const issue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+        title: "Exercise transcript trust", body: "Fixture", labels: [{name: "type: feature"}]};
+      currentIssues.set(number, issue);
+      const comment = 600 + index;
+      issueComments.set(comment, {id: comment, user: discovery, issue_url: issue.repository_url + `/issues/${number}`,
+        body: "<!-- factory:triage v1 -->"});
+      const at = Date.now();
+      const events = completionEvents({v: 1, stage: "triage", issue: number, status: "ready", comment}, at);
+      scenario.change?.(events, at);
+      transcripts.set(id, events);
+      const beforeReads = transcriptReads.length;
+      assert.equal((await github({action: "opened", issue, sender: author})).status, 202);
+      assert.equal((await finish("sch_Maintainer", id, undefined, 0, false,
+        {at, turns: 1, ...scenario.options})).status, 202);
+      await tick();
+      await tick();
+      const ticket = (await status()).tickets.find(entry => entry.issue === number);
+      assert.equal(ticket.reason, "triage-result", scenario.name);
+      assert.equal(calls.plan, initialPlans, scenario.name);
+      assert.equal(transcriptReads.length - beforeReads, scenario.change ? 2 : 0, scenario.name);
+    }
+  } finally {
+    for (const [index] of cases.entries()) {
+      currentIssues.delete(100 + index);
+      issueComments.delete(600 + index);
+      transcripts.delete(`ses_Maintainer${100 + index}`);
+    }
+    await mf.dispose();
+    mf = old;
   }
 });
 
