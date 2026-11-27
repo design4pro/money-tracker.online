@@ -34,6 +34,10 @@ let serial = 0;
 const calls = {maintainerTriage: 0, nativeTriageReads: 0, plan: 0, implement: 0, ops: 0, retroReads: 0, retroRuns: [], githubRequests: 0, prReads: 0, merges: [], closed: [], gates: []};
 const runs = {sch_Triage: [], sch_Maintainer: [], sch_Plan: [], sch_Implement: [], sch_Ops: []};
 const contexts = new Map();
+const transcripts = new Map();
+const transcriptErrors = new Map();
+const sessionCreatedAt = new Map();
+const transcriptReads = [];
 const currentIssues = new Map();
 const issueErrors = new Map();
 const issueComments = new Map();
@@ -75,7 +79,7 @@ function issue(number) {
 
 function session(id, schedule, access) {
   return {id, project_id: env.FCTL_PROJECT_ID, workspace: {id: env.FCTL_WORKSPACE_ID}, schedule: {id: schedule},
-    agent_kind: "codex", github_access: access, created_at: Date.now() - 10_000, branch: "codex/pilot",
+    agent_kind: "codex", github_access: access, created_at: sessionCreatedAt.get(id) ?? Date.now() - 10_000, branch: "codex/pilot",
     pull_requests: access === "push" ? [{repo: ref, number: 23, checks: {sha: revision,
       review: {state: "passed", project_id: env.FCTL_PROJECT_ID, findings: 0, still_open: 0, session_id: "ses_Review"}}}] : []};
 }
@@ -140,9 +144,23 @@ async function provider(req) {
       return json(run);
     }
     if (noun === "sessions") {
-      if (part === "events") return json({events: [{kind: "user_message", data: {
-        text: `Task\n<context>\n${contexts.get(id)}\n</context>`,
-      }}]});
+      if (part === "events") {
+        if (searchParams.has("after")) {
+          const after = Number(searchParams.get("after"));
+          transcriptReads.push({id, after});
+          assert.equal(req.headers.get("authorization"), "Bearer fake-pat");
+          assert.equal(searchParams.get("limit"), "100");
+          const failure = transcriptErrors.get(id)?.(after);
+          if (failure) return failure;
+          const transcript = transcripts.get(id) ?? [];
+          const events = transcript.filter(event => event.seq > after);
+          const limit = transcript.length > 100 ? 100 : 20;
+          return json({events: events.slice(0, limit), has_more: events.length > limit});
+        }
+        return json({events: [{kind: "user_message", data: {
+          text: `Task\n<context>\n${contexts.get(id)}\n</context>`,
+        }}]});
+      }
       if (id.startsWith("ses_Maintainer")) return json(session(id, "sch_Maintainer", "triage"));
       if (id.startsWith("ses_Triage")) return json(session(id, "sch_Triage", "triage"));
       if (id === "ses_Plan" || id === "ses_PlanNext") return json(session(id, "sch_Plan", "triage"));
@@ -312,6 +330,7 @@ before(async () => {
             return new Response(null, {status: 204});
           }
           if (path === "/test/alarm") return Response.json(await this.ctx.storage.getAlarm());
+          if (path === "/test/alarm") return Response.json(await this.ctx.storage.getAlarm());
           if (path === "/test/tick" || path === "/test/pump") {
             if (path === "/test/tick") {
               this.ctx.storage.sql.exec("UPDATE ticket SET due=0");
@@ -343,15 +362,28 @@ function github(payload, delivery, signature, event = "issues") {
       "x-hub-signature-256": signature ?? `sha256=${createHmac("sha256", env.GITHUB_WEBHOOK_SECRET).update(body).digest("hex")}`}});
 }
 
-function finish(schedule, session, result, age = 0, forged = false) {
+function finish(schedule, session, result, age = 0, forged = false, options = {}) {
   const id = `evt_${++serial}`;
   const timestamp = String(Math.floor(Date.now() / 1000) - age);
-  const body = JSON.stringify({id, type: "session.finished", timestamp: new Date(Date.now() + serial * 5).toISOString(),
+  const {at = Date.now() + serial * 5, type = "session.finished", turns, message = JSON.stringify(result)} = options;
+  const body = JSON.stringify({id, type, timestamp: new Date(at).toISOString(),
     project: {id: env.FCTL_PROJECT_ID}, workspace: {id: env.FCTL_WORKSPACE_ID},
-    data: {session: {id: session, schedule: {id: schedule}, started_by: "schedule"}, message: JSON.stringify(result)}});
+    data: {session: {id: session, schedule: {id: schedule}, started_by: "schedule", turns, updated_at: at - 4986}, message}});
   const signature = createHmac("sha256", forged ? "forged" : key).update(`${id}.${timestamp}.${body}`).digest("base64");
   return call("/webhooks/fctl", {method: "POST", body, headers: {"webhook-id": id, "webhook-timestamp": timestamp,
-    "webhook-signature": `v1,${signature}`, "fctl-event": "session.finished"}});
+    "webhook-signature": `v1,${signature}`, "fctl-event": type}});
+}
+
+function completionEvents(result, at) {
+  const idle = at - 5000;
+  return [
+    ...Array.from({length: 34}, (_, index) => ({seq: index + 1, ts: idle - 1000, kind: "log", data: {}})),
+    {seq: 35, ts: idle + 200, kind: "codex", data: {type: "assistant",
+      message: {content: [{type: "text", text: `${JSON.stringify(result)}\nFinished.`}]}}},
+    {seq: 36, ts: idle + 210, kind: "codex", data: {type: "system", subtype: "codex_usage"}},
+    {seq: 37, ts: idle + 220, kind: "codex", data: {type: "result", subtype: "success", is_error: false}},
+    {seq: 38, ts: idle, kind: "status", data: {status: "idle"}},
+  ];
 }
 
 const opened = number => ({action: "opened", issue: issue(number), sender: discovery});
@@ -662,8 +694,11 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.equal((await github(opening, "different-delivery")).status, 202);
     addComment(310, number, "triage");
     const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 310};
-    await finish("sch_Triage", "ses_Maintainer31", triageResult);
-    await finish("sch_Maintainer", "ses_Unrelated", triageResult);
+    const at = Date.now() + serial * 5 + 100;
+    const eventOptions = {at, turns: 1};
+    const beforeReads = transcriptReads.length;
+    await finish("sch_Triage", "ses_Maintainer31", undefined, 0, false, {...eventOptions, at: at - 1});
+    await finish("sch_Maintainer", "ses_Unrelated", undefined, 0, false, eventOptions);
     await tick();
     await tick();
     assert.equal((await find(number)).phase, "triage");
@@ -675,11 +710,55 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.ok(triageInvocation);
     assert.deepEqual(triageContext, {v: 1, provenance: "maintainer", repo, issue: number, actor: author.login,
       author_id: author.id, issue_snapshot_sha256: snapshot});
-    await finish("sch_Maintainer", "ses_Maintainer31", triageResult);
+    assert.equal(transcriptReads.length, beforeReads);
+    const prefix = Array.from({length: 2463}, (_, index) => ({seq: index + 1, ts: at - 6000, kind: "log", data: {}}));
+    const events = [
+      ...prefix,
+      ...completionEvents(triageResult, at).map(event => ({...event, seq: prefix.length + event.seq})),
+      ...completionEvents({...triageResult, comment: 999}, at + 8000).slice(-4)
+        .map(event => ({...event, seq: prefix.length + event.seq + 4})),
+    ];
+    transcripts.set("ses_Maintainer31", events);
+    assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false, eventOptions)).status, 202);
+    for (const [index, type] of ["session.question", "session.failed", "session.stopped"].entries()) {
+      assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false,
+        {at: at + index + 1, type})).status, 202);
+    }
+    transcriptErrors.set("ses_Maintainer31", after => after === 400 ? new Response(null, {status: 503}) : undefined);
+    await tick();
+    transcriptErrors.delete("ses_Maintainer31");
+    assert.equal((await find(number)).failures, 1);
+    assert.deepEqual(transcriptReads.slice(beforeReads).map(read => read.after), [0, 100, 200, 300, 400]);
+
+    transcripts.set("ses_Maintainer31", events.filter(event => event.seq !== 401));
+    await tick();
+    assert.equal((await find(number)).phase, "triage");
+    assert.equal((await find(number)).failures, 2);
+    assert.deepEqual(transcriptReads.slice(beforeReads + 5).map(read => read.after), [400]);
+    transcripts.set("ses_Maintainer31", events);
+    const beforeLongRead = transcriptReads.length;
+    const retryAudits = async () => (await status()).audit.filter(entry =>
+      entry.subject === String(number) && entry.action === "provider-retry").length;
+    const beforeLongRetries = await retryAudits();
+    for (let batch = 0; batch < 4; batch++) {
+      await tick();
+      const ticket = await find(number);
+      assert.equal(ticket.phase, "triage");
+      assert.equal(ticket.failures, 0);
+      assert.equal(await retryAudits(), beforeLongRetries);
+      assert(ticket.due <= Date.now() + 1000);
+      assert.deepEqual(transcriptReads.slice(beforeLongRead + batch * 5).map(read => read.after),
+        Array.from({length: 5}, (_, index) => 400 + batch * 500 + index * 100));
+      // A different wakeup can run the pump before this continuation is due.
+      assert.equal((await call("/test/pump")).status, 204);
+      assert.equal(transcriptReads.length, beforeLongRead + (batch + 1) * 5);
+      assert.equal(await (await call("/test/alarm")).json(), ticket.due);
+    }
     runs.sch_Plan = [];
     ambiguousMaintainerPlan = true;
     for (let step = 0; step < 3; step++) await tick();
     assert.equal(calls.plan, initial.plan + 1);
+    assert.deepEqual(transcriptReads.slice(beforeLongRead + 20).map(read => read.after), [2400, 2500]);
     // The POST may have started the run. Missing evidence must not release its claim.
     commentErrors.set(310, 404);
     await tick();
@@ -689,7 +768,7 @@ test("signed maintainer intake plans and dispatches without production evidence"
     ambiguousMaintainerPlan = false;
     assert.equal((await find(number)).triageRun, "srn_Maintainer31");
     assert.equal((await find(number)).triageSession, "ses_Maintainer31");
-    const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot};
+    const context = {provenance: "maintainer", repo, issue: number, main_sha: base, issue_snapshot_sha256: snapshot, ticket_bot_id: env.GITHUB_TRIAGE_BOT_ID};
     const {invocation: planInvocation, ...plan} = JSON.parse(contexts.get("ses_Plan"));
     assert.ok(planInvocation);
     assert.deepEqual(plan, {v: 1, ...context, triage_comment: 310});
@@ -737,11 +816,79 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
   } finally {
     commentErrors.delete(310);
+    transcripts.delete("ses_Maintainer31");
+    transcriptErrors.delete("ses_Maintainer31");
     ambiguousMaintainerPlan = false;
     await mf.dispose();
     mf = old;
     manualProof = false;
     linkedIssue = 1;
+  }
+});
+
+test("only an omitted finish message can recover its own successful Codex turn", async () => {
+  const old = mf;
+  const author = {type: "User", id: 81, login: "maintainer"};
+  const cases = [
+    {name: "provided null message", options: {message: null}},
+    {name: "provided malformed message", options: {message: "not JSON"}},
+    {name: "missing ordinal", options: {turns: undefined}},
+    ...["failed", "stopped", "question"].map(type => ({name: type, options: {type: `session.${type}`}})),
+    {name: "error terminal with a later valid turn", change: events => {
+      const later = events.slice(-4).map(event => ({...event, seq: event.seq + 4, ts: event.ts + 1000}));
+      events[36].data = {...events[36].data, subtype: "error_during_execution", is_error: true};
+      events.push(...later);
+    }},
+    {name: "expired endpoint error", age: 301_000, error: () => new Response(null, {status: 503})},
+    {name: "expired malformed JSON", age: 301_000, error: () => new Response("invalid JSON")},
+    {name: "expired incomplete sequence", age: 301_000, change: events => { events.splice(35, 1); }},
+    {name: "idle after signed timestamp", change: (events, at) => { events[37].ts = at + 1; }},
+    {name: "user text", change: events => { events[34].kind = "user_message"; }},
+    {name: "tool text", change: events => { events[34].data.message.content[0].type = "tool_result"; }},
+    {name: "idle belongs to a later turn", change: events => {
+      events[37] = {seq: 38, ts: events[37].ts, kind: "user_message", data: {}};
+      events.push({seq: 39, ts: events[37].ts + 1, kind: "status", data: {status: "idle"}});
+    }},
+  ];
+  mf = new Miniflare({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false"}});
+  const initialPlans = calls.plan;
+  try {
+    for (const [index, scenario] of cases.entries()) {
+      const number = 100 + index;
+      const id = `ses_Maintainer${number}`;
+      const issue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+        title: "Exercise transcript trust", body: "Fixture", labels: [{name: "type: feature"}]};
+      currentIssues.set(number, issue);
+      const comment = 600 + index;
+      issueComments.set(comment, {id: comment, user: discovery, issue_url: issue.repository_url + `/issues/${number}`,
+        body: "<!-- factory:triage v1 -->"});
+      const at = Date.now() - (scenario.age ?? 0);
+      sessionCreatedAt.set(id, at - 10_000);
+      const events = completionEvents({v: 1, stage: "triage", issue: number, status: "ready", comment}, at);
+      scenario.change?.(events, at);
+      transcripts.set(id, events);
+      if (scenario.error) transcriptErrors.set(id, scenario.error);
+      const beforeReads = transcriptReads.length;
+      assert.equal((await github({action: "opened", issue, sender: author})).status, 202);
+      assert.equal((await finish("sch_Maintainer", id, undefined, 0, false,
+        {at, turns: 1, ...scenario.options})).status, 202);
+      await tick();
+      await tick();
+      const ticket = (await status()).tickets.find(entry => entry.issue === number);
+      assert.equal(ticket.reason, "triage-result", scenario.name);
+      assert.equal(calls.plan, initialPlans, scenario.name);
+      assert.equal(transcriptReads.length - beforeReads, scenario.error ? 1 : scenario.change ? 2 : 0, scenario.name);
+    }
+  } finally {
+    for (const [index] of cases.entries()) {
+      currentIssues.delete(100 + index);
+      issueComments.delete(600 + index);
+      transcripts.delete(`ses_Maintainer${100 + index}`);
+      transcriptErrors.delete(`ses_Maintainer${100 + index}`);
+      sessionCreatedAt.delete(`ses_Maintainer${100 + index}`);
+    }
+    await mf.dispose();
+    mf = old;
   }
 });
 

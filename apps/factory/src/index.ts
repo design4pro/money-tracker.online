@@ -10,23 +10,25 @@ import type {MaintainerIntake} from "./intake";
 import {deployment, gate, issueEvidence, linked} from "./policy";
 import type {DeploymentSearch} from "./policy";
 import {Fctl, Github, ProviderError} from "./providers";
+import type {RecoveryProgress} from "./providers";
 import {activeRetroSchedule, RETRO_CRON, RETRO_OBJECT, weeklyEnd, weeklyReport} from "./retro";
 import {bearer} from "./signatures";
 
 const WAIT = 60_000;
+const RECOVERY_WAIT = 1_000;
 const DAY = 24 * 60 * 60_000;
 const SUPERSEDED = "release-superseded-without-production-smoke";
 const PENDING_PRODUCTION = "phase='blocked' AND json_extract(state,'$.reason')=? AND json_extract(state,'$.productionVerification') IS NOT NULL";
 
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Ticket = {
-  issue: number; actor: string; phase: Phase; created: number; due: number; failures: number;
+  issue: number; actor: string; phase: Phase; created: number; due: number; failures: number; recoveryPending?: true;
   maintainer?: MaintainerIntake; main?: string;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
   pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch;
 };
-type Finish = Extract<Ingress, {kind: "finish"}>;
+type Finish = Extract<Ingress, {kind: "finish"}> & {recovery?: RecoveryProgress};
 
 export default {
   fetch(request, env) {
@@ -81,8 +83,12 @@ export class Factory extends DurableObject<Env> {
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
         // Keep out-of-order results until exact schedule/run/session evidence exists.
+        // Prefer a parsed message over recoverable evidence, and either over a non-result event.
         this.sql.exec(`INSERT INTO result VALUES (?, ?, ?, ?) ON CONFLICT(session) DO UPDATE SET
-          at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (excluded.issue IS NOT NULL OR result.issue IS NULL)`,
+          at=excluded.at, issue=excluded.issue, state=excluded.state WHERE excluded.at > result.at AND (
+            excluded.issue IS NOT NULL OR (result.issue IS NULL AND (
+              json_type(excluded.state,'$.completedTurns') = 'integer' OR
+              json_type(result.state,'$.completedTurns') IS NULL)))`,
         event.session, event.at, event.result?.issue ?? null, JSON.stringify(event));
       } else if (event.kind === "production") {
         this.sql.exec(`UPDATE ticket SET due=?, state=json_set(json_remove(state,'$.productionHistory'),'$.due',?,'$.productionVerification',?)
@@ -134,7 +140,7 @@ export class Factory extends DurableObject<Env> {
   }
 
   private ticket(ticket: Ticket, changes: Partial<Ticket>) {
-    const next = {...ticket, failures: 0, due: Date.now() + WAIT, ...changes};
+    const next = {...ticket, failures: 0, recoveryPending: undefined, due: Date.now() + WAIT, ...changes};
     this.sql.exec("UPDATE ticket SET phase=?, due=?, feature=?, state=? WHERE issue=?",
       next.phase, next.due, next.feature ?? null, JSON.stringify(next), next.issue);
     if (changes.phase && changes.phase !== ticket.phase) this.audit(String(ticket.issue), changes.reason ?? changes.phase);
@@ -174,6 +180,15 @@ export class Factory extends DurableObject<Env> {
     const row = this.sql.exec<{state: string}>("SELECT state FROM result WHERE session=?", session).toArray()[0];
     const finish = row ? JSON.parse(row.state) as Finish : undefined;
     return finish?.schedule === schedule ? finish : undefined;
+  }
+
+  private finishResult(fctl: Fctl, finish: Finish) {
+    if (!finish.completedTurns) return finish.result;
+    return fctl.resultAt(finish.session, finish.at, finish.completedTurns, finish.recovery, progress => {
+      // A newer signed finish may have arrived during the transcript read.
+      this.sql.exec("UPDATE result SET state=json_set(state, '$.recovery', json(?)) WHERE session=? AND at=?",
+        JSON.stringify(progress), finish.session, finish.at);
+    });
   }
 
   private async pumpRetro() {
@@ -224,6 +239,10 @@ export class Factory extends DurableObject<Env> {
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
         const result = await this.advance(ticket, fctl, github);
+        if (result === "recovery-pending") {
+          this.ticket(ticket, {due: Date.now() + RECOVERY_WAIT, recoveryPending: true});
+          continue;
+        }
         if (result !== "pending" && ticket.phase === "blocked" && ticket.productionVerification) {
           const current = this.tickets("issue=?", ticket.issue)[0];
           if (current.productionVerification === ticket.productionVerification) {
@@ -269,9 +288,13 @@ export class Factory extends DurableObject<Env> {
     const productionDue = this.sql.exec<{due: number | null}>(
       `SELECT MIN(due) AS due FROM ticket WHERE ${PENDING_PRODUCTION}`, SUPERSEDED,
     ).one().due;
-    if (productionDue !== null || pending.pending || bootstrap.length) {
+    const recoveryDue = this.sql.exec<{due: number | null}>(
+      `SELECT MIN(due) AS due FROM ticket WHERE json_extract(state, '$.recoveryPending') = 1
+        AND (phase='triage' OR (phase IN ('plan','implement') AND issue=(SELECT issue FROM slot)))`,
+    ).one().due;
+    if (productionDue !== null || recoveryDue !== null || pending.pending || bootstrap.length) {
       const regularDue = pending.pending || bootstrap.length ? Date.now() + WAIT : Infinity;
-      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, productionDue ?? Infinity)));
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, recoveryDue ?? Infinity, productionDue ?? Infinity)));
     }
     // Leave one watchdog pass when an ingress may have interleaved with the pump.
     else if (now - 120_000 < Number(this.sql.exec("SELECT MAX(at) AS newest FROM delivery").one().newest)) {
@@ -382,10 +405,12 @@ export class Factory extends DurableObject<Env> {
     if (!identifier(runId, "srn") || !identifier(sessionId, "ses")) return;
     const finish = this.finish(sessionId, schedule);
     if (!finish) return this.ticket(ticket, {});
-    const result = finish.result;
     const session = await fctl.session(sessionId, schedule);
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
-    if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
+    if (finish.at < Number(session.created_at)) return this.block(ticket, "triage-result");
+    const result = await this.finishResult(fctl, finish);
+    if (result === "recovery-pending") return result;
+    if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
     let main: string | undefined;
     if (evidence) {
@@ -439,7 +464,11 @@ export class Factory extends DurableObject<Env> {
         const stage = ticket.phase;
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
-        const dispatch = await this.dispatch(fctl, current, ticket.maintainer
+        // Reconciliation must use the exact context sent in the original POST.
+        const pending = ticket.maintainer && current.state === "queued"
+          ? {...current, context: JSON.stringify({...record(JSON.parse(current.context)), ticket_bot_id: env.GITHUB_TRIAGE_BOT_ID})}
+          : current;
+        const dispatch = await this.dispatch(fctl, pending, ticket.maintainer
           ? () => this.matchesDispatchEvidence(github, ticket, stage)
           : undefined);
         if (dispatch.state === "blocked") {
@@ -453,8 +482,10 @@ export class Factory extends DurableObject<Env> {
         if (session.id !== dispatch.session || session.agent_kind !== "codex" || session.github_access !== dispatch.access) {
           return this.block(ticket, "dispatch-session-identity", stage === "plan");
         }
-        const result = finish.result;
-        if (finish.at < Number(session.created_at) || result?.stage !== stage || result.issue !== issue) {
+        if (finish.at < Number(session.created_at)) return this.block(ticket, `${stage}-result`, stage === "plan");
+        const result = await this.finishResult(fctl, finish);
+        if (result === "recovery-pending") return result;
+        if (result?.stage !== stage || result.issue !== issue) {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (result.status === "blocked") {

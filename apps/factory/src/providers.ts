@@ -1,5 +1,5 @@
-import {fctlRepo, identifier, integer, list, record, sha} from "./contracts";
-import type {Env, Json} from "./contracts";
+import {fctlRepo, identifier, integer, list, parseResult, record, sha} from "./contracts";
+import type {Env, Json, Result} from "./contracts";
 import {base64, bytes} from "./signatures";
 
 export class ProviderError extends Error {
@@ -25,6 +25,13 @@ export async function request(url: URL, headers: HeadersInit, method = "GET", pa
   if (response.status === 204) return undefined;
   return response.json();
 }
+
+export type RecoveryProgress = {
+  after: number;
+  ordinal: number;
+  previousAssistant?: Result;
+  terminalResult?: Result;
+};
 
 export class Fctl {
   constructor(private readonly env: Env) {}
@@ -66,11 +73,62 @@ export class Fctl {
     return typeof message === "string" && message.endsWith(`<context>\n${context}\n</context>`);
   }
 
+  async resultAt(session: string, at: number, completedTurns: number, progress: RecoveryProgress | undefined,
+    checkpoint: (next: RecoveryProgress) => void) {
+    let {after, ordinal, previousAssistant, terminalResult} = progress ?? {after: 0, ordinal: 0};
+    const saveProgress = () => checkpoint({after, ordinal, previousAssistant, terminalResult});
+    const incomplete = () => {
+      if (Date.now() - at >= 300_000) return;
+      if (after > (progress?.after ?? 0)) saveProgress();
+      throw new Error("Completion events not available yet");
+    };
+    for (let page = 0; page < 5; page++) {
+      let response: Json;
+      try {
+        response = record(await this.api(`/sessions/${session}/events?after=${after}&limit=100`));
+      } catch {
+        return incomplete();
+      }
+      if (!Array.isArray(response.events) || response.events.length > 100) return incomplete();
+      for (const event of response.events.map(record)) {
+        if (!integer(event.seq) || event.seq !== after + 1) return incomplete();
+        after = event.seq;
+        const data = record(event.data);
+        if (["git", "log", "notice"].includes(String(event.kind)) || event.kind === "codex" &&
+            (data.type === "rate_limit_event" || data.type === "system" && data.subtype === "codex_usage")) continue;
+
+        // fctl v0.39.0 increments turns for every stored Codex result,
+        // including errors. Its finished webhook is emitted after idle settles.
+        if (ordinal === completedTurns) {
+          return event.kind === "status" && data.status === "idle" && typeof event.ts === "number" && event.ts <= at
+            ? terminalResult : undefined;
+        }
+        if (event.kind === "codex" && data.type === "result" && ++ordinal === completedTurns) {
+          if (data.subtype !== "success" || data.is_error !== false || (data.queued_turn_count ?? 0) !== 0) return;
+          if (!previousAssistant) return;
+          terminalResult = previousAssistant;
+        }
+        previousAssistant = finalAssistantResult(event);
+      }
+      if (response.has_more !== true || response.events.length === 0) return incomplete();
+    }
+    saveProgress();
+    return "recovery-pending" as const;
+  }
+
   async currentReview(pr: number, head: string): Promise<Json> {
     const page = record(await this.api(`/projects/${this.env.FCTL_PROJECT_ID}/reviews?limit=100`));
     return list(page.reviews).map(record).find(review => review.number === pr && review.head_sha === head &&
       fctlRepo(review.repo) === this.env.REPO) ?? {};
   }
+}
+
+function finalAssistantResult(event: Json | undefined) {
+  const message = record(event?.data);
+  if (event?.kind !== "codex" || message.type !== "assistant") return;
+  const content = list(record(message.message).content).map(record);
+  if (!content.length || content.some(block => block.type !== "text" || typeof block.text !== "string")) return;
+  return parseResult(content.map(block => block.text).join("\n"));
 }
 
 function base64url(value: Uint8Array): string {
