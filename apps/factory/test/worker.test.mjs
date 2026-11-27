@@ -1070,17 +1070,25 @@ async function stagingRelease(productionConclusion, recovery) {
         assert.deepEqual((await status()).slot, [{issue: number}]);
         assert.equal(continuations.length, before + 1);
         const validAt = finishAt + 8000;
-        const mismatched = {v: 1, stage: "plan", status: "planned", issue: number, comment: 411};
-        await finish("sch_Implement", id, mismatched, 0, false, {at: validAt + 8000, turns: 3});
+        const wrongStage = {v: 1, stage: "plan", status: "planned", issue: number, comment: 411};
+        const wrongIssue = {...result, issue: number + 1};
+        const laterTurns = [wrongStage, wrongIssue, wrongStage, wrongIssue].map((value, index) => ({
+          value, at: validAt + 8000 * (index + 1), turns: index + 3,
+        }));
+        for (const {value, at, turns} of laterTurns.slice(0, 2)) {
+          await finish("sch_Implement", id, value, 0, false, {at, turns});
+        }
         await tick();
         assert.equal((await find()).phase, "implement");
-        for (const [value, time] of [[result, validAt], [mismatched, validAt + 8000], [mismatched, validAt + 16_000]]) {
-          questionTurn.push(...completionEvents(value, time).slice(-4)
+        for (const {value, at} of [{value: result, at: validAt}, ...laterTurns]) {
+          questionTurn.push(...completionEvents(value, at).slice(-4)
             .map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
         }
-        sessionState.set(id, ownedSession("idle", undefined, 4));
+        sessionState.set(id, ownedSession("idle", undefined, 6));
         await finish("sch_Implement", id, undefined, 0, false, {at: validAt, turns: 2});
-        await finish("sch_Implement", id, mismatched, 0, false, {at: validAt + 16_000, turns: 4});
+        for (const {value, at, turns} of laterTurns.slice(2)) {
+          await finish("sch_Implement", id, value, 0, false, {at, turns});
+        }
       } else {
         const stoppedAt = Date.now();
         sessionState.set(id, ownedSession("stopped"));
