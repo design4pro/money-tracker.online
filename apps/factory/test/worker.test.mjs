@@ -1108,6 +1108,18 @@ test("a newer signed staging completion supersedes a pre-work block during corro
   }
 });
 
+test("staging retains its slot when the refreshed session cannot corroborate the signed pre-work turn", async () => {
+  for (const nextSession of [
+    ownedSession("running", undefined, 1),
+    ownedSession("idle", undefined, 2),
+    {...ownedSession("idle", undefined, 1), stats: {turns: 1, turn_started_at: Date.now()}},
+    {...ownedSession("idle", undefined, 1), stats: {}},
+    {...ownedSession("idle", undefined, 1), status: undefined},
+  ]) {
+    await stagingRelease("skipped", undefined, true, {changed: true, nextSession});
+  }
+});
+
 async function stagingRelease(productionConclusion, recovery, staging = false, preWork) {
   const number = 41;
   const author = staging ? discovery : {type: "User", id: 81, login: "maintainer"};
@@ -1168,12 +1180,18 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
         sessionState.set(id, ownedSession("paused", credentialPause));
         await tick();
         assert.equal((await find()).credentialRecovery.session, id);
-        sessionState.set(id, ownedSession("idle", undefined, 1));
       }
+      sessionState.set(id, ownedSession("idle", undefined, 1));
       if (preWork.changed) currentIssues.set(number, {...openedIssue, title: "Changed before work"});
       const at = Date.now();
       const blocked = {v: 1, stage: "implement", status: "blocked", issue: number, reason: "pre-work-evidence-changed"};
       let newerFinish;
+      if (preWork.nextSession) {
+        issueReads.set(number, () => {
+          issueReads.delete(number);
+          sessionState.set(id, preWork.nextSession);
+        });
+      }
       if (preWork.superseded) {
         issueReads.set(number, async () => {
           issueReads.delete(number);
@@ -1205,6 +1223,17 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
           assert.equal((await find()).phase, "pr");
           assert.equal((await find()).pr, 23);
         }
+        return;
+      }
+      if (preWork.nextSession) {
+        assert.equal((await find()).phase, "implement");
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        implementationHasPR = true;
+        sessionState.set(id, ownedSession("idle", undefined, 2));
+        await finish("sch_Implement", id, result, 0, false, {at: at + 8000, turns: 2});
+        await tick();
+        assert.equal((await find()).phase, "pr");
+        assert.equal((await find()).pr, 23);
         return;
       }
       const released = preWork.changed && !preWork.linked;
@@ -1725,8 +1754,9 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         }
         currentIssues.set(number, {...current, ...changes});
         if (blockedReason) {
+          sessionState.set("ses_Implement", ownedSession("idle", undefined, 1));
           await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "blocked", issue: number,
-            reason: blockedReason === "generic" ? undefined : blockedReason});
+            reason: blockedReason === "generic" ? undefined : blockedReason}, 0, false, {turns: 1});
         }
         if (freesSlot) {
           issueErrors.set(number, 503);
@@ -1778,6 +1808,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         }
       } finally {
         implementationHasPR = true;
+        sessionState.delete("ses_Implement");
         issueErrors.delete(number);
         commentErrors.delete(commentId);
         await mf.dispose();

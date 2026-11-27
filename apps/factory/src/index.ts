@@ -767,7 +767,8 @@ export class Factory extends DurableObject<Env> {
         const selectedFinish = () => ticket.credentialRecovery
           ? this.recoveryFinish(String(session.id), dispatch.schedule)
           : this.finish(String(session.id), dispatch.schedule);
-        const selectedAt = ticket.credentialRecovery ? selectedFinish()?.at : finish?.at;
+        const selected = ticket.credentialRecovery ? selectedFinish() : finish;
+        const selectedAt = selected?.at;
         const result = await this.stageResult(ticket, fctl, github, stage, String(dispatch.run), dispatch.schedule, session, finish, async () => {
           if (bound) return this.matchesDispatchEvidence(github, ticket, stage);
           const current = await this.readIssue(github, ticket);
@@ -795,8 +796,13 @@ export class Factory extends DurableObject<Env> {
               if (mismatch) {
                 const latest = await fctl.session(dispatch.session, dispatch.schedule);
                 if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
+                const watermark = selected?.completedTurns ?? selected?.turns;
+                const stats = record(latest.stats);
                 if (latest.id !== dispatch.session || latest.agent_kind !== "codex" ||
-                    latest.github_access !== dispatch.access || !noPR(latest)) return this.ticket(ticket, {});
+                    latest.github_access !== dispatch.access || !noPR(latest) || latest.status !== "idle" ||
+                    !integer(watermark) || stats.turns !== watermark || stats.turn_started_at !== undefined ||
+                    (latest.messaged_at !== undefined && (typeof latest.messaged_at !== "number" ||
+                      selectedAt === undefined || latest.messaged_at > selectedAt))) return this.ticket(ticket, {});
                 return this.block(ticket, "implementation-pre-work-evidence-changed", true);
               }
             }
