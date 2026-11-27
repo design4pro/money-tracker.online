@@ -13,6 +13,7 @@ const merge = "c".repeat(40);
 const base = "d".repeat(40);
 const candidate = "e".repeat(40);
 const descendant = "f".repeat(40);
+const stagingFeature = "ledger-transaction-direction-filter";
 const upstream = "2aae986ff5ad1da1dd8d967498b3b32d6ded413d";
 const key = Buffer.from("synthetic webhook key for replay tests");
 const discovery = {type: "Bot", id: 33, login: "factory-test[bot]"};
@@ -44,6 +45,7 @@ const credentialPause = "Waiting for a fresh ChatGPT credential";
 const transcriptReads = [];
 const currentIssues = new Map();
 const issueErrors = new Map();
+const issueReads = new Map();
 const issueComments = new Map();
 const commentErrors = new Map();
 let productionAvailable = true;
@@ -86,6 +88,19 @@ function retrospective(id, changes = {}) {
 function issue(number) {
   return {number, user: discovery, state: "open", labels: [{name: "factory:parity"}],
     body: `<!-- factory:parity v1 feature_id=feature-${number} upstream=v0.34.3@${upstream} deployed=${head} -->`};
+}
+
+function stagingIssue(number) {
+  return {...issue(number), title: "Filter ledger transactions by direction",
+    repository_url: `https://api.github.com/repos/${repo}`,
+    labels: [{name: "factory:staging-ui"}, {name: "type: feature"}],
+    body: `<!-- factory:staging-ui v1 feature_id=${stagingFeature} upstream=v0.34.3@${upstream} deployed=${head} -->`};
+}
+
+function stagingRun(number, actor = discovery.login) {
+  return {id: `srn_Staging${number}`, schedule_id: "sch_Triage", outcome: "started", trigger: "event",
+    session: {id: `ses_TriageStaging${number}`},
+    event: {kind: "issue_opened", number, repo: ref, actor, url: `https://github.com/${repo}/issues/${number}`}};
 }
 
 function session(id, schedule, access) {
@@ -144,7 +159,7 @@ async function provider(req) {
       }
       if (id === "sch_Plan") {
         calls.plan++;
-        if (ambiguousMaintainerPlan || context.provenance !== "maintainer") {
+        if (ambiguousMaintainerPlan || context.provenance === "parity") {
           return new Response(null, {status: 502});
         }
       }
@@ -214,6 +229,7 @@ async function provider(req) {
     if (/^\/issues\/\d+$/.test(path)) {
       if (method === "PATCH") calls.closed.push(path);
       const number = Number(path.split("/").at(-1));
+      await issueReads.get(number)?.();
       const status = issueErrors.get(number);
       if (status === 301) return new Response(null, {status, headers: {Location: "https://api.github.com/repos/elsewhere/project/issues/222"}});
       if (status) return new Response(null, {status});
@@ -269,8 +285,9 @@ async function provider(req) {
       const name = searchParams.get("check_name");
       if (name === "deploy-staging") {
         stagingLookups++;
-        assert.equal(sha, merge);
+        assert.equal(sha, stagingProof.head ?? merge);
         assert.equal(searchParams.get("filter"), "all");
+        if (stagingProof.missing) return json({total_count: 0, check_runs: []});
         return json({total_count: 1, check_runs: [{name, head_sha: sha, status: "completed", conclusion: "success",
           app: {id: 77, slug: "github-actions"}, details_url: `https://github.com/${repo}/actions/runs/5/job/505`,
           ...stagingProof.check}]});
@@ -316,10 +333,10 @@ async function provider(req) {
         pull_requests: [{number: 23, head: {sha: revision}, base: {sha: base}}]}]});
     }
     const stagingJob = {id: 505, run_id: 5, run_attempt: 2, name: "deploy-staging", head_branch: "main",
-      head_sha: merge, status: "completed", conclusion: "success"};
+      head_sha: stagingProof?.head ?? merge, status: "completed", conclusion: "success"};
     if (path === "/actions/jobs/505") return json(stagingJob);
     if (path === "/actions/runs/5/attempts/2") return json({
-      id: 5, run_attempt: 2, head_sha: merge, head_branch: "main", status: "completed", conclusion: "success",
+      id: 5, run_attempt: 2, head_sha: stagingJob.head_sha, head_branch: "main", status: "completed", conclusion: "success",
       event: "workflow_run", path: ".github/workflows/delivery.yml", repository: {id: 100}, head_repository: {id: 100},
       ...stagingProof.attempt,
     });
@@ -500,6 +517,10 @@ const triage = number => ({v: 1, stage: "triage", status: "ready", issue: number
 
 test("signed pilot pipeline survives replays, out-of-order evidence and ambiguous dispatch", async () => {
   assert.equal((await call("/health")).status, 200);
+  assert.equal((await call("/health/staging-ui")).status, 404);
+  assert.equal((await github({...opened(99), issue: stagingIssue(99)})).status, 403);
+  assert.equal((await github({...opened(99), issue: {...issue(99),
+    body: issue(99).body + "\n" + stagingIssue(99).body}})).status, 403);
   assert.equal((await call("/ops/status")).status, 401);
   assert.equal((await github(opened(1), "fake", `sha256=${"0".repeat(64)}`)).status, 401);
   assert.equal((await finish("sch_Triage", "ses_Triage1", triage(1), 0, true)).status, 401);
@@ -1014,13 +1035,111 @@ for (const order of ["signed order", "reverse arrival order"]) {
     () => stagingRelease("skipped", order));
 }
 
-async function stagingRelease(productionConclusion, recovery) {
+test("staging intake rejects conflicting classifications, unbound evidence and incomplete exact smoke", async () => {
+  const old = mf;
+  const previousRuns = runs.sch_Triage;
+  const previousNative = native;
+  mf = new Miniflare({...workerOptions, bindings: {...env, DELIVERY_TARGET: "staging", HUMAN_REVIEWER_IDS: "81",
+    DELIVERY_STAGING_SMOKE_STEP: "Deploy and verify staging", MERGE_ENABLED: "false"}});
+  const find = async number => (await status()).tickets.find(ticket => ticket.issue === number);
+  const open = (issue, sender = discovery) => github({action: "opened", issue, sender});
+  const original = stagingIssue(71);
+  try {
+    const user = {id: 81, login: "maintainer", type: "User"};
+    assert.equal((await open({...original, user}, user)).status, 403);
+    assert.equal((await open(original, {...discovery, id: 34})).status, 403);
+    assert.equal((await open({...original, user: {...discovery, id: 34}}, {...discovery, id: 34})).status, 403);
+    assert.equal((await open(original, {...discovery, login: "other[bot]"})).status, 403);
+    assert.equal((await open({...original, labels: [...original.labels, {name: "factory:parity"}]})).status, 403);
+    assert.equal((await open({...original, body: original.body + "\n" + original.body})).status, 403);
+    assert.equal((await open({...original, body: original.body.replace(upstream, otherHead)})).status, 403);
+    assert.equal((await open({...original, body: original.body.replace(stagingFeature, "unapproved-feature")})).status, 403);
+    const lookups = productionLookups;
+    const stageLookups = stagingLookups;
+    native = true;
+    runs.sch_Triage = [71, 72, 73, 74, 75].map(number => stagingRun(number));
+    for (const [number, proof] of [
+      [71, {}],
+      [72, {attempt: {head_sha: otherHead}}],
+      [73, {job: {steps: [{name: "Deploy and verify staging", conclusion: "failure"}]}}],
+      [74, {missing: true}],
+      [75, {job: {steps: []}}],
+    ]) {
+      const staged = stagingIssue(number);
+      currentIssues.set(number, number === 71 ? {...staged, body: staged.body.replace(head, otherHead)} : staged);
+      stagingProof = {head, ...proof};
+      assert.equal((await open(staged)).status, 202);
+      const comment = number + 1000;
+      issueComments.set(comment, {id: comment, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`,
+        body: "<!-- factory:triage v1 -->"});
+      await finish("sch_Triage", `ses_TriageStaging${number}`, {v: 1, stage: "triage", status: "ready", issue: number, comment});
+      await tick();
+      assert.equal((await find(number)).reason, number === 71 ? "issue-evidence-changed" : "staging-ui-deployment-evidence", JSON.stringify(await status()));
+    }
+    assert.equal(productionLookups, lookups);
+    assert.equal(stagingLookups, stageLookups + 4);
+    assert.deepEqual((await status()).slot, []);
+  } finally {
+    stagingProof = undefined;
+    runs.sch_Triage = previousRuns;
+    native = previousNative;
+    for (const number of [71, 72, 73, 74, 75]) {
+      currentIssues.delete(number);
+      issueComments.delete(number + 1000);
+    }
+    await mf.dispose();
+    mf = old;
+  }
+});
+
+test("staging retains an independently linked PR after a late issue edit and closes after exact staging smoke",
+  () => stagingRelease("skipped", undefined, "staging-ui"));
+
+test("staging retains an independently linked PR from credential recovery after a late issue edit",
+  () => stagingRelease("skipped", "restart", "staging-ui"));
+
+test("staging pre-work evidence blocks release the slot only with no linked PR and an independently verified mismatch", async () => {
+  for (const scenario of [{changed: true}, {changed: false}]) {
+    await stagingRelease("skipped", undefined, "staging-ui", scenario);
+  }
+});
+
+test("a newer signed staging completion supersedes a pre-work block during corroboration", async () => {
+  for (const mode of [{}, {omitted: true}, {recovery: true, omitted: true}, {recovery: true, deferred: true}]) {
+    await stagingRelease("skipped", undefined, "staging-ui", {changed: true, superseded: true, ...mode});
+  }
+});
+
+test("staging retains its slot when the refreshed session cannot corroborate the signed pre-work turn", async () => {
+  for (const nextSession of [
+    ownedSession("running", undefined, 1),
+    ownedSession("idle", undefined, 2),
+    {...ownedSession("idle", undefined, 1), stats: {turns: 1, turn_started_at: Date.now()}},
+    {...ownedSession("idle", undefined, 1), stats: {}},
+    {...ownedSession("idle", undefined, 1), status: undefined},
+  ]) {
+    await stagingRelease("skipped", undefined, "staging-ui", {changed: true, nextSession});
+  }
+});
+
+test("staging waits for a signed implementation finish when the PR is already visible", async () => {
+  for (const recovery of [false, true]) {
+    await stagingRelease("skipped", undefined, "staging-ui", {changed: true, linked: true, recovery});
+  }
+});
+
+test("verified staging smoke releases a legacy parity slot when staging classification prevents closure",
+  () => stagingRelease("skipped", undefined, "parity"));
+
+async function stagingRelease(productionConclusion, recovery, provenance = "maintainer", preWork) {
   const number = 41;
-  const author = {type: "User", id: 81, login: "maintainer"};
-  const openedIssue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+  const staging = provenance === "staging-ui";
+  const parity = provenance === "parity";
+  const author = staging || parity ? discovery : {type: "User", id: 81, login: "maintainer"};
+  const openedIssue = staging ? stagingIssue(number) : parity ? issue(number) : {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
     title: "Adjust a pilot feature", body: "Acceptance criteria", labels: [{name: "type: feature"}]};
   const old = mf;
-  const bindings = {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false", DELIVERY_TARGET: "staging",
+  const bindings = {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false", DELIVERY_TARGET: "staging", SOURCE_SHA: head,
     DELIVERY_STAGING_SMOKE_STEP: "Deploy and verify staging", FCTL_REVIEW_PROJECT_ID: reviewProject,
     FCTL_REVIEW_TOKEN: "fake-review-pat"};
   mf = new Miniflare({...workerOptions, bindings});
@@ -1028,7 +1147,10 @@ async function stagingRelease(productionConclusion, recovery) {
   const initialProduction = productionLookups;
   const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
   const configure = changes => mf.setOptions({...workerOptions, bindings: {...bindings, MERGE_ENABLED: "true", ...changes}});
-  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase};
+  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR};
+  const previousRuns = runs.sch_Triage;
+  const previousPlanRuns = runs.sch_Plan;
+  if (parity) runs.sch_Plan = [];
   try {
     currentIssues.set(number, openedIssue);
     for (const [id, stage] of [[410, "triage"], [411, "plan"]]) {
@@ -1042,11 +1164,111 @@ async function stagingRelease(productionConclusion, recovery) {
     revision = head;
     conclusion = "success";
     splitReview = {record: {}};
-    await github({action: "opened", issue: openedIssue, sender: author});
-    await finish("sch_Maintainer", "ses_Maintainer41", {v: 1, stage: "triage", status: "ready", issue: number, comment: 410});
+    if (staging) {
+      assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: true, sourceSha: head});
+      native = true;
+      runs.sch_Triage = [stagingRun(number, "wrong[bot]")];
+      stagingProof = {head};
+    }
+    assert.equal((await github({action: "opened", issue: openedIssue, sender: author})).status, 202);
+    const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 410};
+    if (staging) {
+      assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: false, sourceSha: head});
+      const at = Date.now() + 1000;
+      const id = `ses_TriageStaging${number}`;
+      transcripts.set(id, completionEvents(triageResult, at));
+      await finish("sch_Triage", id, undefined, 0, false, {at, turns: 1});
+      await tick();
+      assert.equal((await find()).phase, "triage");
+      runs.sch_Triage = [stagingRun(number)];
+    } else if (parity) {
+      native = true;
+      runs.sch_Triage = [stagingRun(number)];
+      await finish("sch_Triage", `ses_TriageStaging${number}`, triageResult);
+    } else {
+      await finish("sch_Maintainer", "ses_Maintainer41", triageResult);
+    }
     await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 411});
     const id = "ses_Implement";
     const result = {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23};
+    if (preWork) {
+      for (let step = 0; step < 8 && calls.implement === initial.implement; step++) await tick();
+      assert.equal(calls.implement, initial.implement + 1);
+      implementationHasPR = !!preWork.linked;
+      if (preWork.recovery) {
+        sessionState.set(id, ownedSession("paused", credentialPause));
+        await tick();
+        assert.equal((await find()).credentialRecovery.session, id);
+      }
+      sessionState.set(id, ownedSession("idle", undefined, 1));
+      if (preWork.changed) currentIssues.set(number, {...openedIssue, title: "Changed before work"});
+      const at = Date.now();
+      const blocked = {v: 1, stage: "implement", status: "blocked", issue: number, reason: "pre-work-evidence-changed"};
+      let newerFinish;
+      if (preWork.nextSession) {
+        issueReads.set(number, () => {
+          issueReads.delete(number);
+          sessionState.set(id, preWork.nextSession);
+        });
+      }
+      if (preWork.superseded) {
+        issueReads.set(number, async () => {
+          issueReads.delete(number);
+          implementationHasPR = !preWork.deferred;
+          if (preWork.recovery) sessionState.set(id, ownedSession("idle", undefined, 2));
+          const newerAt = at + 8000;
+          if (preWork.omitted) {
+            const earlier = completionEvents(blocked, at);
+            const later = completionEvents(result, newerAt).slice(-4);
+            transcripts.set(id, [...earlier, ...later.map((event, index) => ({...event, seq: earlier.length + index + 1}))]);
+          }
+          newerFinish = (await finish("sch_Implement", id, preWork.omitted ? undefined : result, 0, false,
+            {at: newerAt, turns: 2})).status;
+        });
+      }
+      await finish("sch_Implement", id, blocked, 0, false, {at, turns: 1});
+      await tick();
+      if (preWork.superseded) {
+        assert.equal(newerFinish, 202);
+        assert.equal((await find()).phase, "implement");
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        await tick();
+        if (preWork.deferred) {
+          assert.equal((await find()).reason, "credential-recovery-awaiting-pr-link");
+          await tick();
+          assert.equal((await find()).phase, "implement");
+          assert.deepEqual((await status()).slot, [{issue: number}]);
+        } else {
+          assert.equal((await find()).phase, "pr");
+          assert.equal((await find()).pr, 23);
+        }
+        return;
+      }
+      if (preWork.nextSession || preWork.linked) {
+        await configure({});
+        await tick();
+        const waiting = await find();
+        assert.equal(waiting.phase, "implement");
+        assert.equal(waiting.pr, undefined);
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        assert.equal(calls.merges.length, initial.merges);
+        implementationHasPR = true;
+        sessionState.set(id, ownedSession("idle", undefined, 2));
+        await finish("sch_Implement", id, result, 0, false, {at: at + 8000, turns: 2});
+        await tick();
+        assert.equal((await find()).phase, "pr");
+        assert.equal((await find()).pr, 23);
+        return;
+      }
+      const released = preWork.changed;
+      assert.equal((await find()).reason, released ? "implementation-pre-work-evidence-changed" : "implement-result");
+      assert.deepEqual((await status()).slot, released ? [] : [{issue: number}]);
+      return;
+    }
+    if (staging && !recovery) {
+      for (let step = 0; step < 8 && calls.implement === initial.implement; step++) await tick();
+      assert.equal(calls.implement, initial.implement + 1);
+    }
     if (recovery) {
       const before = continuations.length;
       sessionState.set(id, ownedSession("paused", credentialPause));
@@ -1157,10 +1379,36 @@ async function stagingRelease(productionConclusion, recovery) {
     } else {
       await finish("sch_Implement", id, result);
     }
+    if (staging) {
+      currentIssues.set(number, {...openedIssue, title: "Changed after implementation started"});
+      if (!recovery) {
+        linkedIssue = number + 1;
+        await tick();
+        assert.equal((await find()).phase, "implement");
+        linkedIssue = number;
+      }
+    }
     for (let step = 0; step < 8 && (await find())?.phase !== "pr"; step++) await tick();
     assert.equal((await find())?.phase, "pr", JSON.stringify(await status()));
     assert.equal((await find()).pr, 23);
     assert.equal(calls.merges.length, initial.merges);
+    if (staging) {
+      const snapshot = createHash("sha256").update(JSON.stringify([openedIssue.title, openedIssue.body, "type: feature"])).digest("hex");
+      for (const [session, field, comment] of [["ses_Plan", "triage_comment", 410], ["ses_Implement", "plan_comment", 411]]) {
+        const {v, invocation, ...context} = JSON.parse(contexts.get(session));
+        assert.equal(v, 1);
+        assert.ok(invocation);
+        assert.deepEqual(context, {repo, issue: number, provenance: "staging-ui", feature_id: stagingFeature,
+          deployed_sha: head, author_id: discovery.id, actor: discovery.login, issue_snapshot_sha256: snapshot,
+          [field]: comment, ticket_bot_id: "33"});
+      }
+      await configure({});
+      await tick();
+      assert.equal(calls.gates.at(-1).conclusion, "failure");
+      assert.equal(calls.merges.length, initial.merges);
+      assert.deepEqual((await status()).slot, [{issue: number}]);
+      currentIssues.set(number, openedIssue);
+    }
 
     for (const changes of [{FCTL_REVIEW_TOKEN: ""}, {FCTL_REVIEW_TOKEN: env.FCTL_TOKEN},
       {FCTL_REVIEW_PROJECT_ID: "prj_Wrong"}]) {
@@ -1193,8 +1441,31 @@ async function stagingRelease(productionConclusion, recovery) {
     assert.equal(calls.merges.length, initial.merges);
     assert.equal(calls.gates.at(-1).conclusion, "failure");
     approvedHead = head;
+    if (staging) {
+      currentIssues.set(number, {...openedIssue, title: "Changed scope"});
+      await tick();
+      assert.equal(calls.gates.at(-1).conclusion, "failure");
+      assert.equal(calls.merges.length, initial.merges);
+      currentIssues.set(number, openedIssue);
+    }
     await tick();
     assert.deepEqual(calls.merges.slice(initial.merges), [head]);
+
+    if (parity) {
+      assert.ok(productionLookups > initialProduction, "legacy parity intake still requires production evidence");
+      currentIssues.set(number, {...openedIssue, labels: [...openedIssue.labels, {name: "factory:staging-ui"}]});
+      stagingProof = {job: {steps: []}};
+      await tick();
+      assert.equal((await find()).phase, "release");
+      assert.deepEqual((await status()).slot, [{issue: number}]);
+      stagingProof = {};
+      await tick();
+      assert.equal((await find()).reason, "release-issue-evidence-changed");
+      assert.equal((await find()).merge, merge);
+      assert.deepEqual((await status()).slot, []);
+      assert.equal(calls.closed.length, initial.closed);
+      return;
+    }
 
     for (const proof of [
       {check: {head_sha: descendant}},
@@ -1233,8 +1504,13 @@ async function stagingRelease(productionConclusion, recovery) {
     assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
     assert.equal(calls.implement, initial.implement + 1);
     assert.equal(productionLookups, initialProduction);
+    if (staging) assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: true, sourceSha: head});
   } finally {
-    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase} = saved);
+    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR} = saved);
+    runs.sch_Triage = previousRuns;
+    if (parity) runs.sch_Plan = previousPlanRuns;
+    transcripts.delete(`ses_TriageStaging${number}`);
+    issueReads.delete(number);
     splitReview = stagingProof = approvedHead = undefined;
     changedPath = "apps/app/src/ui/view.css";
     await mf.dispose();
@@ -1519,8 +1795,9 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         }
         currentIssues.set(number, {...current, ...changes});
         if (blockedReason) {
+          sessionState.set("ses_Implement", ownedSession("idle", undefined, 1));
           await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "blocked", issue: number,
-            reason: blockedReason === "generic" ? undefined : blockedReason});
+            reason: blockedReason === "generic" ? undefined : blockedReason}, 0, false, {turns: 1});
         }
         if (freesSlot) {
           issueErrors.set(number, 503);
@@ -1556,8 +1833,8 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         const ticket = state.tickets.find(ticket => ticket.issue === number);
         const expectedReason = blockedReason ? (freesSlot ? "implementation-pre-work-evidence-changed" : "implement-result") :
           releaseReason ?? (commentStatus && !beforePlan && !queuedImplementation ? "plan-comment" : "issue-evidence-changed");
-        assert.equal(ticket.reason, expectedReason);
-        assert.equal(ticket.phase, "blocked");
+        assert.equal(ticket.reason, recordedPR ? undefined : expectedReason);
+        assert.equal(ticket.phase, recordedPR ? "implement" : "blocked");
         assert.deepEqual(state.slot, blockedReason && !freesSlot ? [{issue: number}] : []);
         assert.equal(calls.closed.length, initial.closed);
         assert.equal(calls.plan, initial.plan + Number(!beforePlan));
@@ -1572,6 +1849,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         }
       } finally {
         implementationHasPR = true;
+        sessionState.delete("ses_Implement");
         issueErrors.delete(number);
         commentErrors.delete(commentId);
         await mf.dispose();

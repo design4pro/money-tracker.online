@@ -1,11 +1,12 @@
 import {identifier, integer, parseResult, record, sha, trustedHuman} from "./contracts";
 import type {Env, Result} from "./contracts";
 import {featureSnapshot, maintainerIdentity} from "./intake";
-import type {MaintainerIntake} from "./intake";
+import type {MaintainerIntake, StagingIntake} from "./intake";
+import {hasStagingClassification, issueEvidence} from "./policy";
 import {bearer, digest, fctlSignature, githubSignature} from "./signatures";
 
 export type Ingress =
-  | {kind: "issue"; issue: number; actor: string; maintainer?: MaintainerIntake}
+  | {kind: "issue"; issue: number; actor: string; maintainer?: MaintainerIntake; staging?: StagingIntake}
   | {kind: "finish"; session: string; schedule: string; at: number; result?: Result; completedTurns?: number; turns?: number; eventType?: string}
   | {kind: "delivery"; head: string}
   | {kind: "alert"; key: string; code: string; head?: string}
@@ -114,6 +115,18 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
     const author = record(issue.user);
     const sender = record(payload.sender);
     if (!integer(issue.number) || issue.pull_request) return rejected(403);
+    if (hasStagingClassification(issue)) {
+      if (env.DELIVERY_TARGET !== "staging" || author.type !== "Bot" || !integer(author.id) ||
+          String(author.id) !== env.GITHUB_DISCOVERY_BOT_ID || sender.type !== "Bot" ||
+          sender.id !== author.id || sender.login !== author.login ||
+          typeof author.login !== "string" || !/^[a-zA-Z0-9_-]+\[bot\]$/.test(author.login) ||
+          issue.repository_url !== `https://api.github.com/repos/${env.REPO}`) return rejected(403);
+      const evidence = issueEvidence(issue, true);
+      const snapshot = evidence && await featureSnapshot(issue);
+      if (!evidence || !snapshot) return rejected(403);
+      return {id, event: {kind: "issue", issue: issue.number, actor: author.login,
+        staging: {id: author.id, snapshot, ...evidence}}};
+    }
     if (trustedHuman(author, env.HUMAN_REVIEWER_IDS) && sender.type === "User" &&
         sender.id === author.id && sender.login === author.login &&
         maintainerIdentity(issue, env, issue.number, author.id)) {
