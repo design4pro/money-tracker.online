@@ -934,6 +934,66 @@ test("existing staging ticket joins split review and closes after exact smoke wi
 test("late staging proof wakes and closes a superseded ticket when production fails",
   () => stagingRelease("failure"));
 
+test("native parity triage follows its reserved run after it leaves recent history", async () => {
+  const number = 40;
+  const id = "ses_Triage40";
+  const run = "srn_Triage40";
+  const old = mf;
+  const previousRuns = runs.sch_Triage;
+  const previousNative = native;
+  mf = new Miniflare({...workerOptions, bindings: {...env, MERGE_ENABLED: "false"}});
+  const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
+  try {
+    native = true;
+    const event = {kind: "issue_opened", number, repo: ref, actor: discovery.login, url: `https://github.com/${repo}/issues/${number}`};
+    const original = {schedule_id: "sch_Triage", outcome: "started", trigger: "event", id: run, session: {id}, event};
+    runs.sch_Triage = [original];
+    sessionState.set(id, ownedSession("paused", credentialPause));
+    issueComments.set(400, {id: 400, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`,
+      body: "<!-- factory:triage v1 -->"});
+    const before = continuations.length;
+    await github(opened(number));
+    await tick();
+    assert.equal(continuations.length, before + 1);
+    assert.equal(continuations.at(-1).id, id);
+    assert.equal((await find()).credentialRecovery.run, run);
+
+    runs.sch_Triage = Array.from({length: 100}, (_, index) => ({
+      ...original, id: `srn_Newer${index}`, session: {id: `ses_Newer${index}`},
+    }));
+    const runReads = calls.nativeTriageReads;
+    const lookups = productionLookups;
+    const result = {v: 1, stage: "triage", status: "ready", issue: number, comment: 400};
+    await finish("sch_Triage", "ses_Newer0", result);
+    await tick();
+    assert.equal((await find()).phase, "triage");
+
+    sessionState.set(id, ownedSession("idle", undefined, 2));
+    await finish("sch_Triage", id, result, 0, false, {turns: 2});
+    const originalIssue = issue(number);
+    currentIssues.set(number, {...originalIssue, body: originalIssue.body.replace(head, otherHead)});
+    await tick();
+    assert.equal((await find()).reason, "credential-recovery-evidence-changed-operator");
+    assert.equal(productionLookups, lookups);
+    currentIssues.set(number, originalIssue);
+    await tick();
+    assert.equal((await find()).phase, "ready");
+    assert.equal((await find()).triageRun, run);
+    assert.equal((await find()).triageSession, id);
+    assert.equal(calls.nativeTriageReads, runReads);
+    assert.ok(productionLookups > lookups, "parity still needs exact production evidence");
+    assert.equal(continuations.length, before + 1);
+  } finally {
+    native = previousNative;
+    runs.sch_Triage = previousRuns;
+    currentIssues.delete(number);
+    issueComments.delete(400);
+    sessionState.delete(id);
+    await mf.dispose();
+    mf = old;
+  }
+});
+
 test("a lost credential resume response preserves the original implementation through exact staging smoke",
   () => stagingRelease("skipped", true));
 

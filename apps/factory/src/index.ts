@@ -26,7 +26,8 @@ const PENDING_RELEASE = `${SUPERSEDED_RELEASE} AND json_extract(state,'$.product
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Stage = "triage" | "plan" | "implement";
 type CredentialRecovery = {
-  session: string; run: string; stage: Stage;
+  session: string; run: string; schedule: string; stage: Stage;
+  parity?: ReturnType<typeof issueEvidence>;
   action: "resume" | "messages"; reservedAt: number;
 };
 type Ticket = {
@@ -216,8 +217,13 @@ export class Factory extends DurableObject<Env> {
   }
 
   private async stageResult(ticket: Ticket, fctl: Fctl, stage: Stage, run: string, schedule: string,
-    session: Json, finish: Finish | undefined, verify: () => Promise<boolean>) {
+    session: Json, finish: Finish | undefined, verify: () => Promise<boolean>, parity?: ReturnType<typeof issueEvidence>) {
     const id = String(session.id);
+    const reservation = ticket.credentialRecovery;
+    if (reservation && (reservation.session !== id || reservation.run !== run ||
+        reservation.schedule !== schedule || reservation.stage !== stage)) {
+      return this.recoveryWait(ticket, "credential-recovery-identity-operator");
+    }
     if (finish && finish.at < Number(session.created_at)) return;
     const result = finish && await this.finishResult(fctl, finish);
     // Evidence can change while the transcript or session is being read.
@@ -230,11 +236,10 @@ export class Factory extends DurableObject<Env> {
       }
       return this.finish(id, schedule)?.at === finish?.at ? result : "recovery-pending" as const;
     }
-    const reservation = ticket.credentialRecovery;
     // fctl stops the old runner as part of resuming a paused Codex session.
     // The stop alone cannot settle the reserved continuation's outcome.
     const restartStop = finish?.eventType === "session.stopped" && reservation?.action === "resume" &&
-      reservation.session === id && reservation.run === run && reservation.stage === stage && finish.at >= reservation.reservedAt;
+      finish.at >= reservation.reservedAt;
     if (finish && !result && !restartStop) return;
 
     const interrupted = result?.interruptedIdleAt;
@@ -249,9 +254,6 @@ export class Factory extends DurableObject<Env> {
       return this.recoveryWait(ticket, reason);
     }
     if (reservation) {
-      if (reservation.session !== id || reservation.run !== run || reservation.stage !== stage) {
-        return this.recoveryWait(ticket, "credential-recovery-identity-operator");
-      }
       // Queued, running and idle are all possible after an ambiguous POST.
       // Only the original session's newer signed result can advance the stage.
       if (ticket.reason?.endsWith("-operator")) return this.recoveryWait(ticket);
@@ -282,7 +284,7 @@ export class Factory extends DurableObject<Env> {
       return "recovery-pending" as const;
     }
 
-    const credentialRecovery: CredentialRecovery = {session: id, run, stage, action, reservedAt: Date.now()};
+    const credentialRecovery: CredentialRecovery = {session: id, run, schedule, stage, parity, action, reservedAt: Date.now()};
     const reserved = {...ticket, credentialRecovery};
     this.ctx.storage.transactionSync(() => {
       this.ticket(reserved, {reason: `credential-${action}-reserved`});
@@ -512,11 +514,24 @@ export class Factory extends DurableObject<Env> {
       if (!issue || !evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
           record(issue.user).login !== ticket.actor) return this.block(ticket, "issue-evidence");
       if (this.tickets("feature=? AND issue<>?", evidence.feature, ticket.issue).length) return this.block(ticket, "duplicate-feature");
-      const runs = list((await fctl.runs(schedule)).runs).map(record);
-      const run = runs.find(row => nativeRun(row, schedule, String(record(row.session).id), env.REPO, ticket.issue, ticket.actor));
-      if (!run) return this.ticket(ticket, {});
-      runId = String(run.id);
-      sessionId = record(run.session).id;
+      const reserved = ticket.credentialRecovery;
+      if (reserved) {
+        // The run was verified before reserving the POST. It can age out of the first page.
+        if (reserved.stage !== "triage" || reserved.schedule !== schedule) {
+          return this.recoveryWait(ticket, "credential-recovery-identity-operator");
+        }
+        if (reserved.parity?.feature !== evidence.feature || reserved.parity.deployed !== evidence.deployed) {
+          return this.recoveryWait(ticket, "credential-recovery-evidence-changed-operator");
+        }
+        runId = reserved.run;
+        sessionId = reserved.session;
+      } else {
+        const runs = list((await fctl.runs(schedule)).runs).map(record);
+        const run = runs.find(row => nativeRun(row, schedule, String(record(row.session).id), env.REPO, ticket.issue, ticket.actor));
+        if (!run) return this.ticket(ticket, {});
+        runId = String(run.id);
+        sessionId = record(run.session).id;
+      }
     }
     if (!identifier(runId, "srn") || !identifier(sessionId, "ses")) return;
     const finish = this.finish(sessionId, schedule);
@@ -531,7 +546,7 @@ export class Factory extends DurableObject<Env> {
       return !!parity && parity.feature === evidence?.feature && parity.deployed === evidence?.deployed &&
         current.number === ticket.issue && String(record(current.user).id) === env.GITHUB_DISCOVERY_BOT_ID &&
         record(current.user).login === ticket.actor;
-    });
+    }, evidence);
     if (result === "waiting" || result === "recovery-pending") return result;
     if (!result || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
         !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
