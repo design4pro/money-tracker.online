@@ -28,7 +28,7 @@ type Stage = "triage" | "plan" | "implement";
 type CredentialRecovery = {
   session: string; run: string; schedule: string; stage: Stage;
   parity?: ReturnType<typeof issueEvidence>;
-  action: "resume" | "messages"; reservedAt: number;
+  action: "resume" | "messages"; reservedAt: number; interruptedTurns?: number;
 };
 type Ticket = {
   issue: number; actor: string; phase: Phase; created: number; due: number; failures: number; recoveryPending?: true;
@@ -64,6 +64,10 @@ export class Factory extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS ticket (issue INTEGER PRIMARY KEY, phase TEXT NOT NULL, due INTEGER NOT NULL, feature TEXT UNIQUE, state TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS result (session TEXT PRIMARY KEY, at INTEGER NOT NULL, issue INTEGER, state TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS result_issue ON result(issue);
+      CREATE TABLE IF NOT EXISTS recovery_finish (
+        session TEXT NOT NULL, schedule TEXT NOT NULL, at INTEGER NOT NULL, state TEXT NOT NULL,
+        PRIMARY KEY(session,schedule,at)
+      );
       CREATE TABLE IF NOT EXISTS dispatch (key TEXT PRIMARY KEY, state TEXT NOT NULL, due INTEGER NOT NULL, payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS slot (singleton INTEGER PRIMARY KEY CHECK(singleton=1), issue INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS audit (at INTEGER NOT NULL, subject TEXT NOT NULL, action TEXT NOT NULL);
@@ -92,14 +96,19 @@ export class Factory extends DurableObject<Env> {
         this.sql.exec("INSERT OR IGNORE INTO ticket VALUES (?, ?, ?, NULL, ?)", ticket.issue, ticket.phase, now, JSON.stringify(ticket));
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
-        // A known mismatch cannot replace or prevent storage of a signed
-        // turn candidate for the reserved stage, regardless of delivery order.
-        if (event.result && this.sql.exec(`SELECT 1 FROM ticket
+        const active = this.sql.exec<{issue: number; phase: string}>(`SELECT issue,phase FROM ticket
           WHERE phase IN ('triage','plan','implement')
             AND json_extract(state,'$.credentialRecovery.session') = ?
-            AND json_extract(state,'$.credentialRecovery.schedule') = ?
-            AND (issue != ? OR phase != ?) LIMIT 1`,
-        event.session, event.schedule, event.result.issue, event.result.stage).toArray().length) return;
+            AND json_extract(state,'$.credentialRecovery.schedule') = ? LIMIT 1`, event.session, event.schedule).toArray()[0];
+        if (active) {
+          // An explicit mismatch cannot supersede a signed turn candidate.
+          if (event.result && (event.result.issue !== active.issue || event.result.stage !== active.phase)) return;
+          if (event.completedTurns) {
+            this.sql.exec("INSERT OR IGNORE INTO recovery_finish VALUES (?, ?, ?, ?)",
+              event.session, event.schedule, event.at, JSON.stringify(event));
+            return;
+          }
+        }
 
         // Keep out-of-order results until exact schedule/run/session evidence exists.
         // Prefer a parsed message over recoverable evidence, and either over a non-result event.
@@ -168,7 +177,11 @@ export class Factory extends DurableObject<Env> {
     }
     this.sql.exec("UPDATE ticket SET phase=?, due=?, feature=?, state=? WHERE issue=?",
       next.phase, next.due, next.feature ?? null, JSON.stringify(next), next.issue);
-    if (changes.phase && changes.phase !== ticket.phase) this.audit(String(ticket.issue), changes.reason ?? changes.phase);
+    if (changes.phase && changes.phase !== ticket.phase) {
+      if (ticket.credentialRecovery) this.sql.exec("DELETE FROM recovery_finish WHERE session=? AND schedule=?",
+        ticket.credentialRecovery.session, ticket.credentialRecovery.schedule);
+      this.audit(String(ticket.issue), changes.reason ?? changes.phase);
+    }
   }
 
   private block(ticket: Ticket, reason: string, releaseSlot = false) {
@@ -207,12 +220,19 @@ export class Factory extends DurableObject<Env> {
     return finish?.schedule === schedule ? finish : undefined;
   }
 
-  private finishResult(fctl: Fctl, finish: Finish) {
+  private recoveryFinish(session: string, schedule: string): Finish | undefined {
+    const row = this.sql.exec<{state: string}>(
+      "SELECT state FROM recovery_finish WHERE session=? AND schedule=? ORDER BY at LIMIT 1", session, schedule).toArray()[0];
+    return row ? JSON.parse(row.state) as Finish : undefined;
+  }
+
+  private finishResult(fctl: Fctl, finish: Finish, queued: boolean) {
     if (!finish.completedTurns) return finish.result;
     return fctl.resultAt(finish.session, finish.at, finish.completedTurns, finish.recovery, progress => {
-      // A newer signed finish may have arrived during the transcript read.
-      this.sql.exec("UPDATE result SET state=json_set(state, '$.recovery', json(?)) WHERE session=? AND at=?",
-        JSON.stringify(progress), finish.session, finish.at);
+      // The normal path can be superseded during a transcript read.
+      const table = queued ? "recovery_finish" : "result";
+      this.sql.exec(`UPDATE ${table} SET state=json_set(state, '$.recovery', json(?)) WHERE session=? AND at=?
+        AND json_extract(state,'$.schedule')=?`, JSON.stringify(progress), finish.session, finish.at, finish.schedule);
     });
   }
 
@@ -230,11 +250,14 @@ export class Factory extends DurableObject<Env> {
         reservation.schedule !== schedule || reservation.stage !== stage)) {
       return this.recoveryWait(ticket, "credential-recovery-identity-operator");
     }
-    if (finish && finish.at < Number(session.created_at)) {
-      return reservation ? this.recoveryWait(ticket, "credential-recovery-finish-identity-operator") : undefined;
-    }
-    const result = finish && await this.finishResult(fctl, finish);
-    // Evidence can change while the transcript or session is being read.
+    const eligible = (item?: Finish) => item && item.at >= Number(session.created_at) &&
+      (reservation?.interruptedTurns === undefined || (item.turns ?? item.completedTurns ?? 0) > reservation.interruptedTurns);
+    const candidate = reservation && this.recoveryFinish(id, schedule);
+    const inline = finish?.result && eligible(finish);
+    const selected = reservation ? inline ? finish : candidate : finish;
+    if (!reservation && finish && !eligible(finish)) return;
+    const result = selected && eligible(selected) ? await this.finishResult(fctl, selected, selected === candidate) : undefined;
+    // A newer inline finish can arrive while a candidate's transcript is being read.
     if (this.finish(id, schedule)?.at !== finish?.at) return "recovery-pending" as const;
     if (result === "recovery-pending") return result;
     const interrupted = result && "interruptedIdleAt" in result ? result.interruptedIdleAt : undefined;
@@ -246,6 +269,19 @@ export class Factory extends DurableObject<Env> {
         return this.recoveryWait(ticket, "credential-recovery-evidence-changed-operator");
       }
       return this.finish(id, schedule)?.at === finish?.at ? parsed : "recovery-pending" as const;
+    }
+    if (reservation && candidate && selected === candidate) {
+      const more = this.ctx.storage.transactionSync(() => {
+        this.sql.exec("DELETE FROM recovery_finish WHERE session=? AND schedule=? AND at=?", id, schedule, candidate.at);
+        if (interrupted !== undefined) {
+          ticket = {...ticket, credentialRecovery: {...reservation, interruptedTurns: candidate.completedTurns}};
+        }
+        const pending = !!this.recoveryFinish(id, schedule);
+        if (pending) this.ticket(ticket, {due: Date.now() + RECOVERY_WAIT, recoveryPending: true});
+        else if (interrupted !== undefined) this.ticket(ticket, {});
+        return pending;
+      });
+      if (more) return "waiting";
     }
     // A reserved continuation stays eligible until this session returns its
     // stage result. An intermediate finish, stop, failure or question cannot
@@ -296,7 +332,8 @@ export class Factory extends DurableObject<Env> {
       return "recovery-pending" as const;
     }
 
-    const credentialRecovery: CredentialRecovery = {session: id, run, schedule, stage, parity, action, reservedAt: Date.now()};
+    const credentialRecovery: CredentialRecovery = {session: id, run, schedule, stage, parity, action, reservedAt: Date.now(),
+      interruptedTurns: interrupted === undefined ? undefined : finish?.completedTurns};
     const reserved = {...ticket, credentialRecovery};
     this.ctx.storage.transactionSync(() => {
       this.ticket(reserved, {reason: `credential-${action}-reserved`});

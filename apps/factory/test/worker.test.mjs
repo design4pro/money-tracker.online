@@ -1000,8 +1000,10 @@ test("native parity triage follows its reserved run after it leaves recent histo
 test("a lost credential resume response preserves the original implementation through exact staging smoke",
   () => stagingRelease("skipped", "restart"));
 
-test("a question turn without a stage result preserves the original implementation until its successor",
-  () => stagingRelease("skipped", "question"));
+for (const order of ["signed order", "reverse arrival order"]) {
+  test(`a valid omitted-message finish survives a newer malformed finish in ${order}`,
+    () => stagingRelease("skipped", order));
+}
 
 async function stagingRelease(productionConclusion, recovery) {
   const number = 41;
@@ -1049,7 +1051,7 @@ async function stagingRelease(productionConclusion, recovery) {
       assert.match(resume.body.prompt, /original factory implement task for issue #41/);
       assert.deepEqual(resume.body.attachments, []);
       await tick(); // fctl may still report the original pause.
-      if (recovery === "question") {
+      if (recovery !== "restart") {
         const questionAt = Date.now();
         const finishAt = questionAt + 8000;
         sessionState.set(id, {...ownedSession("idle", undefined, 1), question: {
@@ -1084,8 +1086,14 @@ async function stagingRelease(productionConclusion, recovery) {
           questionTurn.push(...completionEvents(value, at).slice(-4)
             .map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
         }
-        sessionState.set(id, ownedSession("idle", undefined, 6));
-        await finish("sch_Implement", id, undefined, 0, false, {at: validAt, turns: 2});
+        const malformedAt = laterTurns.at(-1).at + 8000;
+        const malformed = completionEvents(result, malformedAt).slice(-4);
+        malformed[0].data.message.content[0].text = "Missing the stage JSON.";
+        questionTurn.push(...malformed.map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
+        sessionState.set(id, ownedSession("idle", undefined, 7));
+        const opaqueFinishes = [{at: validAt, turns: 2}, {at: malformedAt, turns: 7}];
+        if (recovery === "reverse arrival order") opaqueFinishes.reverse();
+        for (const options of opaqueFinishes) await finish("sch_Implement", id, undefined, 0, false, options);
         for (const {value, at, turns} of laterTurns.slice(2)) {
           await finish("sch_Implement", id, value, 0, false, {at, turns});
         }
