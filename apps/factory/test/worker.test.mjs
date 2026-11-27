@@ -150,7 +150,8 @@ async function provider(req) {
           transcriptReads.push({id, after});
           assert.equal(req.headers.get("authorization"), "Bearer fake-pat");
           assert.equal(searchParams.get("limit"), "100");
-          if (transcriptErrors.has(id)) return transcriptErrors.get(id)();
+          const failure = transcriptErrors.get(id)?.(after);
+          if (failure) return failure;
           const transcript = transcripts.get(id) ?? [];
           const events = transcript.filter(event => event.seq > after);
           const limit = transcript.length > 100 ? 100 : 20;
@@ -328,6 +329,7 @@ before(async () => {
             this.ctx.storage.sql.exec("UPDATE delivery SET at=0");
             return new Response(null, {status: 204});
           }
+          if (path === "/test/alarm") return Response.json(await this.ctx.storage.getAlarm());
           if (path === "/test/alarm") return Response.json(await this.ctx.storage.getAlarm());
           if (path === "/test/tick" || path === "/test/pump") {
             if (path === "/test/tick") {
@@ -709,32 +711,36 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.deepEqual(triageContext, {v: 1, provenance: "maintainer", repo, issue: number, actor: author.login,
       author_id: author.id, issue_snapshot_sha256: snapshot});
     assert.equal(transcriptReads.length, beforeReads);
-    const events = completionEvents(triageResult, at);
-    transcripts.set("ses_Maintainer31", events.filter(event => event.seq !== 36));
+    const prefix = Array.from({length: 2463}, (_, index) => ({seq: index + 1, ts: at - 6000, kind: "log", data: {}}));
+    const events = [
+      ...prefix,
+      ...completionEvents(triageResult, at).map(event => ({...event, seq: prefix.length + event.seq})),
+      ...completionEvents({...triageResult, comment: 999}, at + 8000).slice(-4)
+        .map(event => ({...event, seq: prefix.length + event.seq + 4})),
+    ];
+    transcripts.set("ses_Maintainer31", events);
     assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false, eventOptions)).status, 202);
     for (const [index, type] of ["session.question", "session.failed", "session.stopped"].entries()) {
       assert.equal((await finish("sch_Maintainer", "ses_Maintainer31", undefined, 0, false,
         {at: at + index + 1, type})).status, 202);
     }
-    transcriptErrors.set("ses_Maintainer31", () => new Response(null, {status: 503}));
+    transcriptErrors.set("ses_Maintainer31", after => after === 400 ? new Response(null, {status: 503}) : undefined);
     await tick();
     transcriptErrors.delete("ses_Maintainer31");
     assert.equal((await find(number)).failures, 1);
+    assert.deepEqual(transcriptReads.slice(beforeReads).map(read => read.after), [0, 100, 200, 300, 400]);
+
+    transcripts.set("ses_Maintainer31", events.filter(event => event.seq !== 401));
     await tick();
     assert.equal((await find(number)).phase, "triage");
     assert.equal((await find(number)).failures, 2);
-    const prefix = Array.from({length: 2463}, (_, index) => ({seq: index + 1, ts: at - 6000, kind: "log", data: {}}));
-    transcripts.set("ses_Maintainer31", [
-      ...prefix,
-      ...events.map(event => ({...event, seq: prefix.length + event.seq})),
-      ...completionEvents({...triageResult, comment: 999}, at + 8000).slice(-4)
-        .map(event => ({...event, seq: prefix.length + event.seq + 4})),
-    ]);
+    assert.deepEqual(transcriptReads.slice(beforeReads + 5).map(read => read.after), [400]);
+    transcripts.set("ses_Maintainer31", events);
     const beforeLongRead = transcriptReads.length;
     const retryAudits = async () => (await status()).audit.filter(entry =>
       entry.subject === String(number) && entry.action === "provider-retry").length;
     const beforeLongRetries = await retryAudits();
-    for (let batch = 0; batch < 5; batch++) {
+    for (let batch = 0; batch < 4; batch++) {
       await tick();
       const ticket = await find(number);
       assert.equal(ticket.phase, "triage");
@@ -742,13 +748,17 @@ test("signed maintainer intake plans and dispatches without production evidence"
       assert.equal(await retryAudits(), beforeLongRetries);
       assert(ticket.due <= Date.now() + 1000);
       assert.deepEqual(transcriptReads.slice(beforeLongRead + batch * 5).map(read => read.after),
-        Array.from({length: 5}, (_, index) => batch * 500 + index * 100));
+        Array.from({length: 5}, (_, index) => 400 + batch * 500 + index * 100));
+      // A different wakeup can run the pump before this continuation is due.
+      assert.equal((await call("/test/pump")).status, 204);
+      assert.equal(transcriptReads.length, beforeLongRead + (batch + 1) * 5);
+      assert.equal(await (await call("/test/alarm")).json(), ticket.due);
     }
     runs.sch_Plan = [];
     ambiguousMaintainerPlan = true;
     for (let step = 0; step < 3; step++) await tick();
     assert.equal(calls.plan, initial.plan + 1);
-    assert.deepEqual(transcriptReads.slice(beforeLongRead + 25).map(read => read.after), [2500]);
+    assert.deepEqual(transcriptReads.slice(beforeLongRead + 20).map(read => read.after), [2400, 2500]);
     // The POST may have started the run. Missing evidence must not release its claim.
     commentErrors.set(310, 404);
     await tick();

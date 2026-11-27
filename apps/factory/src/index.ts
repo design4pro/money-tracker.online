@@ -22,7 +22,7 @@ const PENDING_PRODUCTION = "phase='blocked' AND json_extract(state,'$.reason')=?
 
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Ticket = {
-  issue: number; actor: string; phase: Phase; created: number; due: number; failures: number;
+  issue: number; actor: string; phase: Phase; created: number; due: number; failures: number; recoveryPending?: true;
   maintainer?: MaintainerIntake; main?: string;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
@@ -140,7 +140,7 @@ export class Factory extends DurableObject<Env> {
   }
 
   private ticket(ticket: Ticket, changes: Partial<Ticket>) {
-    const next = {...ticket, failures: 0, due: Date.now() + WAIT, ...changes};
+    const next = {...ticket, failures: 0, recoveryPending: undefined, due: Date.now() + WAIT, ...changes};
     this.sql.exec("UPDATE ticket SET phase=?, due=?, feature=?, state=? WHERE issue=?",
       next.phase, next.due, next.feature ?? null, JSON.stringify(next), next.issue);
     if (changes.phase && changes.phase !== ticket.phase) this.audit(String(ticket.issue), changes.reason ?? changes.phase);
@@ -236,14 +236,11 @@ export class Factory extends DurableObject<Env> {
       `${PENDING_PRODUCTION} AND due<=? ORDER BY due,issue LIMIT 1`,
       SUPERSEDED, now,
     );
-    let recoveryDue = Infinity;
     for (const ticket of [...due, ...(active ? [active] : []), ...superseded]) {
       try {
         const result = await this.advance(ticket, fctl, github);
         if (result === "recovery-pending") {
-          const due = Date.now() + RECOVERY_WAIT;
-          this.ticket(ticket, {due});
-          recoveryDue = Math.min(recoveryDue, due);
+          this.ticket(ticket, {due: Date.now() + RECOVERY_WAIT, recoveryPending: true});
           continue;
         }
         if (result !== "pending" && ticket.phase === "blocked" && ticket.productionVerification) {
@@ -291,9 +288,12 @@ export class Factory extends DurableObject<Env> {
     const productionDue = this.sql.exec<{due: number | null}>(
       `SELECT MIN(due) AS due FROM ticket WHERE ${PENDING_PRODUCTION}`, SUPERSEDED,
     ).one().due;
-    if (productionDue !== null || pending.pending || bootstrap.length) {
+    const recoveryDue = this.sql.exec<{due: number | null}>(
+      "SELECT MIN(due) AS due FROM ticket WHERE json_extract(state, '$.recoveryPending') = 1",
+    ).one().due;
+    if (productionDue !== null || recoveryDue !== null || pending.pending || bootstrap.length) {
       const regularDue = pending.pending || bootstrap.length ? Date.now() + WAIT : Infinity;
-      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, recoveryDue, productionDue ?? Infinity)));
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 100, Math.min(regularDue, recoveryDue ?? Infinity, productionDue ?? Infinity)));
     }
     // Leave one watchdog pass when an ingress may have interleaved with the pump.
     else if (now - 120_000 < Number(this.sql.exec("SELECT MAX(at) AS newest FROM delivery").one().newest)) {

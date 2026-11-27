@@ -75,10 +75,13 @@ export class Fctl {
 
   async resultAt(session: string, at: number, completedTurns: number, progress: RecoveryProgress | undefined,
     checkpoint: (next: RecoveryProgress) => void) {
-    const incomplete = () => {
-      if (Date.now() - at < 300_000) throw new Error("Completion events not available yet");
-    };
     let {after, ordinal, previousAssistant, terminalResult} = progress ?? {after: 0, ordinal: 0};
+    const saveProgress = () => checkpoint({after, ordinal, previousAssistant, terminalResult});
+    const incomplete = () => {
+      if (Date.now() - at >= 300_000) return;
+      if (after > (progress?.after ?? 0)) saveProgress();
+      throw new Error("Completion events not available yet");
+    };
     for (let page = 0; page < 5; page++) {
       let response: Json;
       try {
@@ -109,7 +112,7 @@ export class Fctl {
       }
       if (response.has_more !== true || response.events.length === 0) return incomplete();
     }
-    checkpoint({after, ordinal, previousAssistant, terminalResult});
+    saveProgress();
     return "recovery-pending" as const;
   }
 
