@@ -37,6 +37,10 @@ const contexts = new Map();
 const transcripts = new Map();
 const transcriptErrors = new Map();
 const sessionCreatedAt = new Map();
+const sessionState = new Map();
+const continuations = [];
+const continuationResponses = new Map();
+const credentialPause = "Waiting for a fresh ChatGPT credential";
 const transcriptReads = [];
 const currentIssues = new Map();
 const issueErrors = new Map();
@@ -88,7 +92,8 @@ function session(id, schedule, access) {
   return {id, project_id: env.FCTL_PROJECT_ID, workspace: {id: env.FCTL_WORKSPACE_ID}, schedule: {id: schedule},
     agent_kind: "codex", github_access: access, created_at: sessionCreatedAt.get(id) ?? Date.now() - 10_000, branch: "codex/pilot",
     pull_requests: access === "push" ? [{repo: ref, number: 23, checks: {sha: revision,
-      review: {state: "passed", project_id: env.FCTL_PROJECT_ID, findings: 0, still_open: 0, session_id: "ses_Review"}}}] : []};
+      review: {state: "passed", project_id: env.FCTL_PROJECT_ID, findings: 0, still_open: 0, session_id: "ses_Review"}}}] : [],
+    ...sessionState.get(id)};
 }
 
 async function provider(req) {
@@ -151,6 +156,12 @@ async function provider(req) {
       return json(run);
     }
     if (noun === "sessions") {
+      if (part === "resume" || part === "messages") {
+        assert.equal(method, "POST");
+        assert.equal(req.headers.get("authorization"), "Bearer fake-pat");
+        continuations.push({id, part, body});
+        return continuationResponses.get(id)?.() ?? json({id});
+      }
       if (part === "events") {
         if (searchParams.has("after")) {
           const after = Number(searchParams.get("after"));
@@ -227,6 +238,15 @@ async function provider(req) {
         head: {sha: next, ref: "codex/pilot", repo: {id: 100}}, changed_files: 1,
         body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`});
     }
+    if (path === "/pulls/25") return json({
+      number: 25, state: "open", base: {ref: "main", repo: {id: 100}}, head: {sha: revision, ref: "codex/pilot", repo: {id: 100}},
+      body: `<!-- factory:implementation v1 issue=${linkedIssue + 1} session=ses_Implement -->`,
+    });
+    if (path === "/pulls/26") return json({
+      number: 26, state: "closed", merged: false, base: {ref: "main", repo: {id: 100}},
+      head: {sha: revision, ref: "codex/pilot", repo: {id: 100}},
+      body: `<!-- factory:implementation v1 issue=${linkedIssue} session=ses_Implement -->`,
+    });
     if (path === "/pulls/23/files") return json([{filename: changedPath, status: "modified"}]);
     if (path === "/pulls/23/reviews") return json(approvedHead ? [{
       id: 45, user: {id: 81, type: "User"}, state: "APPROVED", commit_id: approvedHead, submitted_at: new Date().toISOString(),
@@ -436,6 +456,43 @@ function completionEvents(result, at) {
     {seq: 37, ts: idle + 220, kind: "codex", data: {type: "result", subtype: "success", is_error: false}},
     {seq: 38, ts: idle, kind: "status", data: {status: "idle"}},
   ];
+}
+
+function interruptionEvents(at, prefix = 0, reason = credentialPause) {
+  return [
+    ...Array.from({length: prefix}, (_, index) => ({seq: index + 1, ts: at - 6000, kind: "log", data: {}})),
+    {seq: prefix + 1, ts: at - 5500, kind: "status", data: {status: "paused", reason}},
+    {seq: prefix + 2, ts: at - 5400, kind: "codex", data: {type: "result", subtype: "interrupted", is_error: true}},
+    {seq: prefix + 3, ts: at - 5000, kind: "status", data: {status: "idle"}},
+  ];
+}
+
+function credentialRestartEvents(at) {
+  const events = interruptionEvents(at, 89);
+  return [
+    ...events.slice(0, -2),
+    {seq: 91, ts: at - 5490, kind: "log", data: {}},
+    {...events[90], seq: 92},
+    {seq: 93, ts: at - 5390, kind: "git", data: {}},
+    {seq: 94, ts: at - 5380, kind: "codex", data: {type: "assistant", message: {
+      content: [{type: "tool_use", name: "Read"}],
+    }}},
+    {seq: 95, ts: at - 5370, kind: "codex", data: {type: "user", message: {
+      content: [{type: "tool_result", content: "Late output"}],
+    }}},
+    ...["stopping", "queued", "provisioning", "preparing", "preparing", "preparing", "preparing", "preparing",
+      "preparing", "preparing"].map((status, index) => ({
+      seq: 96 + index, ts: at - 5360 + index, kind: "status", data: {status},
+    })),
+    {seq: 106, ts: at - 5340, kind: "log", data: {}},
+    {seq: 107, ts: at - 5330, kind: "log", data: {}},
+    {seq: 108, ts: at - 5320, kind: "codex", data: {type: "system", subtype: "init"}},
+    {...events[91], seq: 109},
+  ];
+}
+
+function ownedSession(status, status_reason, turns = 0) {
+  return {status, status_reason, created_by: {id: env.FCTL_ACCOUNT_ID}, role: "owner", stats: {turns}};
 }
 
 const opened = number => ({action: "opened", issue: issue(number), sender: discovery});
@@ -889,7 +946,75 @@ test("existing staging ticket joins split review and closes after exact smoke wi
 test("late staging proof wakes and closes a superseded ticket when production fails",
   () => stagingRelease("failure"));
 
-async function stagingRelease(productionConclusion) {
+test("native parity triage follows its reserved run after it leaves recent history", async () => {
+  const number = 40;
+  const id = "ses_Triage40";
+  const run = "srn_Triage40";
+  const old = mf;
+  const previousRuns = runs.sch_Triage;
+  const previousNative = native;
+  mf = new Miniflare({...workerOptions, bindings: {...env, MERGE_ENABLED: "false"}});
+  const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
+  try {
+    native = true;
+    const event = {kind: "issue_opened", number, repo: ref, actor: discovery.login, url: `https://github.com/${repo}/issues/${number}`};
+    const original = {schedule_id: "sch_Triage", outcome: "started", trigger: "event", id: run, session: {id}, event};
+    runs.sch_Triage = [original];
+    sessionState.set(id, ownedSession("paused", credentialPause));
+    issueComments.set(400, {id: 400, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${number}`,
+      body: "<!-- factory:triage v1 -->"});
+    const before = continuations.length;
+    await github(opened(number));
+    await tick();
+    assert.equal(continuations.length, before + 1);
+    assert.equal(continuations.at(-1).id, id);
+    assert.equal((await find()).credentialRecovery.run, run);
+
+    runs.sch_Triage = Array.from({length: 100}, (_, index) => ({
+      ...original, id: `srn_Newer${index}`, session: {id: `ses_Newer${index}`},
+    }));
+    const runReads = calls.nativeTriageReads;
+    const lookups = productionLookups;
+    const result = {v: 1, stage: "triage", status: "ready", issue: number, comment: 400};
+    await finish("sch_Triage", "ses_Newer0", result);
+    await tick();
+    assert.equal((await find()).phase, "triage");
+
+    sessionState.set(id, ownedSession("idle", undefined, 2));
+    await finish("sch_Triage", id, result, 0, false, {turns: 2});
+    const originalIssue = issue(number);
+    currentIssues.set(number, {...originalIssue, body: originalIssue.body.replace(head, otherHead)});
+    await tick();
+    assert.equal((await find()).reason, "credential-recovery-evidence-changed-operator");
+    assert.equal(productionLookups, lookups);
+    currentIssues.set(number, originalIssue);
+    await tick();
+    assert.equal((await find()).phase, "ready");
+    assert.equal((await find()).triageRun, run);
+    assert.equal((await find()).triageSession, id);
+    assert.equal(calls.nativeTriageReads, runReads);
+    assert.ok(productionLookups > lookups, "parity still needs exact production evidence");
+    assert.equal(continuations.length, before + 1);
+  } finally {
+    native = previousNative;
+    runs.sch_Triage = previousRuns;
+    currentIssues.delete(number);
+    issueComments.delete(400);
+    sessionState.delete(id);
+    await mf.dispose();
+    mf = old;
+  }
+});
+
+test("a lost credential resume response preserves the original implementation through exact staging smoke",
+  () => stagingRelease("skipped", "restart"));
+
+for (const order of ["signed order", "reverse arrival order"]) {
+  test(`a valid omitted-message finish survives a newer malformed finish in ${order}`,
+    () => stagingRelease("skipped", order));
+}
+
+async function stagingRelease(productionConclusion, recovery) {
   const number = 41;
   const author = {type: "User", id: 81, login: "maintainer"};
   const openedIssue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
@@ -920,9 +1045,121 @@ async function stagingRelease(productionConclusion) {
     await github({action: "opened", issue: openedIssue, sender: author});
     await finish("sch_Maintainer", "ses_Maintainer41", {v: 1, stage: "triage", status: "ready", issue: number, comment: 410});
     await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 411});
-    await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23});
+    const id = "ses_Implement";
+    const result = {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23};
+    if (recovery) {
+      const before = continuations.length;
+      sessionState.set(id, ownedSession("paused", credentialPause));
+      continuationResponses.set(id, () => new Response("lost response", {status: 502}));
+      for (let step = 0; step < 8 && continuations.length === before; step++) await tick();
+      assert.equal((await find()).phase, "implement");
+      assert.equal((await find()).reason, "credential-resume-uncertain");
+      const [resume] = continuations.slice(before);
+      assert.equal(resume.id, id);
+      assert.equal(resume.part, "resume");
+      assert.match(resume.body.prompt, /original factory implement task for issue #41/);
+      assert.deepEqual(resume.body.attachments, []);
+      await tick(); // fctl may still report the original pause.
+      if (recovery !== "restart") {
+        const questionAt = Date.now();
+        const finishAt = questionAt + 8000;
+        sessionState.set(id, {...ownedSession("idle", undefined, 1), question: {
+          text: "Confirm the prior result", asked_at: questionAt,
+        }});
+        await finish("sch_Implement", id, undefined, 0, false, {at: questionAt, type: "session.question"});
+        await tick();
+        assert.equal((await find()).reason, "credential-continuation-question-operator");
+        const questionTurn = completionEvents(result, finishAt);
+        questionTurn[34].data.message.content[0].text = "Waiting for an answer.";
+        transcripts.set(id, questionTurn);
+        await finish("sch_Implement", id, undefined, 0, false, {at: finishAt, turns: 1});
+        await tick();
+        assert.equal((await find()).reason, "credential-continuation-question-operator");
+        sessionState.set(id, ownedSession("idle", undefined, 1));
+        await tick();
+        assert.equal((await find()).phase, "implement");
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        assert.equal(continuations.length, before + 1);
+        const blockedAt = finishAt + 8000;
+        const validAt = blockedAt + 8000;
+        const staleBlock = {v: 1, stage: "implement", status: "blocked", issue: number};
+        const wrongStage = {v: 1, stage: "plan", status: "planned", issue: number, comment: 411};
+        const wrongIssue = {...result, issue: number + 1};
+        const laterTurns = [wrongStage, wrongIssue, wrongStage, wrongIssue].map((value, index) => ({
+          value, at: validAt + 8000 * (index + 1), turns: index + 4,
+        }));
+        for (const {value, at, turns} of laterTurns.slice(0, 2)) {
+          await finish("sch_Implement", id, value, 0, false, {at, turns});
+        }
+        await tick();
+        assert.equal((await find()).phase, "implement");
+        for (const {value, at} of [{value: staleBlock, at: blockedAt}, {value: result, at: validAt}, ...laterTurns]) {
+          questionTurn.push(...completionEvents(value, at).slice(-4)
+            .map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
+        }
+        const malformedAt = laterTurns.at(-1).at + 8000;
+        const malformed = completionEvents(result, malformedAt).slice(-4);
+        malformed[0].data.message.content[0].text = "Missing the stage JSON.";
+        questionTurn.push(...malformed.map((event, index) => ({...event, seq: questionTurn.length + index + 1})));
+        sessionState.set(id, ownedSession("idle", undefined, 8));
+        const finishes = [
+          {value: staleBlock, at: blockedAt, turns: 2}, {at: validAt, turns: 3}, {at: malformedAt, turns: 8},
+        ];
+        if (recovery === "reverse arrival order") finishes.reverse();
+        for (const {value, ...options} of finishes) await finish("sch_Implement", id, value, 0, false, options);
+        for (const {value, at, turns} of laterTurns.slice(2)) {
+          await finish("sch_Implement", id, value, 0, false, {at, turns});
+        }
+      } else {
+        const stoppedAt = Date.now();
+        sessionState.set(id, ownedSession("stopped"));
+        await finish("sch_Implement", id, undefined, 0, false, {at: stoppedAt, type: "session.stopped"});
+        await tick();
+        assert.equal((await find()).phase, "implement", "the resume can stop the original runner");
+        assert.equal((await find()).reason, "credential-restart-stop-observed");
+        sessionState.set(id, ownedSession("idle", undefined, 1));
+        const at = stoppedAt + 1000;
+        const options = {at, turns: 1};
+        const restarted = credentialRestartEvents(at);
+        transcripts.set(id, restarted);
+        await finish("sch_Implement", id, undefined, 0, false, options);
+        await tick();
+        await finish("sch_Implement", id, undefined, 0, false, options);
+        await finish("sch_Implement", id, undefined, 0, false, {at: at + 1, type: "session.stopped"});
+        await finish("sch_Implement", id, result, 0, false, {at: at + 2, turns: 1});
+        await tick();
+        assert.deepEqual((await status()).slot, [{issue: number}]);
+        assert.equal((await find()).phase, "implement");
+        assert.equal(calls.merges.length, initial.merges);
+        assert.equal(continuations.length, before + 1);
+        const wrongPRAt = at + 8000;
+        const inlineWrongPRAt = wrongPRAt + 8000;
+        const closedPRAt = inlineWrongPRAt + 8000;
+        const newerAt = closedPRAt + 8000;
+        const wrongPR = {...result, pr: 24};
+        const wrongMarker = {...result, pr: 25};
+        const closedPR = {...result, pr: 26};
+        const turns = [[wrongPR, wrongPRAt], [wrongMarker, inlineWrongPRAt], [closedPR, closedPRAt], [result, newerAt]];
+        const later = turns.flatMap(([value, time]) => completionEvents(value, time).slice(-4));
+        transcripts.set(id, [...restarted, ...later.map((event, index) => ({...event, seq: restarted.length + index + 1}))]);
+        const links = session(id, "sch_Implement", "push").pull_requests;
+        sessionState.set(id, {...ownedSession("idle", undefined, 5), pull_requests: [...links, ...[25, 26].map(number => ({repo: ref, number}))]});
+        await finish("sch_Implement", id, undefined, 0, false, {at: wrongPRAt, turns: 2});
+        await finish("sch_Implement", id, wrongMarker, 0, false, {at: inlineWrongPRAt, turns: 3});
+        await finish("sch_Implement", id, closedPR, 0, false, {at: closedPRAt, turns: 4});
+        for (let step = 0; step < 3; step++) {
+          await tick();
+          assert.equal((await find()).phase, "implement");
+          assert.equal((await find()).reason, "credential-recovery-awaiting-pr-link");
+        }
+        await finish("sch_Implement", id, undefined, 0, false, {at: newerAt, turns: 5});
+      }
+    } else {
+      await finish("sch_Implement", id, result);
+    }
     for (let step = 0; step < 8 && (await find())?.phase !== "pr"; step++) await tick();
     assert.equal((await find())?.phase, "pr", JSON.stringify(await status()));
+    assert.equal((await find()).pr, 23);
     assert.equal(calls.merges.length, initial.merges);
 
     for (const changes of [{FCTL_REVIEW_TOKEN: ""}, {FCTL_REVIEW_TOKEN: env.FCTL_TOKEN},
@@ -1003,10 +1240,101 @@ async function stagingRelease(productionConclusion) {
     await mf.dispose();
     mf = old;
     currentIssues.delete(number);
+    sessionState.delete("ses_Implement");
+    continuationResponses.delete("ses_Implement");
+    transcripts.delete("ses_Implement");
     issueComments.delete(410);
     issueComments.delete(411);
   }
 }
+
+test("native refresh to idle prompts once after the signed boundary and leaves other pauses to fctl or the operator", async () => {
+  const number = 50;
+  const id = "ses_Maintainer50";
+  const planId = "ses_Plan";
+  const author = {type: "User", id: 81, login: "maintainer"};
+  const issue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
+    title: "Continue interrupted triage", body: "Fixture", labels: [{name: "type: feature"}]};
+  const old = mf;
+  mf = new Miniflare({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "81", MERGE_ENABLED: "false"}});
+  const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
+  const before = continuations.length;
+  try {
+    const at = Date.now();
+    const options = {at, turns: 1};
+    currentIssues.set(number, issue);
+    issueComments.set(510, {id: 510, user: discovery, issue_url: `${issue.repository_url}/issues/${number}`,
+      body: "<!-- factory:triage v1 -->"});
+    sessionState.set(id, ownedSession("idle", undefined, 1));
+    transcripts.set(id, interruptionEvents(at, 498));
+    await github({action: "opened", issue, sender: author});
+    await finish("sch_Maintainer", "ses_Unrelated", undefined, 0, false, options);
+    await tick();
+    assert.equal(continuations.length, before, "idle alone and an unrelated finish cannot authorize continuation");
+    const reads = transcriptReads.length;
+    await finish("sch_Maintainer", id, undefined, 0, false, options);
+    await tick();
+    assert.equal((await find()).recoveryPending, true);
+    assert.equal(continuations.length, before);
+    await tick();
+    assert.deepEqual(transcriptReads.slice(reads).map(read => read.after), [0, 100, 200, 300, 400, 500]);
+    const [message] = continuations.slice(before);
+    assert.equal(message.id, id);
+    assert.equal(message.part, "messages");
+    assert.match(message.body.text, /original factory triage task for issue #50/);
+    assert.equal(message.body.client_id, "factory-credential-srn_Maintainer50");
+    assert.deepEqual(message.body.attachments, []);
+    await finish("sch_Maintainer", id, undefined, 0, false, options);
+    await tick();
+    assert.equal(continuations.length, before + 1);
+    assert.equal(transcriptReads.length, reads + 6, "the exact interruption boundary is checkpointed");
+
+    sessionState.set(planId, ownedSession("paused", "Waiting for the ChatGPT plan usage limit to reset"));
+    const triageResult = {v: 1, stage: "triage", status: "ready", issue: number, comment: 510};
+    commentErrors.set(509, 503);
+    await finish("sch_Maintainer", id, {...triageResult, comment: 509}, 0, false, {at: at + 8000, turns: 2});
+    await tick();
+    assert.equal((await find()).phase, "triage");
+    assert.equal((await find()).reason, "credential-recovery-evidence-retry");
+    await finish("sch_Maintainer", id, triageResult, 0, false, {at: at + 16_000, turns: 3});
+    for (let step = 0; step < 5 && (await find()).reason !== "session-usage-limit"; step++) await tick();
+    assert.equal((await find()).phase, "plan");
+    assert.equal((await find()).reason, "session-usage-limit");
+    sessionState.set(planId, ownedSession("paused", "Paused by the operator"));
+    await tick();
+    assert.equal((await find()).reason, "session-paused-operator");
+    sessionState.set(planId, {...ownedSession("paused", credentialPause), created_by: {id: "usr_Other"}});
+    await tick();
+    assert.equal((await find()).reason, "credential-recovery-owner-or-question-operator");
+    sessionState.set(planId, ownedSession("paused", credentialPause));
+    commentErrors.set(510, 404);
+    await tick();
+    assert.equal((await find()).reason, "credential-recovery-evidence-changed-operator");
+    assert.equal(continuations.length, before + 1);
+
+    commentErrors.delete(510);
+    continuationResponses.set(planId, () => new Response(null, {status: 501}));
+    await tick();
+    await tick();
+    assert.equal((await find()).reason, "credential-connection-unavailable-operator");
+    assert.deepEqual(continuations.slice(before + 1).map(({id, part}) => [id, part]), [[planId, "resume"]]);
+    await finish("sch_Plan", planId, {v: 1, stage: "plan", status: "blocked", issue: number});
+    await tick();
+    assert.equal((await find()).reason, "plan-result");
+    assert.deepEqual((await status()).slot, []);
+  } finally {
+    currentIssues.delete(number);
+    issueComments.delete(510);
+    commentErrors.delete(509);
+    commentErrors.delete(510);
+    sessionState.delete(id);
+    sessionState.delete(planId);
+    continuationResponses.delete(planId);
+    transcripts.delete(id);
+    await mf.dispose();
+    mf = old;
+  }
+});
 
 test("only an omitted finish message can recover its own successful Codex turn", async () => {
   const old = mf;
@@ -1021,12 +1349,34 @@ test("only an omitted finish message can recover its own successful Codex turn",
       events[36].data = {...events[36].data, subtype: "error_during_execution", is_error: true};
       events.push(...later);
     }},
+    ...[
+      {kind: "user_message", data: {text: "A new turn"}},
+      {kind: "codex", data: {type: "result", subtype: "success", is_error: false}},
+      {kind: "codex", data: {type: "assistant", message: {content: [{type: "text", text: "A new reply"}]}}},
+    ].map(entry => ({
+      name: `new ${entry.data.type ?? entry.kind} before interrupted idle`, pages: 2, change: (events, at) => {
+        const restart = credentialRestartEvents(at);
+        restart[104] = {...restart[104], ...entry};
+        events.splice(0, events.length, ...restart);
+      },
+    })),
+    {name: "credential pause after the interrupted result", pages: 1, change: (events, at) => {
+      const [pause, result, idle] = interruptionEvents(at);
+      events.splice(0, events.length, {...result, seq: 1}, {...pause, seq: 2, ts: result.ts + 1}, idle);
+    }},
+    {name: "interruption caused by a usage limit", pages: 1, change: (events, at) => {
+      events.splice(0, events.length, ...interruptionEvents(at, 0, "Waiting for the ChatGPT plan usage limit to reset"));
+    }},
     {name: "expired endpoint error", age: 301_000, error: () => new Response(null, {status: 503})},
     {name: "expired malformed JSON", age: 301_000, error: () => new Response("invalid JSON")},
     {name: "expired incomplete sequence", age: 301_000, change: events => { events.splice(35, 1); }},
     {name: "idle after signed timestamp", change: (events, at) => { events[37].ts = at + 1; }},
     {name: "user text", change: events => { events[34].kind = "user_message"; }},
     {name: "tool text", change: events => { events[34].data.message.content[0].type = "tool_result"; }},
+    {name: "sandbox init after a successful result", change: events => {
+      const idle = events.pop();
+      events.push({...idle, kind: "codex", data: {type: "system", subtype: "init"}}, {...idle, seq: idle.seq + 1});
+    }},
     {name: "idle belongs to a later turn", change: events => {
       events[37] = {seq: 38, ts: events[37].ts, kind: "user_message", data: {}};
       events.push({seq: 39, ts: events[37].ts + 1, kind: "status", data: {status: "idle"}});
@@ -1059,7 +1409,7 @@ test("only an omitted finish message can recover its own successful Codex turn",
       const ticket = (await status()).tickets.find(entry => entry.issue === number);
       assert.equal(ticket.reason, "triage-result", scenario.name);
       assert.equal(calls.plan, initialPlans, scenario.name);
-      assert.equal(transcriptReads.length - beforeReads, scenario.error ? 1 : scenario.change ? 2 : 0, scenario.name);
+      assert.equal(transcriptReads.length - beforeReads, scenario.pages ?? (scenario.error ? 1 : scenario.change ? 2 : 0), scenario.name);
     }
   } finally {
     for (const [index] of cases.entries()) {

@@ -26,11 +26,17 @@ export async function request(url: URL, headers: HeadersInit, method = "GET", pa
   return response.json();
 }
 
+export const CREDENTIAL_PAUSE = "Waiting for a fresh ChatGPT credential";
+
 export type RecoveryProgress = {
+  version?: 1;
   after: number;
   ordinal: number;
   previousAssistant?: Result;
   terminalResult?: Result;
+  credentialPause?: boolean;
+  terminalInterrupted?: boolean;
+  interruptedIdleAt?: number;
 };
 
 export class Fctl {
@@ -78,8 +84,13 @@ export class Fctl {
 
   async resultAt(session: string, at: number, completedTurns: number, progress: RecoveryProgress | undefined,
     checkpoint: (next: RecoveryProgress) => void) {
-    let {after, ordinal, previousAssistant, terminalResult} = progress ?? {after: 0, ordinal: 0};
-    const saveProgress = () => checkpoint({after, ordinal, previousAssistant, terminalResult});
+    // Older checkpoints may already have passed the pause event.
+    if (progress?.version !== 1) progress = undefined;
+    if (progress?.interruptedIdleAt !== undefined) return {interruptedIdleAt: progress.interruptedIdleAt};
+    let {after, ordinal, previousAssistant, terminalResult, credentialPause, terminalInterrupted} =
+      progress ?? {after: 0, ordinal: 0};
+    const saveProgress = (interruptedIdleAt?: number) =>
+      checkpoint({version: 1, after, ordinal, previousAssistant, terminalResult, credentialPause, terminalInterrupted, interruptedIdleAt});
     const incomplete = () => {
       if (Date.now() - at >= 300_000) return;
       if (after > (progress?.after ?? 0)) saveProgress();
@@ -102,15 +113,39 @@ export class Fctl {
 
         // fctl v0.39.0 increments turns for every stored Codex result,
         // including errors. Its finished webhook is emitted after idle settles.
+        if (event.kind === "status" && data.status === "paused") {
+          credentialPause = data.reason === CREDENTIAL_PAUSE && typeof event.ts === "number" && event.ts <= at;
+          if (terminalInterrupted) continue;
+        }
         if (ordinal === completedTurns) {
-          return event.kind === "status" && data.status === "idle" && typeof event.ts === "number" && event.ts <= at
-            ? terminalResult : undefined;
+          // A credential restart can flush raw tool output and report its
+          // startup statuses before idle. A delivered message or another
+          // result still breaks the signed turn's boundary.
+          if (terminalInterrupted && credentialPause && (
+            lateCodexToolEvent(event) ||
+            event.kind === "codex" && data.type === "system" && data.subtype === "init" ||
+            event.kind === "status" && ["stopping", "queued", "provisioning", "preparing"].includes(String(data.status))
+          )) continue;
+          if (event.kind !== "status" || data.status !== "idle" || typeof event.ts !== "number" || event.ts > at) return;
+          if (terminalInterrupted && credentialPause) {
+            saveProgress(event.ts);
+            return {interruptedIdleAt: event.ts};
+          }
+          return terminalResult;
         }
-        if (event.kind === "codex" && data.type === "result" && ++ordinal === completedTurns) {
-          if (data.subtype !== "success" || data.is_error !== false || (data.queued_turn_count ?? 0) !== 0) return;
-          if (!previousAssistant) return;
-          terminalResult = previousAssistant;
+        if (event.kind === "codex" && data.type === "result") {
+          ordinal++;
+          if (ordinal === completedTurns) {
+            if ((data.queued_turn_count ?? 0) !== 0) return;
+            if (credentialPause && data.subtype === "interrupted" && data.is_error === true &&
+                typeof event.ts === "number" && event.ts <= at) {
+              terminalInterrupted = true;
+            } else if (data.subtype === "success" && data.is_error === false && previousAssistant) {
+              terminalResult = previousAssistant;
+            } else return;
+          } else credentialPause = undefined;
         }
+        if (event.kind === "user_message" || event.kind === "status" && data.status === "idle") credentialPause = undefined;
         previousAssistant = finalAssistantResult(event);
       }
       if (response.has_more !== true || response.events.length === 0) return incomplete();
@@ -136,6 +171,14 @@ export class Fctl {
       throw error;
     }
   }
+}
+
+function lateCodexToolEvent(event: Json): boolean {
+  if (event.kind !== "codex") return false;
+  const data = record(event.data);
+  const kind = data.type === "assistant" ? "tool_use" : data.type === "user" ? "tool_result" : undefined;
+  const content = list(record(data.message).content);
+  return kind !== undefined && content.length > 0 && content.every(block => record(block).type === kind);
 }
 
 function finalAssistantResult(event: Json | undefined) {
