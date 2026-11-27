@@ -314,20 +314,20 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
-  private async readEvidence(github: Github, path: string): Promise<Json | undefined> {
+  private async readEvidence(github: Github, path: string, rejectMovedIssue = false): Promise<Json | undefined> {
     // Authentication failures must still retry, even if the token endpoint returns 404.
     await github.appToken();
     try {
       return record(await github.api(path));
     } catch (error) {
-      if (error instanceof ProviderError && [404, 410].includes(error.status)) return;
+      if (error instanceof ProviderError && ([404, 410].includes(error.status) || rejectMovedIssue && error.status === 301)) return;
       throw error;
     }
   }
 
   private async readIssue(github: Github, ticket: Ticket): Promise<Json | undefined> {
     const path = `/issues/${ticket.issue}`;
-    return ticket.maintainer ? this.readEvidence(github, path) : record(await github.api(path));
+    return ticket.maintainer ? this.readEvidence(github, path, true) : record(await github.api(path));
   }
 
   private async matchesMaintainer(ticket: Ticket, issue?: Json): Promise<boolean> {

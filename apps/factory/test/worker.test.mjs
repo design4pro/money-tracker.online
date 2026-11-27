@@ -167,6 +167,7 @@ async function provider(req) {
       if (method === "PATCH") calls.closed.push(path);
       const number = Number(path.split("/").at(-1));
       const status = issueErrors.get(number);
+      if (status === 301) return new Response(null, {status, headers: {Location: "https://api.github.com/repos/elsewhere/project/issues/222"}});
       if (status) return new Response(null, {status});
       return json(currentIssues.get(number) ?? issue(number));
     }
@@ -754,8 +755,11 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
     {changes: wrongAuthor, releaseReason: "release-issue-identity"},
     {releaseReason: "release-issue-missing", issueStatus: 404},
     {releaseReason: "release-issue-missing", issueStatus: 410},
+    {releaseReason: "release-issue-missing", issueStatus: 301},
     {beforePlan: true, issueStatus: 404},
+    {beforePlan: true, issueStatus: 301},
     {issueStatus: 410},
+    {issueStatus: 301},
     {commentStatus: 404},
     {commentStatus: 410},
     {queuedImplementation: true, commentStatus: 404},
