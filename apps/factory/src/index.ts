@@ -287,7 +287,7 @@ export class Factory extends DurableObject<Env> {
     const parsed = result && !("interruptedIdleAt" in result) ? result : undefined;
     if (!reservation && finish && interrupted === undefined) {
       if (ticket.staging && parsed && parsed.stage === stage && parsed.issue === ticket.issue &&
-          parsed.status !== "blocked") {
+          parsed.status !== "blocked" && parsed.status !== "implemented") {
         const matches = await verify();
         if (this.finish(id, schedule)?.at !== finish.at) return "recovery-pending" as const;
         if (!matches) return;
@@ -300,8 +300,11 @@ export class Factory extends DurableObject<Env> {
       const expired = Date.now() >= reservation.reservedAt + CREDENTIAL_WAIT;
       if (parsed.status !== "blocked") {
         try {
-          if (!await verify()) reason = "credential-recovery-evidence-changed-operator";
-          else if (parsed.status === "implemented" && !await this.recoveryPR(github, ticket, session, parsed.pr)) {
+          // Keep a linked staging PR even if the issue changes after work started.
+          // The merge gate checks current evidence before it can merge the PR.
+          const stagedPR = ticket.staging && parsed.status === "implemented";
+          if (!stagedPR && !await verify()) reason = "credential-recovery-evidence-changed-operator";
+          else if (parsed.status === "implemented" && !await this.matchesImplementationPR(github, ticket, session, parsed.pr)) {
             reason = expired ? "credential-recovery-pr-link-operator" : "credential-recovery-awaiting-pr-link";
           } else if ((parsed.stage === "triage" || parsed.stage === "plan") &&
               !await this.checkComment(github, ticket.issue, parsed.stage, parsed.comment)) {
@@ -526,7 +529,7 @@ export class Factory extends DurableObject<Env> {
       linked(pr.body, ticket.issue, String(session.id));
   }
 
-  private async recoveryPR(github: Github, ticket: Ticket, session: Json, number: number): Promise<boolean> {
+  private async matchesImplementationPR(github: Github, ticket: Ticket, session: Json, number: number): Promise<boolean> {
     if (!this.sessionHasPR(session, number)) return false;
     const pr = await this.readEvidence(github, `/pulls/${number}`);
     if (!pr || pr.number !== number || pr.state !== "open" && pr.merged !== true) return false;
@@ -772,7 +775,7 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (result.status === "blocked") {
-          if (stage === "implement" && ticket.maintainer && result.reason === "pre-work-evidence-changed" &&
+          if (stage === "implement" && bound && result.reason === "pre-work-evidence-changed" &&
               !session.pull_request && (session.pull_requests === undefined ||
                 Array.isArray(session.pull_requests) && session.pull_requests.length === 0) &&
               !await this.matchesDispatchEvidence(github, ticket, stage)) {
@@ -787,7 +790,11 @@ export class Factory extends DurableObject<Env> {
           this.ticket(ticket, {phase: "planned", planComment: result.comment, due: Date.now()});
         } else {
           if (result.status !== "implemented") return this.block(ticket, "implementation-pr-missing");
-          if (!this.sessionHasPR(session, result.pr)) {
+          if (ticket.staging && !ticket.credentialRecovery) {
+            const linkedPR = await this.matchesImplementationPR(github, ticket, session, result.pr);
+            if (this.finish(String(session.id), dispatch.schedule)?.at !== finish?.at) return "recovery-pending" as const;
+            if (!linkedPR) return this.ticket(ticket, {});
+          } else if (!this.sessionHasPR(session, result.pr)) {
             return this.ticket(ticket, {});
           }
           this.ticket(ticket, {phase: "pr", pr: result.pr, due: Date.now()});

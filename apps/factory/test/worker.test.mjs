@@ -1088,10 +1088,19 @@ test("staging intake rejects conflicting classifications, unbound evidence and i
   }
 });
 
-test("native staging UI intake keeps its signed snapshot through implementation recovery and exact staging closure",
+test("staging retains an independently linked PR after a late issue edit and closes after exact staging smoke",
+  () => stagingRelease("skipped", undefined, true));
+
+test("staging retains an independently linked PR from credential recovery after a late issue edit",
   () => stagingRelease("skipped", "restart", true));
 
-async function stagingRelease(productionConclusion, recovery, staging = false) {
+test("staging pre-work evidence blocks release the slot only with no linked PR and an independently verified mismatch", async () => {
+  for (const scenario of [{changed: true}, {changed: true, linked: true}, {changed: false}]) {
+    await stagingRelease("skipped", undefined, true, scenario);
+  }
+});
+
+async function stagingRelease(productionConclusion, recovery, staging = false, preWork) {
   const number = 41;
   const author = staging ? discovery : {type: "User", id: 81, login: "maintainer"};
   const openedIssue = staging ? stagingIssue(number) : {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
@@ -1105,7 +1114,7 @@ async function stagingRelease(productionConclusion, recovery, staging = false) {
   const initialProduction = productionLookups;
   const find = async () => (await status()).tickets.find(ticket => ticket.issue === number);
   const configure = changes => mf.setOptions({...workerOptions, bindings: {...bindings, MERGE_ENABLED: "true", ...changes}});
-  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native};
+  const saved = {mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR};
   const previousRuns = runs.sch_Triage;
   try {
     currentIssues.set(number, openedIssue);
@@ -1143,6 +1152,23 @@ async function stagingRelease(productionConclusion, recovery, staging = false) {
     await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 411});
     const id = "ses_Implement";
     const result = {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23};
+    if (preWork) {
+      for (let step = 0; step < 8 && calls.implement === initial.implement; step++) await tick();
+      assert.equal(calls.implement, initial.implement + 1);
+      implementationHasPR = !!preWork.linked;
+      if (preWork.changed) currentIssues.set(number, {...openedIssue, title: "Changed before work"});
+      await finish("sch_Implement", id, {v: 1, stage: "implement", status: "blocked", issue: number,
+        reason: "pre-work-evidence-changed"});
+      await tick();
+      const released = preWork.changed && !preWork.linked;
+      assert.equal((await find()).reason, released ? "implementation-pre-work-evidence-changed" : "implement-result");
+      assert.deepEqual((await status()).slot, released ? [] : [{issue: number}]);
+      return;
+    }
+    if (staging && !recovery) {
+      for (let step = 0; step < 8 && calls.implement === initial.implement; step++) await tick();
+      assert.equal(calls.implement, initial.implement + 1);
+    }
     if (recovery) {
       const before = continuations.length;
       sessionState.set(id, ownedSession("paused", credentialPause));
@@ -1253,6 +1279,15 @@ async function stagingRelease(productionConclusion, recovery, staging = false) {
     } else {
       await finish("sch_Implement", id, result);
     }
+    if (staging) {
+      currentIssues.set(number, {...openedIssue, title: "Changed after implementation started"});
+      if (!recovery) {
+        linkedIssue = number + 1;
+        await tick();
+        assert.equal((await find()).phase, "implement");
+        linkedIssue = number;
+      }
+    }
     for (let step = 0; step < 8 && (await find())?.phase !== "pr"; step++) await tick();
     assert.equal((await find())?.phase, "pr", JSON.stringify(await status()));
     assert.equal((await find()).pr, 23);
@@ -1267,6 +1302,12 @@ async function stagingRelease(productionConclusion, recovery, staging = false) {
           deployed_sha: head, author_id: discovery.id, actor: discovery.login, issue_snapshot_sha256: snapshot,
           [field]: comment, ticket_bot_id: "33"});
       }
+      await configure({});
+      await tick();
+      assert.equal(calls.gates.at(-1).conclusion, "failure");
+      assert.equal(calls.merges.length, initial.merges);
+      assert.deepEqual((await status()).slot, [{issue: number}]);
+      currentIssues.set(number, openedIssue);
     }
 
     for (const changes of [{FCTL_REVIEW_TOKEN: ""}, {FCTL_REVIEW_TOKEN: env.FCTL_TOKEN},
@@ -1349,7 +1390,7 @@ async function stagingRelease(productionConclusion, recovery, staging = false) {
     assert.equal(productionLookups, initialProduction);
     if (staging) assert.deepEqual(await (await call("/health/staging-ui")).json(), {idle: true, sourceSha: head});
   } finally {
-    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native} = saved);
+    ({mainHead, linkedIssue, implemented, revision, conclusion, candidateBase, native, implementationHasPR} = saved);
     runs.sch_Triage = previousRuns;
     transcripts.delete(`ses_TriageStaging${number}`);
     splitReview = stagingProof = approvedHead = undefined;
