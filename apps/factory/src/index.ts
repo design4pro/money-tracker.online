@@ -1,5 +1,5 @@
 import {DurableObject} from "cloudflare:workers";
-import {fctlRepo, identifier, integer, list, nativeRun, record, sha} from "./contracts";
+import {fctlRepo, identifier, integer, list, nativeRun, record, sha, trustedHuman} from "./contracts";
 import type {Env, Result} from "./contracts";
 import {advanceDispatch} from "./dispatch";
 import type {Dispatch} from "./dispatch";
@@ -315,7 +315,9 @@ export class Factory extends DurableObject<Env> {
 
   private async matchesMaintainer(ticket: Ticket, issue: Record<string, unknown>): Promise<boolean> {
     const maintainer = ticket.maintainer;
-    return !!maintainer && maintainerIdentity(issue, this.env, ticket.issue, ticket.actor, maintainer.id) &&
+    const author = record(issue.user);
+    return !!maintainer && maintainerIdentity(issue, this.env, ticket.issue, maintainer.id) &&
+      trustedHuman(author, this.env.HUMAN_REVIEWER_IDS) && author.login === ticket.actor &&
       await featureSnapshot(issue) === maintainer.snapshot;
   }
 
@@ -470,10 +472,16 @@ export class Factory extends DurableObject<Env> {
         return;
       }
       const issue = record(await github.api(`/issues/${ticket.issue}`));
-      const issueMatches = ticket.maintainer
-        ? maintainerIdentity(issue, this.env, ticket.issue, ticket.actor, ticket.maintainer.id)
-        : issue.number === ticket.issue && !issue.pull_request && String(record(issue.user).id) === this.env.GITHUB_DISCOVERY_BOT_ID;
-      if (!issueMatches) {
+      if (ticket.maintainer) {
+        // Release verifies the recorded author, while intake and dispatch consult the current allowlist.
+        const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined};
+        if (!maintainerIdentity(issue, this.env, ticket.issue, ticket.maintainer.id)) {
+          return this.block(release, "release-issue-identity", true);
+        }
+        if (issue.state !== "closed" && await featureSnapshot(issue) !== ticket.maintainer.snapshot) {
+          return this.block(release, "release-issue-evidence-changed", true);
+        }
+      } else if (issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
         return this.block(ticket, "release-issue-identity");
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});

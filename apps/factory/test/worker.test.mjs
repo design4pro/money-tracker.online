@@ -638,6 +638,10 @@ test("signed maintainer intake plans and dispatches without production evidence"
     assert.deepEqual(implementation, {v: 1, ...context, plan_comment: 311});
     assert.equal(productionLookups, lookups);
 
+    // The original author remains the release identity after allowlist rotation and a login change.
+    await mf.setOptions({...workerOptions, bindings: {...env, HUMAN_REVIEWER_IDS: "82", MERGE_ENABLED: "false"}});
+    currentIssues.set(number, {...currentIssues.get(number), user: {...author, login: "renamed-maintainer"}});
+
     const parityIssue = 32;
     assert.equal((await github(opened(parityIssue))).status, 202);
     addComment(320, parityIssue, "triage");
@@ -670,18 +674,25 @@ test("signed maintainer intake plans and dispatches without production evidence"
   }
 });
 
-test("maintainer issue edits or identity changes block a queued implementation", async () => {
+test("maintainer issue edits or identity changes block dispatch or release", async () => {
   const user = {type: "User", id: 81, login: "maintainer"};
   const old = mf;
-  const initial = calls.implement;
+  const changedBody = {body: "Changed acceptance criteria"};
+  const removedClassification = {labels: [{name: "status: in progress"}]};
+  const wrongAuthor = {user: {...user, id: 82}};
+  const cases = [
+    {changes: {title: "Changed title"}},
+    {changes: changedBody},
+    {changes: removedClassification},
+    {changes: wrongAuthor},
+    {changes: {state: "closed"}},
+    {changes: changedBody, releaseReason: "release-issue-evidence-changed"},
+    {changes: removedClassification, releaseReason: "release-issue-evidence-changed"},
+    {changes: wrongAuthor, releaseReason: "release-issue-identity"},
+  ];
   try {
-    for (const [index, changes] of [
-      {title: "Changed title"},
-      {body: "Changed acceptance criteria"},
-      {labels: [{name: "status: in progress"}]},
-      {user: {...user, id: 82}},
-      {state: "closed"},
-    ].entries()) {
+    for (const [index, {changes, releaseReason}] of cases.entries()) {
+      const initial = {implement: calls.implement, closed: calls.closed.length};
       const number = 40 + index;
       const current = {number, user, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
         title: "Pilot feature", body: null, labels: [{name: "type: feature"}]};
@@ -703,18 +714,33 @@ test("maintainer issue edits or identity changes block a queued implementation",
         await tick();
         await tick();
         assert.equal((await status()).tickets[0].phase, "implement");
+        if (releaseReason) {
+          await tick();
+          assert.equal(calls.implement, initial.implement + 1);
+          linkedIssue = number;
+          implemented = true;
+          mainHead = merge;
+          manualProof = true;
+          await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "implemented", issue: number, pr: 23});
+          await tick();
+          assert.equal((await status()).tickets[0].phase, "pr");
+        }
         currentIssues.set(number, {...current, ...changes});
-        await tick();
+        for (let step = 0; step < 4; step++) await tick();
         const state = await status();
-        assert.equal(state.tickets[0].reason, "issue-evidence-changed");
+        assert.equal(state.tickets[0].reason, releaseReason ?? "issue-evidence-changed");
         assert.equal(state.tickets[0].phase, "blocked");
         assert.deepEqual(state.slot, []);
-        assert.equal(calls.implement, initial);
+        assert.equal(calls.closed.length, initial.closed);
+        assert.equal(calls.implement, initial.implement + Number(!!releaseReason));
+        if (releaseReason) assert.equal(state.tickets[0].merge, merge);
       } finally {
         await mf.dispose();
       }
     }
   } finally {
     mf = old;
+    manualProof = false;
+    linkedIssue = 1;
   }
 });

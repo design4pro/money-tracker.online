@@ -112,7 +112,7 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
     if (!integer(issue.number) || issue.pull_request) return rejected(403);
     if (trustedHuman(author, env.HUMAN_REVIEWER_IDS) && sender.type === "User" &&
         sender.id === author.id && sender.login === author.login &&
-        maintainerIdentity(issue, env, issue.number, author.login, author.id)) {
+        maintainerIdentity(issue, env, issue.number, author.id)) {
       const snapshot = await featureSnapshot(issue);
       if (snapshot) return {id, event: {kind: "issue", issue: issue.number, actor: author.login,
         maintainer: {id: author.id, snapshot}}};

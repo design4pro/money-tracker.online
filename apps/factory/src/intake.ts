@@ -1,14 +1,14 @@
-import {record, trustedHuman} from "./contracts";
+import {record} from "./contracts";
 import type {Env, Json} from "./contracts";
 import {bytes, digest} from "./signatures";
 
 export type MaintainerIntake = {id: number; snapshot: string};
 
-export function maintainerIdentity(issue: Json, env: Env, number: number, actor: string, id: number): boolean {
+export function maintainerIdentity(issue: Json, env: Env, number: number, id: number): boolean {
   const author = record(issue.user);
   return issue.number === number && !issue.pull_request &&
     issue.repository_url === `https://api.github.com/repos/${env.REPO}` &&
-    trustedHuman(author, env.HUMAN_REVIEWER_IDS) && author.id === id && author.login === actor;
+    author.type === "User" && author.id === id;
 }
 
 export async function featureSnapshot(issue: Json): Promise<string | undefined> {
