@@ -13,6 +13,7 @@ export function LedgerPanel() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [entry, setEntry] = useState<Entry>()
+  const [search, setSearch] = useState("")
   const pending = useRef(new Map<string, string>())
 
   useEffect(() => {
@@ -91,6 +92,11 @@ export function LedgerPanel() {
   const categories = new Map(
     ledger.categories.map((category) => [category.id, category.name])
   )
+  const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const transactions = ledger.transactions.filter(({ description }) => {
+    const text = description.toLowerCase()
+    return terms.every((term) => text.includes(term))
+  })
 
   return (
     <>
@@ -244,15 +250,28 @@ export function LedgerPanel() {
               <Plus aria-hidden="true" /> Add transaction
             </Button>
           </div>
+          <label className="mt-4">
+            Search transaction descriptions
+            <input
+              type="search"
+              className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
           {ledger.transactions.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">
               {accounts.size
                 ? "No transactions yet."
                 : "Add an account before recording a transaction."}
             </p>
+          ) : transactions.length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground" role="status">
+              No transactions match your search.
+            </p>
           ) : (
             <ul className="mt-4 divide-y">
-              {ledger.transactions.map((transaction) => (
+              {transactions.map((transaction) => (
                 <li
                   className="flex flex-wrap items-center gap-3 py-3"
                   key={transaction.id}
