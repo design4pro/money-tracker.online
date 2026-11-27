@@ -287,7 +287,8 @@ export class Factory extends DurableObject<Env> {
 
   private async checkComment(github: Github, issue: number, result: Result): Promise<boolean> {
     if (!("comment" in result)) return false;
-    const comment = record(await github.api(`/issues/comments/${result.comment}`));
+    const comment = await this.readEvidence(github, `/issues/comments/${result.comment}`);
+    if (!comment) return false;
     const author = record(comment.user);
     return comment.id === result.comment && author.type === "Bot" && String(author.id) === this.env.GITHUB_TRIAGE_BOT_ID &&
       comment.issue_url === `https://api.github.com/repos/${this.env.REPO}/issues/${issue}` &&
@@ -313,15 +314,20 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
-  private async readIssue(github: Github, ticket: Ticket): Promise<Json | undefined> {
+  private async readEvidence(github: Github, path: string): Promise<Json | undefined> {
     // Authentication failures must still retry, even if the token endpoint returns 404.
     await github.appToken();
     try {
-      return record(await github.api(`/issues/${ticket.issue}`));
+      return record(await github.api(path));
     } catch (error) {
-      if (ticket.maintainer && error instanceof ProviderError && [404, 410].includes(error.status)) return;
+      if (error instanceof ProviderError && [404, 410].includes(error.status)) return;
       throw error;
     }
+  }
+
+  private async readIssue(github: Github, ticket: Ticket): Promise<Json | undefined> {
+    const path = `/issues/${ticket.issue}`;
+    return ticket.maintainer ? this.readEvidence(github, path) : record(await github.api(path));
   }
 
   private async matchesMaintainer(ticket: Ticket, issue?: Json): Promise<boolean> {
