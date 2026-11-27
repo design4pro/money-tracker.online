@@ -788,24 +788,24 @@ export class Factory extends DurableObject<Env> {
             if (ticket.credentialRecovery && this.recoveryFinish(String(session.id), dispatch.schedule, true)?.at !== selectedAt) {
               return this.recoveryWait(ticket);
             }
-            const noPR = (value: Json) => !value.pull_request &&
-              (value.pull_requests === undefined || Array.isArray(value.pull_requests) && value.pull_requests.length === 0);
-            if (noPR(session)) {
-              const mismatch = !await this.matchesDispatchEvidence(github, ticket, stage);
-              if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
-              if (mismatch) {
-                const latest = await fctl.session(dispatch.session, dispatch.schedule);
-                if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
-                const watermark = selected?.completedTurns ?? selected?.turns;
-                const stats = record(latest.stats);
-                if (latest.id !== dispatch.session || latest.agent_kind !== "codex" ||
-                    latest.github_access !== dispatch.access || !noPR(latest) || latest.status !== "idle" ||
-                    !integer(watermark) || stats.turns !== watermark || stats.turn_started_at !== undefined ||
-                    (latest.messaged_at !== undefined && (typeof latest.messaged_at !== "number" ||
-                      selectedAt === undefined || latest.messaged_at > selectedAt))) return this.ticket(ticket, {});
-                return this.block(ticket, "implementation-pre-work-evidence-changed", true);
-              }
-            }
+            const watermark = selected?.completedTurns ?? selected?.turns;
+            const atSignedIdleTurn = (value: Json) => {
+              const stats = record(value.stats);
+              return !value.pull_request &&
+                (value.pull_requests === undefined || Array.isArray(value.pull_requests) && value.pull_requests.length === 0) &&
+                value.status === "idle" && integer(watermark) && stats.turns === watermark &&
+                stats.turn_started_at === undefined && (value.messaged_at === undefined ||
+                  typeof value.messaged_at === "number" && selectedAt !== undefined && value.messaged_at <= selectedAt);
+            };
+            // A follow-up can publish a PR before its signed finish arrives.
+            if (!atSignedIdleTurn(session)) return this.ticket(ticket, {});
+            const mismatch = !await this.matchesDispatchEvidence(github, ticket, stage);
+            if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
+            const latest = await fctl.session(dispatch.session, dispatch.schedule);
+            if (selectedFinish()?.at !== selectedAt) return "recovery-pending" as const;
+            if (latest.id !== dispatch.session || latest.agent_kind !== "codex" ||
+                latest.github_access !== dispatch.access || !atSignedIdleTurn(latest)) return this.ticket(ticket, {});
+            if (mismatch) return this.block(ticket, "implementation-pre-work-evidence-changed", true);
           }
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }

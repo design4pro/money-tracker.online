@@ -1097,7 +1097,7 @@ test("staging retains an independently linked PR from credential recovery after 
   () => stagingRelease("skipped", "restart", true));
 
 test("staging pre-work evidence blocks release the slot only with no linked PR and an independently verified mismatch", async () => {
-  for (const scenario of [{changed: true}, {changed: true, linked: true}, {changed: false}]) {
+  for (const scenario of [{changed: true}, {changed: false}]) {
     await stagingRelease("skipped", undefined, true, scenario);
   }
 });
@@ -1117,6 +1117,12 @@ test("staging retains its slot when the refreshed session cannot corroborate the
     {...ownedSession("idle", undefined, 1), status: undefined},
   ]) {
     await stagingRelease("skipped", undefined, true, {changed: true, nextSession});
+  }
+});
+
+test("staging waits for a signed implementation finish when the PR is already visible", async () => {
+  for (const recovery of [false, true]) {
+    await stagingRelease("skipped", undefined, true, {changed: true, linked: true, recovery});
   }
 });
 
@@ -1225,9 +1231,14 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
         }
         return;
       }
-      if (preWork.nextSession) {
-        assert.equal((await find()).phase, "implement");
+      if (preWork.nextSession || preWork.linked) {
+        await configure({});
+        await tick();
+        const waiting = await find();
+        assert.equal(waiting.phase, "implement");
+        assert.equal(waiting.pr, undefined);
         assert.deepEqual((await status()).slot, [{issue: number}]);
+        assert.equal(calls.merges.length, initial.merges);
         implementationHasPR = true;
         sessionState.set(id, ownedSession("idle", undefined, 2));
         await finish("sch_Implement", id, result, 0, false, {at: at + 8000, turns: 2});
@@ -1236,7 +1247,7 @@ async function stagingRelease(productionConclusion, recovery, staging = false, p
         assert.equal((await find()).pr, 23);
         return;
       }
-      const released = preWork.changed && !preWork.linked;
+      const released = preWork.changed;
       assert.equal((await find()).reason, released ? "implementation-pre-work-evidence-changed" : "implement-result");
       assert.deepEqual((await status()).slot, released ? [] : [{issue: number}]);
       return;
@@ -1792,8 +1803,8 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         const ticket = state.tickets.find(ticket => ticket.issue === number);
         const expectedReason = blockedReason ? (freesSlot ? "implementation-pre-work-evidence-changed" : "implement-result") :
           releaseReason ?? (commentStatus && !beforePlan && !queuedImplementation ? "plan-comment" : "issue-evidence-changed");
-        assert.equal(ticket.reason, expectedReason);
-        assert.equal(ticket.phase, "blocked");
+        assert.equal(ticket.reason, recordedPR ? undefined : expectedReason);
+        assert.equal(ticket.phase, recordedPR ? "implement" : "blocked");
         assert.deepEqual(state.slot, blockedReason && !freesSlot ? [{issue: number}] : []);
         assert.equal(calls.closed.length, initial.closed);
         assert.equal(calls.plan, initial.plan + Number(!beforePlan));
