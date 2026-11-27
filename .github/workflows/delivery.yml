@@ -140,7 +140,9 @@ jobs:
 
   deploy-production:
     name: deploy-production
-    if: github.ref == 'refs/heads/main' && github.ref_protected
+    if: >-
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      vars.PRODUCTION_DELIVERY_ENABLED == 'true'
     needs: deploy-staging
     environment: production
     runs-on: ubuntu-24.04
