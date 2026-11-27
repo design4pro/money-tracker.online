@@ -43,6 +43,7 @@ let linkedIssue = 1;
 let native = false;
 let ambiguousMaintainerPlan = false;
 let implemented = false;
+let implementationHasPR = true;
 let changedHead = false;
 let readPr = 0;
 let revision = head;
@@ -113,8 +114,9 @@ async function provider(req) {
         return json({runs: id === "sch_Triage" && !native ? [] : runs[id]});
       }
       assert.notEqual(id, "sch_Triage", "native parity triage must never be token-dispatched");
-      const sessionId = id === "sch_Maintainer" ? `ses_Maintainer${JSON.parse(body.context).issue}` :
-        {sch_Plan: "ses_Plan", sch_Implement: "ses_Implement", sch_Ops: "ses_Ops"}[id];
+      const context = JSON.parse(body.context);
+      const sessionId = id === "sch_Maintainer" ? `ses_Maintainer${context.issue}` :
+        {sch_Plan: context.issue > 100 ? "ses_PlanNext" : "ses_Plan", sch_Implement: "ses_Implement", sch_Ops: "ses_Ops"}[id];
       const run = {id: `srn_${sessionId.slice(4)}`, schedule_id: id, outcome: "started", trigger: "token",
         by: {id: env.FCTL_ACCOUNT_ID}, session: {id: sessionId}, at: Date.now()};
       runs[id].unshift(run);
@@ -125,7 +127,7 @@ async function provider(req) {
       }
       if (id === "sch_Plan") {
         calls.plan++;
-        if (ambiguousMaintainerPlan || JSON.parse(body.context).provenance !== "maintainer") {
+        if (ambiguousMaintainerPlan || context.provenance !== "maintainer") {
           return new Response(null, {status: 502});
         }
       }
@@ -142,8 +144,13 @@ async function provider(req) {
       }}]});
       if (id.startsWith("ses_Maintainer")) return json(session(id, "sch_Maintainer", "triage"));
       if (id.startsWith("ses_Triage")) return json(session(id, "sch_Triage", "triage"));
-      if (id === "ses_Plan") return json(session(id, "sch_Plan", "triage"));
-      if (id === "ses_Implement") return json(session(id, "sch_Implement", "push"));
+      if (id === "ses_Plan" || id === "ses_PlanNext") return json(session(id, "sch_Plan", "triage"));
+      if (id === "ses_Implement") {
+        const implementation = session(id, "sch_Implement", "push");
+        // fctl 0.39 omits pull_requests when the session has none.
+        if (!implementationHasPR) delete implementation.pull_requests;
+        return json(implementation);
+      }
     }
     if (noun === "projects" && part === "reviews") return json({reviews: [{repo: ref, number: 23, head_sha: revision,
       state: "passed", findings: 0, still_open: 0, session_id: "ses_Review", opened_by: {id: "ses_Implement"}}]});
@@ -756,9 +763,15 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
     {beforePlan: true, commentStatus: 404},
     {beforePlan: true, invalidComment: true},
     {queuedImplementation: true, invalidComment: true},
+    {changes: changedBody, blockedReason: "pre-work-evidence-changed", freesSlot: true},
+    {changes: changedBody, blockedReason: "pre-work-evidence-changed", recordedPR: true},
+    {blockedReason: "pre-work-evidence-changed"},
+    {changes: changedBody, blockedReason: "generic"},
   ];
   try {
-    for (const [index, {changes, releaseReason, issueStatus, beforePlan, commentStatus, queuedImplementation, invalidComment}] of cases.entries()) {
+    for (const [index, scenario] of cases.entries()) {
+      const {changes, releaseReason, issueStatus, beforePlan, commentStatus, queuedImplementation, invalidComment,
+        blockedReason, freesSlot, recordedPR} = scenario;
       const initial = {plan: calls.plan, implement: calls.implement, closed: calls.closed.length};
       const number = 40 + index;
       const commentId = beforePlan ? 400 : 401;
@@ -796,7 +809,37 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
           await tick();
           assert.equal((await status()).tickets[0].phase, "pr");
         }
+        const nextNumber = number + 100;
+        if (blockedReason) {
+          await tick();
+          assert.equal(calls.implement, initial.implement + 1);
+          implementationHasPR = !!recordedPR;
+          if (freesSlot) {
+            const next = {...current, number: nextNumber};
+            currentIssues.set(nextNumber, next);
+            issueComments.set(402, {id: 402, user: discovery, issue_url: `https://api.github.com/repos/${repo}/issues/${nextNumber}`,
+              body: "<!-- factory:triage v1 -->"});
+            await github({action: "opened", issue: next, sender: user});
+            await finish("sch_Maintainer", `ses_Maintainer${nextNumber}`, {v: 1, stage: "triage", status: "ready", issue: nextNumber, comment: 402});
+            await tick();
+            const waiting = await status();
+            assert.equal(waiting.tickets.find(ticket => ticket.issue === nextNumber).phase, "ready");
+            assert.deepEqual(waiting.slot, [{issue: number}]);
+          }
+        }
         currentIssues.set(number, {...current, ...changes});
+        if (blockedReason) {
+          await finish("sch_Implement", "ses_Implement", {v: 1, stage: "implement", status: "blocked", issue: number,
+            reason: blockedReason === "generic" ? undefined : blockedReason});
+        }
+        if (freesSlot) {
+          issueErrors.set(number, 503);
+          await tick();
+          const retry = await status();
+          assert.equal(retry.tickets.find(ticket => ticket.issue === number).phase, "implement");
+          assert.deepEqual(retry.slot, [{issue: number}]);
+          issueErrors.delete(number);
+        }
         if (commentStatus) {
           commentErrors.set(commentId, 503);
           await tick();
@@ -817,16 +860,29 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
           assert.equal(calls.closed.length, initial.closed);
           issueErrors.set(number, issueStatus);
         }
-        for (let step = 0; step < 4; step++) await tick();
+        await tick();
+        if (releaseReason) for (let step = 0; step < 3; step++) await tick();
         const state = await status();
-        assert.equal(state.tickets[0].reason, releaseReason ?? (commentStatus && !beforePlan && !queuedImplementation ? "plan-comment" : "issue-evidence-changed"));
-        assert.equal(state.tickets[0].phase, "blocked");
-        assert.deepEqual(state.slot, []);
+        const ticket = state.tickets.find(ticket => ticket.issue === number);
+        const expectedReason = blockedReason ? (freesSlot ? "implementation-pre-work-evidence-changed" : "implement-result") :
+          releaseReason ?? (commentStatus && !beforePlan && !queuedImplementation ? "plan-comment" : "issue-evidence-changed");
+        assert.equal(ticket.reason, expectedReason);
+        assert.equal(ticket.phase, "blocked");
+        assert.deepEqual(state.slot, blockedReason && !freesSlot ? [{issue: number}] : []);
         assert.equal(calls.closed.length, initial.closed);
         assert.equal(calls.plan, initial.plan + Number(!beforePlan));
-        assert.equal(calls.implement, initial.implement + Number(!!releaseReason));
-        if (releaseReason) assert.equal(state.tickets[0].merge, merge);
+        assert.equal(calls.implement, initial.implement + Number(!!(releaseReason || blockedReason)));
+        if (releaseReason) assert.equal(ticket.merge, merge);
+        if (freesSlot) {
+          await tick();
+          await tick();
+          assert.deepEqual((await status()).slot, [{issue: nextNumber}]);
+          assert.equal(calls.plan, initial.plan + 2);
+          assert.equal(JSON.parse(contexts.get("ses_PlanNext")).issue, nextNumber);
+        }
       } finally {
+        implementationHasPR = true;
+        issueErrors.delete(number);
         commentErrors.delete(commentId);
         await mf.dispose();
       }

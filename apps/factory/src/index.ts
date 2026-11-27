@@ -339,6 +339,12 @@ export class Factory extends DurableObject<Env> {
       await featureSnapshot(issue) === maintainer.snapshot;
   }
 
+  private async matchesDispatchEvidence(github: Github, ticket: Ticket, stage: "plan" | "implement"): Promise<boolean> {
+    return await this.checkComment(github, ticket.issue,
+      stage === "plan" ? "triage" : "plan", stage === "plan" ? ticket.triageComment : ticket.planComment) &&
+      await this.matchesMaintainer(ticket, await this.readIssue(github, ticket));
+  }
+
   private async triage(ticket: Ticket, fctl: Fctl, github: Github) {
     const {env} = this;
     const {maintainer} = ticket;
@@ -434,9 +440,7 @@ export class Factory extends DurableObject<Env> {
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
         const dispatch = await this.dispatch(fctl, current, ticket.maintainer
-          ? async () => await this.checkComment(github, issue,
-            stage === "plan" ? "triage" : "plan", stage === "plan" ? ticket.triageComment : ticket.planComment) &&
-            await this.matchesMaintainer(ticket, await this.readIssue(github, ticket))
+          ? () => this.matchesDispatchEvidence(github, ticket, stage)
           : undefined);
         if (dispatch.state === "blocked") {
           return this.block(ticket, dispatch.reason ?? "dispatch-blocked",
@@ -450,7 +454,16 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, "dispatch-session-identity", stage === "plan");
         }
         const result = finish.result;
-        if (finish.at < Number(session.created_at) || result?.stage !== stage || result.issue !== issue || result.status === "blocked") {
+        if (finish.at < Number(session.created_at) || result?.stage !== stage || result.issue !== issue) {
+          return this.block(ticket, `${stage}-result`, stage === "plan");
+        }
+        if (result.status === "blocked") {
+          if (stage === "implement" && ticket.maintainer && result.reason === "pre-work-evidence-changed" &&
+              !session.pull_request && (session.pull_requests === undefined ||
+                Array.isArray(session.pull_requests) && session.pull_requests.length === 0) &&
+              !await this.matchesDispatchEvidence(github, ticket, stage)) {
+            return this.block(ticket, "implementation-pre-work-evidence-changed", true);
+          }
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (stage === "plan") {

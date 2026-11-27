@@ -55,7 +55,7 @@ export function fctlRepo(value: unknown): string {
 
 export type Stage = "triage" | "plan" | "implement";
 export type Result =
-  | {v: 1; stage: Stage; status: "blocked"; issue: number}
+  | {v: 1; stage: Stage; status: "blocked"; issue: number; reason?: "pre-work-evidence-changed"}
   | {v: 1; stage: "triage"; status: "ready"; issue: number; comment: number}
   | {v: 1; stage: "plan"; status: "planned"; issue: number; comment: number}
   | {v: 1; stage: "implement"; status: "implemented"; issue: number; pr: number};
@@ -77,7 +77,10 @@ export function parseResult(message: unknown): Result | undefined {
   }
   const {v, stage, status, issue, comment, pr} = data;
   if (v !== 1 || !integer(issue) || (stage !== "triage" && stage !== "plan" && stage !== "implement")) return;
-  if (status === "blocked") return {v, stage, status, issue};
+  if (status === "blocked") {
+    const reason = stage === "implement" && data.reason === "pre-work-evidence-changed" ? data.reason : undefined;
+    return {v, stage, status, issue, reason};
+  }
   if (stage === "triage" && status === "ready" && integer(comment)) return {v, stage, status, issue, comment};
   if (stage === "plan" && status === "planned" && integer(comment)) return {v, stage, status, issue, comment};
   if (stage === "implement" && status === "implemented" && integer(pr)) return {v, stage, status, issue, pr};
