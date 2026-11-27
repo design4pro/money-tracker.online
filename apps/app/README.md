@@ -19,6 +19,22 @@ Vite serves `http://localhost:3000` and defaults to local Workers bindings. Set 
 
 `GET /health` checks the migrated database read-only and returns `{"ok":true,"sourceSha":null}` locally. If the schema is unavailable it responds with HTTP 503 and `ok: false`. The deployed value of `sourceSha` is the Worker’s `SOURCE_SHA` variable.
 
+## Local spending chat
+
+The Agent-Native HTTP connector and typed read-only action run in the built TanStack Start Worker with `@agent-native/core` and `@agent-native/agentkit` pinned to `0.231.0`. The dashboard uses its existing ShadCN components to render the turn. Better Auth supplies the user ID, Polar supplies entitlement, and D1 supplies spending totals. The deterministic provider receives only UTC month bounds and exact minor-unit totals by currency. The query uses booking dates and treats negative ledger entries as spending.
+
+From `apps/app`, run the same built Worker against an ephemeral synthetic ledger:
+
+```sh
+npm ci
+npm run build
+npm run test:chat-proof
+npx playwright install chromium
+npm run test:chat-browser
+```
+
+The browser check uses localhost port 3000 and signs in with synthetic Better Auth sessions. The prototype is off by default. Its local-only opt-in is `LOCAL_CHAT_PROOF=1` with `APP_ORIGIN=http://localhost:3000` and `POLAR_ENVIRONMENT=sandbox`. Keep the flag out of staging and production. The fixture commands supply every required binding and use no external model, email or billing credentials.
+
 ## Runtime setup
 
 Use distinct staging and production Workers, D1 databases, queues and dead-letter queues. Names are in `wrangler.jsonc`. The D1 IDs beginning with `00000000-` and any `.example.invalid` domains are synthetic placeholders. The configured cron runs every five minutes. The consumer handles one message at a time with up to eight retries, then moves failures to the environment’s DLQ. Inspect and redrive failed messages after resolving the underlying failure. Staging uses Polar Sandbox and production uses Polar production.
