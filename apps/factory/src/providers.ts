@@ -1,5 +1,5 @@
 import {fctlRepo, identifier, integer, list, parseResult, record, sha} from "./contracts";
-import type {Env, Json, Result} from "./contracts";
+import type {DeliveryTarget, Env, Json, Result} from "./contracts";
 import {base64, bytes} from "./signatures";
 
 export class ProviderError extends Error {
@@ -288,10 +288,11 @@ export class Github {
     return {candidates, exhausted: response.check_runs.length < 100};
   }
 
-  async deliveryAttempt(run: number, attempt: number, head: string): Promise<boolean> {
+  async deliveryAttempt(run: number, attempt: number, head: string, target: DeliveryTarget): Promise<boolean> {
     const evidence = record(await this.api(`/actions/runs/${run}/attempts/${attempt}`));
     return evidence.id === run && evidence.run_attempt === attempt && evidence.head_sha === head &&
-      evidence.status === "completed" && evidence.conclusion === "success" && evidence.head_branch === "main" &&
+      evidence.status === "completed" && (target === "staging" || evidence.conclusion === "success") &&
+      evidence.head_branch === "main" &&
       ["workflow_run", "workflow_dispatch", "push"].includes(String(evidence.event)) &&
       evidence.path === ".github/workflows/delivery.yml" && String(record(evidence.repository).id) === this.env.REPO_ID &&
       String(record(evidence.head_repository).id) === this.env.REPO_ID;

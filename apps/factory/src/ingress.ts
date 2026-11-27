@@ -103,7 +103,8 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
   if (type === "workflow_run" && payload.action === "completed") {
     const run = record(payload.workflow_run);
     if (run.path === ".github/workflows/delivery.yml" && run.head_branch === "main" &&
-        run.conclusion === "success" && sha(run.head_sha)) {
+        (run.conclusion === "success" || env.DELIVERY_TARGET === "staging" && run.status === "completed") &&
+        sha(run.head_sha)) {
       return {id, event: {kind: "delivery", head: run.head_sha}};
     }
   }

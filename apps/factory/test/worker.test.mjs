@@ -57,6 +57,7 @@ let mainHead = base;
 let conclusion = "neutral";
 let smoke = "failure";
 let priorAttemptHead = merge;
+let priorAttemptConclusion = "success";
 let manualProof = false;
 let missingJobLookups = 0;
 let goneAttemptLookups = 0;
@@ -304,7 +305,7 @@ async function provider(req) {
     });
     if (path === "/actions/runs/5/attempts/2/jobs") return json({total_count: 2, jobs: [
       {...stagingJob, steps: [{name: "Deploy and verify staging", conclusion: "success"}], ...stagingProof.job},
-      {...stagingJob, id: 506, name: "deploy-production", conclusion: "skipped"},
+      {...stagingJob, id: 506, name: "deploy-production", conclusion: stagingProof.productionConclusion ?? "skipped"},
     ]});
     if (path.startsWith("/actions/jobs/")) {
       const id = Number(path.split("/").at(-1));
@@ -324,7 +325,7 @@ async function provider(req) {
         return new Response(null, {status: 410});
       }
       return json({id, run_attempt: 1, head_sha: id === 1 ? head : id === 2 ? priorAttemptHead : merge,
-        status: "completed", conclusion: "success", head_branch: "main", event: id === 1 ? "push" : id === 4 ? "workflow_dispatch" : "workflow_run",
+        status: "completed", conclusion: id === 2 ? priorAttemptConclusion : "success", head_branch: "main", event: id === 1 ? "push" : id === 4 ? "workflow_dispatch" : "workflow_run",
         path: id < 10 ? ".github/workflows/delivery.yml" : ".github/workflows/other.yml",
         repository: {id: 100}, head_repository: {id: 100}});
     }
@@ -495,6 +496,11 @@ test("signed pilot pipeline survives replays, out-of-order evidence and ambiguou
   assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "release");
   assert.deepEqual(calls.closed, []);
   priorAttemptHead = merge;
+  priorAttemptConclusion = "failure";
+  await tick();
+  assert.equal((await status()).tickets.find(ticket => ticket.issue === 1).phase, "release");
+  assert.deepEqual(calls.closed, []);
+  priorAttemptConclusion = "success";
   smoke = "failure";
   mainHead = descendant;
   await tick();
@@ -877,7 +883,13 @@ test("signed maintainer intake plans and dispatches without production evidence"
   }
 });
 
-test("existing staging ticket joins split native review to GitHub and closes only after exact staging smoke", async () => {
+test("existing staging ticket joins split review and closes after exact smoke with production skipped",
+  () => stagingRelease("skipped"));
+
+test("late staging proof wakes and closes a superseded ticket when production fails",
+  () => stagingRelease("failure"));
+
+async function stagingRelease(productionConclusion) {
   const number = 41;
   const author = {type: "User", id: 81, login: "maintainer"};
   const openedIssue = {number, user: author, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
@@ -962,19 +974,23 @@ test("existing staging ticket joins split native review to GitHub and closes onl
       assert.equal(calls.closed.length, initial.closed);
     }
 
-    const beforeProof = stagingLookups;
     mainHead = descendant;
     await tick();
     assert.equal((await find()).reason, "release-superseded-without-staging-smoke");
     assert.deepEqual((await status()).slot, []);
-    stagingProof = {};
+    await tick();
+    assert.equal((await find()).productionVerification, undefined, "late proof requires a new webhook wakeup");
+    const beforeProof = stagingLookups;
+    const deliveryConclusion = productionConclusion === "skipped" ? "success" : "failure";
+    stagingProof = {productionConclusion, attempt: {conclusion: deliveryConclusion}};
     const completion = {action: "completed", workflow_run: {
-      id: 5, run_attempt: 2, head_sha: merge, head_branch: "main", conclusion: "success", path: ".github/workflows/delivery.yml",
+      id: 5, run_attempt: 2, head_sha: merge, head_branch: "main", status: "completed",
+      conclusion: deliveryConclusion, path: ".github/workflows/delivery.yml",
     }};
     await github(completion, "staging-delivery", undefined, "workflow_run");
     await github(completion, "duplicate-staging-delivery", undefined, "workflow_run");
     await tick();
-    assert.equal(stagingLookups, beforeProof + 2);
+    assert.equal(stagingLookups, beforeProof + 1);
     assert.equal((await find()).phase, "closed");
     assert.equal((await find()).merge, merge);
     assert.deepEqual(calls.closed.slice(initial.closed), [`/issues/${number}`]);
@@ -990,7 +1006,7 @@ test("existing staging ticket joins split native review to GitHub and closes onl
     issueComments.delete(410);
     issueComments.delete(411);
   }
-});
+}
 
 test("only an omitted finish message can recover its own successful Codex turn", async () => {
   const old = mf;

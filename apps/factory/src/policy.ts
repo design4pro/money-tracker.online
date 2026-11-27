@@ -60,7 +60,7 @@ export async function deployment(github: Github, env: Env, search: DeploymentSea
           job.head_branch === "main" && job.status === "completed" && job.conclusion === "success" &&
           integer(attempt) && attempt <= 51) {
         budget--;
-        if (await github.deliveryAttempt(run, attempt, head)) {
+        if (await github.deliveryAttempt(run, attempt, head, target)) {
           budget--;
           if (deployed(await github.api(`/actions/runs/${run}/attempts/${attempt}/jobs?per_page=100`),
             head, deployName, id, run, attempt, smokeStep, smokeJob)) return true;
