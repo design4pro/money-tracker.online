@@ -16,7 +16,7 @@ export function matchingRun(run: Json, schedule: string, account: string): boole
 }
 
 export async function advanceDispatch(
-  fctl: Fctl, env: Env, dispatch: Dispatch, save: (value: Dispatch) => void,
+  fctl: Fctl, env: Env, dispatch: Dispatch, save: (value: Dispatch) => void, verify?: () => Promise<boolean>,
 ): Promise<Dispatch> {
   const now = Date.now();
   const ops = dispatch.access === "read";
@@ -63,6 +63,7 @@ export async function advanceDispatch(
     return update({state: "blocked", reason: "schedule-contract"});
   }
   if (schedule.enabled !== true) return update({due: now + 5 * 60_000, reason: "schedule-paused"});
+  if (verify && !await verify()) return update({state: "blocked", reason: "issue-evidence-changed"});
   dispatch = update({state: "posting", since: now, due: now + 30_000, attempts: dispatch.attempts + 1});
   try {
     const run = record(await fctl.api(`/schedules/${dispatch.schedule}/runs`, {context: dispatch.context}, ops));

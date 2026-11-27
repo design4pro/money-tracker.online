@@ -1,10 +1,12 @@
 import {DurableObject} from "cloudflare:workers";
-import {fctlRepo, identifier, integer, list, nativeRun, record, sha} from "./contracts";
-import type {Env, Result} from "./contracts";
+import {fctlRepo, identifier, integer, list, nativeRun, record, sha, trustedHuman} from "./contracts";
+import type {Env, Json} from "./contracts";
 import {advanceDispatch} from "./dispatch";
 import type {Dispatch} from "./dispatch";
 import {ingress} from "./ingress";
 import type {Ingress} from "./ingress";
+import {featureSnapshot, maintainerIdentity} from "./intake";
+import type {MaintainerIntake} from "./intake";
 import {deployment, gate, issueEvidence, linked} from "./policy";
 import type {DeploymentSearch} from "./policy";
 import {Fctl, Github, ProviderError} from "./providers";
@@ -19,6 +21,7 @@ const PENDING_PRODUCTION = "phase='blocked' AND json_extract(state,'$.reason')=?
 type Phase = "triage" | "ready" | "plan" | "planned" | "implement" | "pr" | "release" | "closed" | "blocked";
 type Ticket = {
   issue: number; actor: string; phase: Phase; created: number; due: number; failures: number;
+  maintainer?: MaintainerIntake; main?: string;
   feature?: string; deployed?: string; triageRun?: string; triageSession?: string;
   triageComment?: number; planComment?: number; plan?: string; implement?: string;
   pr?: number; head?: string; merge?: string; mergedAt?: number; reason?: string; productionVerification?: string; productionHistory?: DeploymentSearch;
@@ -73,7 +76,7 @@ export class Factory extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       if (!this.sql.exec("INSERT OR IGNORE INTO delivery VALUES (?, ?) RETURNING id", id, now).toArray().length) return;
       if (event.kind === "issue") {
-        const ticket: Ticket = {issue: event.issue, actor: event.actor, phase: "triage", due: now, created: now, failures: 0};
+        const ticket: Ticket = {issue: event.issue, actor: event.actor, maintainer: event.maintainer, phase: "triage", due: now, created: now, failures: 0};
         this.sql.exec("INSERT OR IGNORE INTO ticket VALUES (?, ?, ?, NULL, ?)", ticket.issue, ticket.phase, now, JSON.stringify(ticket));
         this.audit(String(ticket.issue), "issue-observed");
       } else if (event.kind === "finish") {
@@ -161,8 +164,8 @@ export class Factory extends DurableObject<Env> {
     });
   }
 
-  private async dispatch(fctl: Fctl, dispatch: Dispatch) {
-    const result = await advanceDispatch(fctl, this.env, dispatch, next => this.saveDispatch(next));
+  private async dispatch(fctl: Fctl, dispatch: Dispatch, verify?: () => Promise<boolean>) {
+    const result = await advanceDispatch(fctl, this.env, dispatch, next => this.saveDispatch(next), verify);
     if (result.state !== dispatch.state) this.audit(result.key, result.reason ?? result.state);
     return result;
   }
@@ -282,13 +285,14 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
-  private async checkComment(github: Github, issue: number, result: Result): Promise<boolean> {
-    if (!result.comment) return false;
-    const comment = record(await github.api(`/issues/comments/${result.comment}`));
+  private async checkComment(github: Github, issue: number, stage: "triage" | "plan", id?: number): Promise<boolean> {
+    if (!integer(id)) return false;
+    const comment = await this.readEvidence(github, `/issues/comments/${id}`);
+    if (!comment) return false;
     const author = record(comment.user);
-    return comment.id === result.comment && author.type === "Bot" && String(author.id) === this.env.GITHUB_TRIAGE_BOT_ID &&
+    return comment.id === id && author.type === "Bot" && String(author.id) === this.env.GITHUB_TRIAGE_BOT_ID &&
       comment.issue_url === `https://api.github.com/repos/${this.env.REPO}/issues/${issue}` &&
-      typeof comment.body === "string" && comment.body.startsWith(`<!-- factory:${result.stage} v1 -->`);
+      typeof comment.body === "string" && comment.body.startsWith(`<!-- factory:${stage} v1 -->`);
   }
 
   private async verifyDeployment(ticket: Ticket, github: Github, head: string) {
@@ -310,38 +314,103 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
+  private async readEvidence(github: Github, path: string, rejectMovedIssue = false): Promise<Json | undefined> {
+    // Authentication failures must still retry, even if the token endpoint returns 404.
+    await github.appToken();
+    try {
+      return record(await github.api(path));
+    } catch (error) {
+      if (error instanceof ProviderError && ([404, 410].includes(error.status) || rejectMovedIssue && error.status === 301)) return;
+      throw error;
+    }
+  }
+
+  private async readIssue(github: Github, ticket: Ticket): Promise<Json | undefined> {
+    const path = `/issues/${ticket.issue}`;
+    return ticket.maintainer ? this.readEvidence(github, path, true) : record(await github.api(path));
+  }
+
+  private async matchesMaintainer(ticket: Ticket, issue?: Json): Promise<boolean> {
+    if (!issue) return false;
+    const maintainer = ticket.maintainer;
+    const author = record(issue.user);
+    return !!maintainer && maintainerIdentity(issue, this.env, ticket.issue, maintainer.id) &&
+      trustedHuman(author, this.env.HUMAN_REVIEWER_IDS) && author.login === ticket.actor &&
+      await featureSnapshot(issue) === maintainer.snapshot;
+  }
+
+  private async matchesDispatchEvidence(github: Github, ticket: Ticket, stage: "plan" | "implement"): Promise<boolean> {
+    return await this.checkComment(github, ticket.issue,
+      stage === "plan" ? "triage" : "plan", stage === "plan" ? ticket.triageComment : ticket.planComment) &&
+      await this.matchesMaintainer(ticket, await this.readIssue(github, ticket));
+  }
+
   private async triage(ticket: Ticket, fctl: Fctl, github: Github) {
-    if (Date.now() - ticket.created > DAY) return this.block(ticket, "native-triage-timeout");
     const {env} = this;
-    if (!identifier(env.TRIAGE_SCHEDULE_ID, "sch")) return this.block(ticket, "triage-schedule-identity");
-    const issue = record(await github.api(`/issues/${ticket.issue}`));
-    const evidence = issueEvidence(issue);
-    if (!evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
-        record(issue.user).login !== ticket.actor) return this.block(ticket, "issue-evidence");
-    if (this.tickets("feature=? AND issue<>?", evidence.feature, ticket.issue).length) return this.block(ticket, "duplicate-feature");
-    const runs = list((await fctl.runs(env.TRIAGE_SCHEDULE_ID)).runs).map(record);
-    const run = runs.find(row => nativeRun(row, env.TRIAGE_SCHEDULE_ID, String(record(row.session).id), env.REPO, ticket.issue, ticket.actor));
-    if (!run) return this.ticket(ticket, {});
-    const sessionId = record(run.session).id;
-    if (!identifier(sessionId, "ses")) return;
-    const finish = this.finish(sessionId, env.TRIAGE_SCHEDULE_ID);
+    const {maintainer} = ticket;
+    if (Date.now() - ticket.created > DAY) return this.block(ticket, maintainer ? "maintainer-triage-timeout" : "native-triage-timeout");
+    const schedule = maintainer ? env.MAINTAINER_TRIAGE_SCHEDULE_ID : env.TRIAGE_SCHEDULE_ID;
+    if (!identifier(schedule, "sch") || maintainer && [env.TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID].includes(schedule)) {
+      return this.block(ticket, "triage-schedule-identity");
+    }
+    const issue = await this.readIssue(github, ticket);
+    const evidence = issue && !maintainer ? issueEvidence(issue) : undefined;
+    let runId: string | undefined;
+    let sessionId: unknown;
+    if (maintainer) {
+      if (!await this.matchesMaintainer(ticket, issue)) return this.block(ticket, "issue-evidence-changed");
+      const key = `maintainer-triage:${ticket.issue}`;
+      this.queue(key, schedule, "triage", {repo: env.REPO, issue: ticket.issue, provenance: "maintainer",
+        author_id: maintainer.id, actor: ticket.actor, issue_snapshot_sha256: maintainer.snapshot});
+      const queued = this.dispatches("key=?", key)[0];
+      if (queued.schedule !== schedule) return this.block(ticket, "triage-schedule-identity");
+      const dispatch = await this.dispatch(fctl, queued);
+      if (dispatch.state === "blocked") return this.block(ticket, dispatch.reason ?? "triage-dispatch-blocked");
+      if (dispatch.state !== "started") return this.ticket(ticket, {});
+      runId = dispatch.run;
+      sessionId = dispatch.session;
+    } else {
+      if (!issue || !evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
+          record(issue.user).login !== ticket.actor) return this.block(ticket, "issue-evidence");
+      if (this.tickets("feature=? AND issue<>?", evidence.feature, ticket.issue).length) return this.block(ticket, "duplicate-feature");
+      const runs = list((await fctl.runs(schedule)).runs).map(record);
+      const run = runs.find(row => nativeRun(row, schedule, String(record(row.session).id), env.REPO, ticket.issue, ticket.actor));
+      if (!run) return this.ticket(ticket, {});
+      runId = String(run.id);
+      sessionId = record(run.session).id;
+    }
+    if (!identifier(runId, "srn") || !identifier(sessionId, "ses")) return;
+    const finish = this.finish(sessionId, schedule);
     if (!finish) return this.ticket(ticket, {});
     const result = finish.result;
-    const session = await fctl.session(sessionId, env.TRIAGE_SCHEDULE_ID);
+    const session = await fctl.session(sessionId, schedule);
     if (session.id !== sessionId || session.github_access !== "triage" || session.agent_kind !== "codex") return this.block(ticket, "triage-session-identity");
     if (!result || finish.at < Number(session.created_at) || result.stage !== "triage" || result.issue !== ticket.issue || result.status !== "ready" ||
-        !await this.checkComment(github, ticket.issue, result)) return this.block(ticket, "triage-result");
-    const verified = await this.verifyDeployment(ticket, github, evidence.deployed);
-    if (verified === undefined) return;
-    if (!verified) return this.block({...ticket, productionHistory: undefined}, "parity-deployment-evidence");
-    this.ticket(ticket, {phase: "ready", ...evidence, productionHistory: undefined, triageRun: String(run.id), triageSession: sessionId,
+        !await this.checkComment(github, ticket.issue, "triage", result.comment)) return this.block(ticket, "triage-result");
+    let main: string | undefined;
+    if (evidence) {
+      const verified = await this.verifyDeployment(ticket, github, evidence.deployed);
+      if (verified === undefined) return;
+      if (!verified) return this.block({...ticket, productionHistory: undefined}, "parity-deployment-evidence");
+    } else {
+      const ref = record(await github.api("/git/ref/heads/main"));
+      const commit = record(ref.object);
+      if (ref.ref !== "refs/heads/main" || commit.type !== "commit" || !sha(commit.sha)) {
+        return this.block(ticket, "main-revision-evidence");
+      }
+      main = commit.sha;
+    }
+    this.ticket(ticket, {phase: "ready", ...evidence, main, productionHistory: undefined, triageRun: runId, triageSession: sessionId,
       triageComment: result.comment, due: Date.now()});
   }
 
   private async advance(ticket: Ticket, fctl: Fctl, github: Github) {
     const env = this.env;
     const issue = ticket.issue;
-    const context = {repo: env.REPO, issue, feature_id: ticket.feature, deployed_sha: ticket.deployed};
+    const provenance = ticket.maintainer
+      ? {provenance: "maintainer", main_sha: ticket.main, issue_snapshot_sha256: ticket.maintainer.snapshot}
+      : {provenance: "parity", feature_id: ticket.feature, deployed_sha: ticket.deployed};
+    const context = {repo: env.REPO, issue, ...provenance};
     switch (ticket.phase) {
       case "triage":
         return this.triage(ticket, fctl, github);
@@ -353,10 +422,12 @@ export class Factory extends DurableObject<Env> {
         });
         return;
       case "planned": {
-        const current = record(await github.api(`/issues/${issue}`));
-        const evidence = issueEvidence(current);
-        if (!evidence || evidence.feature !== ticket.feature || evidence.deployed !== ticket.deployed ||
-            String(record(current.user).id) !== env.GITHUB_DISCOVERY_BOT_ID) return this.block(ticket, "issue-evidence-changed", true);
+        if (!ticket.maintainer) {
+          const current = record(await github.api(`/issues/${issue}`));
+          const evidence = issueEvidence(current);
+          if (!evidence || evidence.feature !== ticket.feature || evidence.deployed !== ticket.deployed ||
+              String(record(current.user).id) !== env.GITHUB_DISCOVERY_BOT_ID) return this.block(ticket, "issue-evidence-changed", true);
+        }
         this.ctx.storage.transactionSync(() => {
           this.queue(`implement:${issue}`, env.IMPLEMENT_SCHEDULE_ID, "push", {...context, plan_comment: ticket.planComment});
           this.ticket(ticket, {phase: "implement", implement: `implement:${issue}`, due: Date.now()});
@@ -368,8 +439,13 @@ export class Factory extends DurableObject<Env> {
         const stage = ticket.phase;
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
-        const dispatch = await this.dispatch(fctl, current);
-        if (dispatch.state === "blocked") return this.block(ticket, dispatch.reason ?? "dispatch-blocked", stage === "plan");
+        const dispatch = await this.dispatch(fctl, current, ticket.maintainer
+          ? () => this.matchesDispatchEvidence(github, ticket, stage)
+          : undefined);
+        if (dispatch.state === "blocked") {
+          return this.block(ticket, dispatch.reason ?? "dispatch-blocked",
+            stage === "plan" || dispatch.reason === "issue-evidence-changed");
+        }
         if (dispatch.state !== "started" || !dispatch.session) return this.ticket(ticket, {});
         const finish = this.finish(dispatch.session, dispatch.schedule);
         if (!finish) return this.ticket(ticket, {});
@@ -378,14 +454,25 @@ export class Factory extends DurableObject<Env> {
           return this.block(ticket, "dispatch-session-identity", stage === "plan");
         }
         const result = finish.result;
-        if (finish.at < Number(session.created_at) || result?.stage !== stage || result.issue !== issue || result.status === "blocked") {
+        if (finish.at < Number(session.created_at) || result?.stage !== stage || result.issue !== issue) {
+          return this.block(ticket, `${stage}-result`, stage === "plan");
+        }
+        if (result.status === "blocked") {
+          if (stage === "implement" && ticket.maintainer && result.reason === "pre-work-evidence-changed" &&
+              !session.pull_request && (session.pull_requests === undefined ||
+                Array.isArray(session.pull_requests) && session.pull_requests.length === 0) &&
+              !await this.matchesDispatchEvidence(github, ticket, stage)) {
+            return this.block(ticket, "implementation-pre-work-evidence-changed", true);
+          }
           return this.block(ticket, `${stage}-result`, stage === "plan");
         }
         if (stage === "plan") {
-          if (!await this.checkComment(github, issue, result)) return this.block(ticket, "plan-comment", true);
+          if (result.status !== "planned" || !await this.checkComment(github, issue, "plan", result.comment)) {
+            return this.block(ticket, "plan-comment", true);
+          }
           this.ticket(ticket, {phase: "planned", planComment: result.comment, due: Date.now()});
         } else {
-          if (!result.pr) return this.block(ticket, "implementation-pr-missing");
+          if (result.status !== "implemented") return this.block(ticket, "implementation-pr-missing");
           if (!list(session.pull_requests).map(record).some(pr => pr.number === result.pr && fctlRepo(pr.repo) === env.REPO)) {
             return this.ticket(ticket, {});
           }
@@ -434,8 +521,18 @@ export class Factory extends DurableObject<Env> {
         }
         return;
       }
-      const issue = record(await github.api(`/issues/${ticket.issue}`));
-      if (issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
+      const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined};
+      const issue = await this.readIssue(github, ticket);
+      if (!issue) return this.block(release, "release-issue-missing", true);
+      if (ticket.maintainer) {
+        // Release verifies the recorded author, while intake and dispatch consult the current allowlist.
+        if (!maintainerIdentity(issue, this.env, ticket.issue, ticket.maintainer.id)) {
+          return this.block(release, "release-issue-identity", true);
+        }
+        if (issue.state !== "closed" && await featureSnapshot(issue) !== ticket.maintainer.snapshot) {
+          return this.block(release, "release-issue-evidence-changed", true);
+        }
+      } else if (issue.number !== ticket.issue || issue.pull_request || String(record(issue.user).id) !== this.env.GITHUB_DISCOVERY_BOT_ID) {
         return this.block(ticket, "release-issue-identity");
       }
       if (issue.state !== "closed") await github.api(`/issues/${ticket.issue}`, "PATCH", {state: "closed", state_reason: "completed"});

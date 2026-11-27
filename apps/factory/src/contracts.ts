@@ -14,6 +14,7 @@ export interface Env {
   FCTL_ACCESS_CLIENT_ID?: string;
   FCTL_ACCESS_CLIENT_SECRET?: string;
   TRIAGE_SCHEDULE_ID: string;
+  MAINTAINER_TRIAGE_SCHEDULE_ID?: string;
   PLAN_SCHEDULE_ID: string;
   IMPLEMENT_SCHEDULE_ID: string;
   OPS_SCHEDULE_ID: string;
@@ -53,7 +54,16 @@ export function fctlRepo(value: unknown): string {
 }
 
 export type Stage = "triage" | "plan" | "implement";
-export type Result = {v: 1; stage: Stage; status: string; issue: number; comment?: number; pr?: number};
+export type Result =
+  | {v: 1; stage: Stage; status: "blocked"; issue: number; reason?: "pre-work-evidence-changed"}
+  | {v: 1; stage: "triage"; status: "ready"; issue: number; comment: number}
+  | {v: 1; stage: "plan"; status: "planned"; issue: number; comment: number}
+  | {v: 1; stage: "implement"; status: "implemented"; issue: number; pr: number};
+
+export function trustedHuman(user: Json, ids = ""): user is Json & {id: number; login: string} {
+  return user.type === "User" && integer(user.id) && typeof user.login === "string" &&
+    /^[a-zA-Z0-9-]{1,39}$/.test(user.login) && ids.split(",").some(id => id.trim() === String(user.id));
+}
 
 export function parseResult(message: unknown): Result | undefined {
   if (typeof message !== "string") return;
@@ -67,10 +77,12 @@ export function parseResult(message: unknown): Result | undefined {
   }
   const {v, stage, status, issue, comment, pr} = data;
   if (v !== 1 || !integer(issue) || (stage !== "triage" && stage !== "plan" && stage !== "implement")) return;
-  if (status === "blocked") return {v, stage, status, issue};
-  if ((stage === "triage" && status === "ready" || stage === "plan" && status === "planned") && integer(comment)) {
-    return {v, stage, status, issue, comment};
+  if (status === "blocked") {
+    const reason = stage === "implement" && data.reason === "pre-work-evidence-changed" ? data.reason : undefined;
+    return {v, stage, status, issue, reason};
   }
+  if (stage === "triage" && status === "ready" && integer(comment)) return {v, stage, status, issue, comment};
+  if (stage === "plan" && status === "planned" && integer(comment)) return {v, stage, status, issue, comment};
   if (stage === "implement" && status === "implemented" && integer(pr)) return {v, stage, status, issue, pr};
 }
 

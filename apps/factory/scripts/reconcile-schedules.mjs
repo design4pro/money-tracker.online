@@ -25,6 +25,7 @@ const repo = "design4pro/money-tracker.online";
 const profiles = [
   {key: "PARITY", access: "comment", cron: "0 9 * * 1"},
   {key: "TRIAGE", access: "triage", event: true},
+  {key: "MAINTAINER_TRIAGE", access: "triage"},
   {key: "PLAN", access: "triage"},
   {key: "IMPLEMENT", access: "push"},
   {key: "OPS", access: "read"},
@@ -41,7 +42,7 @@ if (current.unheard?.some(event => event.kind === "issue_opened")) {
 const ids = {};
 const existing = [];
 for (const profile of profiles) {
-  const short = profile.key.toLowerCase();
+  const short = profile.key.toLowerCase().replaceAll("_", "-");
   const name = `money-tracker-online-factory-${short}-v1`;
   const path = fileURLToPath(new URL(`../profiles/v1/${short}.md`, import.meta.url));
   const prompt = readFileSync(path, "utf8").trim();
@@ -53,7 +54,8 @@ for (const profile of profiles) {
     ["--when-asked"];
   const flags = ["--task-file", path, "--agent", "codex", "--base", "main", "--github", profile.access, "--tz", "Europe/Warsaw", ...when];
   const expectedEvent = profile.event && schedule?.event?.kind === "issue_opened" && schedule.event.by === "agents" &&
-    String(schedule.event.repos) === repo && String(schedule.event.labels) === "factory:parity" &&
+    Array.isArray(schedule.event.repos) && schedule.event.repos.length === 1 && schedule.event.repos[0] === repo &&
+    Array.isArray(schedule.event.labels) && schedule.event.labels.length === 1 && schedule.event.labels[0] === "factory:parity" &&
     !schedule.event.branches?.length && schedule.event.max_per_hour === 3 && schedule.event.max_per_day === 10;
   const drift = schedule && (schedule.prompt?.trim() !== prompt || schedule.agent_kind !== "codex" || schedule.base_branch !== "main" ||
     schedule.github_access !== profile.access || schedule.timezone !== "Europe/Warsaw" || (schedule.cron ?? undefined) !== profile.cron ||
@@ -61,7 +63,7 @@ for (const profile of profiles) {
   if (drift && schedule.enabled) throw new Error(`Pause ${name} before reconciling its drift.`);
   const result = schedule ? drift ? schedules("edit", schedule.id, ...flags) : schedule :
     schedules("add", name, ...flags, "--paused");
-  if (!/^sch_[A-Za-z0-9]+$/.test(result.id ?? "") || result.project_id !== project) throw new Error(`Unexpected identity for ${name}`);
+  if (!/^sch_[A-Za-z0-9]+$/.test(result.id ?? "") || result.project_id !== project || (schedule && result.id !== schedule.id)) throw new Error(`Unexpected identity for ${name}`);
   ids[`${profile.key}_SCHEDULE_ID`] = result.id;
   existing.push({id: result.id, enabled: result.enabled, created: !schedule});
 }

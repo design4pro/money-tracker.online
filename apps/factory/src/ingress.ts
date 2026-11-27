@@ -1,9 +1,11 @@
-import {identifier, integer, parseResult, record, sha} from "./contracts";
+import {identifier, integer, parseResult, record, sha, trustedHuman} from "./contracts";
 import type {Env, Result} from "./contracts";
+import {featureSnapshot, maintainerIdentity} from "./intake";
+import type {MaintainerIntake} from "./intake";
 import {bearer, digest, fctlSignature, githubSignature} from "./signatures";
 
 export type Ingress =
-  | {kind: "issue"; issue: number; actor: string}
+  | {kind: "issue"; issue: number; actor: string; maintainer?: MaintainerIntake}
   | {kind: "finish"; session: string; schedule: string; at: number; result?: Result}
   | {kind: "production"; head: string}
   | {kind: "alert"; key: string; code: string; head?: string}
@@ -76,7 +78,7 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
     const at = Date.parse(String(payload.timestamp));
     if (["session.finished", "session.failed", "session.stopped", "session.question"].includes(String(payload.type)) &&
         identifier(session.id, "ses") && identifier(schedule, "sch") && session.started_by === "schedule" &&
-        [env.TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID, env.IMPLEMENT_SCHEDULE_ID].includes(schedule) && Number.isFinite(at)) {
+        [env.TRIAGE_SCHEDULE_ID, env.MAINTAINER_TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID, env.IMPLEMENT_SCHEDULE_ID].includes(schedule) && Number.isFinite(at)) {
       return {id: `fctl:${payload.id}`, event: {kind: "finish", session: session.id, schedule, at,
         result: payload.type === "session.finished" ? parseResult(data.message) : undefined}};
     }
@@ -107,7 +109,15 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
     const issue = record(payload.issue);
     const author = record(issue.user);
     const sender = record(payload.sender);
-    if (!integer(issue.number) || issue.pull_request || author.type !== "Bot" || !integer(author.id) ||
+    if (!integer(issue.number) || issue.pull_request) return rejected(403);
+    if (trustedHuman(author, env.HUMAN_REVIEWER_IDS) && sender.type === "User" &&
+        sender.id === author.id && sender.login === author.login &&
+        maintainerIdentity(issue, env, issue.number, author.id)) {
+      const snapshot = await featureSnapshot(issue);
+      if (snapshot) return {id, event: {kind: "issue", issue: issue.number, actor: author.login,
+        maintainer: {id: author.id, snapshot}}};
+    }
+    if (author.type !== "Bot" || !integer(author.id) ||
         String(author.id) !== env.GITHUB_DISCOVERY_BOT_ID || sender.id !== author.id ||
         typeof author.login !== "string" || !/^[a-zA-Z0-9_-]+\[bot\]$/.test(author.login)) return rejected(403);
     if (!Array.isArray(issue.labels) || !issue.labels.some(label => record(label).name === "factory:parity")) return rejected(403);
