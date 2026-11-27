@@ -694,10 +694,12 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
     {changes: wrongAuthor, releaseReason: "release-issue-identity"},
     {releaseReason: "release-issue-missing", issueStatus: 404},
     {releaseReason: "release-issue-missing", issueStatus: 410},
+    {beforePlan: true, issueStatus: 404},
+    {issueStatus: 410},
   ];
   try {
-    for (const [index, {changes, releaseReason, issueStatus}] of cases.entries()) {
-      const initial = {implement: calls.implement, closed: calls.closed.length};
+    for (const [index, {changes, releaseReason, issueStatus, beforePlan}] of cases.entries()) {
+      const initial = {plan: calls.plan, implement: calls.implement, closed: calls.closed.length};
       const number = 40 + index;
       const current = {number, user, state: "open", repository_url: `https://api.github.com/repos/${repo}`,
         title: "Pilot feature", body: null, labels: [{name: "type: feature"}]};
@@ -714,11 +716,16 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
       try {
         assert.equal((await github({action: "opened", issue: current, sender: user})).status, 202);
         await finish("sch_Triage", sessionId, {v: 1, stage: "triage", status: "ready", issue: number, comment: 400});
-        for (let step = 0; step < 4; step++) await tick();
-        await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 401});
         await tick();
         await tick();
-        assert.equal((await status()).tickets[0].phase, "implement");
+        assert.equal((await status()).tickets[0].phase, "plan");
+        if (!beforePlan) {
+          await tick();
+          await finish("sch_Plan", "ses_Plan", {v: 1, stage: "plan", status: "planned", issue: number, comment: 401});
+          await tick();
+          await tick();
+          assert.equal((await status()).tickets[0].phase, "implement");
+        }
         if (releaseReason) {
           await tick();
           assert.equal(calls.implement, initial.implement + 1);
@@ -735,7 +742,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
           issueErrors.set(number, 503);
           for (let step = 0; step < 4; step++) await tick();
           const retry = await status();
-          assert.equal(retry.tickets[0].phase, "release");
+          assert.equal(retry.tickets[0].phase, releaseReason ? "release" : beforePlan ? "plan" : "implement");
           assert.ok(retry.tickets[0].failures > 0);
           assert.deepEqual(retry.slot, [{issue: number}]);
           assert.equal(calls.closed.length, initial.closed);
@@ -747,6 +754,7 @@ test("maintainer issue edits or identity changes block dispatch or release", asy
         assert.equal(state.tickets[0].phase, "blocked");
         assert.deepEqual(state.slot, []);
         assert.equal(calls.closed.length, initial.closed);
+        assert.equal(calls.plan, initial.plan + Number(!beforePlan));
         assert.equal(calls.implement, initial.implement + Number(!!releaseReason));
         if (releaseReason) assert.equal(state.tickets[0].merge, merge);
       } finally {

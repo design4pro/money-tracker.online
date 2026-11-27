@@ -313,7 +313,19 @@ export class Factory extends DurableObject<Env> {
     }
   }
 
-  private async matchesMaintainer(ticket: Ticket, issue: Record<string, unknown>): Promise<boolean> {
+  private async readIssue(github: Github, ticket: Ticket): Promise<Json | undefined> {
+    // Authentication failures must still retry, even if the token endpoint returns 404.
+    await github.appToken();
+    try {
+      return record(await github.api(`/issues/${ticket.issue}`));
+    } catch (error) {
+      if (ticket.maintainer && error instanceof ProviderError && [404, 410].includes(error.status)) return;
+      throw error;
+    }
+  }
+
+  private async matchesMaintainer(ticket: Ticket, issue?: Json): Promise<boolean> {
+    if (!issue) return false;
     const maintainer = ticket.maintainer;
     const author = record(issue.user);
     return !!maintainer && maintainerIdentity(issue, this.env, ticket.issue, maintainer.id) &&
@@ -325,12 +337,12 @@ export class Factory extends DurableObject<Env> {
     if (Date.now() - ticket.created > DAY) return this.block(ticket, "native-triage-timeout");
     const {env} = this;
     if (!identifier(env.TRIAGE_SCHEDULE_ID, "sch")) return this.block(ticket, "triage-schedule-identity");
-    const issue = record(await github.api(`/issues/${ticket.issue}`));
-    const evidence = ticket.maintainer ? undefined : issueEvidence(issue);
+    const issue = await this.readIssue(github, ticket);
+    const evidence = issue && !ticket.maintainer ? issueEvidence(issue) : undefined;
     if (ticket.maintainer) {
       if (!await this.matchesMaintainer(ticket, issue)) return this.block(ticket, "issue-evidence-changed");
     } else {
-      if (!evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
+      if (!issue || !evidence || issue.number !== ticket.issue || String(record(issue.user).id) !== env.GITHUB_DISCOVERY_BOT_ID ||
           record(issue.user).login !== ticket.actor) return this.block(ticket, "issue-evidence");
       if (this.tickets("feature=? AND issue<>?", evidence.feature, ticket.issue).length) return this.block(ticket, "duplicate-feature");
     }
@@ -399,7 +411,7 @@ export class Factory extends DurableObject<Env> {
         const current = this.dispatches("key=?", ticket[stage] ?? "")[0];
         if (!current) return this.block(ticket, "missing-dispatch");
         const dispatch = await this.dispatch(fctl, current, ticket.maintainer
-          ? async () => this.matchesMaintainer(ticket, record(await github.api(`/issues/${issue}`)))
+          ? async () => this.matchesMaintainer(ticket, await this.readIssue(github, ticket))
           : undefined);
         if (dispatch.state === "blocked") {
           return this.block(ticket, dispatch.reason ?? "dispatch-blocked",
@@ -472,16 +484,8 @@ export class Factory extends DurableObject<Env> {
         return;
       }
       const release = {...ticket, merge: pr.merge_commit_sha, mergedAt, productionVerification: undefined, productionHistory: undefined};
-      let issue: Json;
-      try {
-        issue = record(await github.api(`/issues/${ticket.issue}`));
-      } catch (error) {
-        // The deployment check has already authenticated this repository installation.
-        if (ticket.maintainer && error instanceof ProviderError && [404, 410].includes(error.status)) {
-          return this.block(release, "release-issue-missing", true);
-        }
-        throw error;
-      }
+      const issue = await this.readIssue(github, ticket);
+      if (!issue) return this.block(release, "release-issue-missing", true);
       if (ticket.maintainer) {
         // Release verifies the recorded author, while intake and dispatch consult the current allowlist.
         if (!maintainerIdentity(issue, this.env, ticket.issue, ticket.maintainer.id)) {
