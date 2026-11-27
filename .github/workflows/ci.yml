@@ -51,6 +51,8 @@ jobs:
             npm test --prefix "$package"
             npm run build --prefix "$package"
           done
+      - name: Verify spending chat authorization and isolation in the built Worker
+        run: npm run test:chat-proof --prefix apps/app
       - name: Test repository scripts
         run: |
           npm ci --prefix scripts --ignore-scripts
@@ -60,5 +62,4 @@ jobs:
         run: |
           ./scripts/node_modules/.bin/playwright install --with-deps chromium
           node scripts/browser-fixture.mjs
-          npm run test:chat-browser --prefix apps/app
           bash scripts/ci-smoke.sh
