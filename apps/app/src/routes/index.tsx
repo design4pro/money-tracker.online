@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router"
 import { ArrowDownToLine } from "lucide-react"
 import { Session } from "@/components/session"
+import { SpendingChat } from "@/components/spending-chat"
 import { LedgerPanel } from "@/components/ledger-panel"
 import { Button } from "@/components/ui/button"
 import { subscriptionLabel, useSubscription } from "@/lib/subscription"
@@ -18,7 +19,9 @@ function Dashboard() {
   const returning = Route.useSearch().checkout === "return"
   return (
     <Session>
-      {(name) => <Workspace name={name} returning={returning} />}
+      {(name, userId) => (
+        <Workspace key={userId} name={name} returning={returning} />
+      )}
     </Session>
   )
 }
@@ -32,13 +35,16 @@ function Workspace({ name, returning }: { name: string; returning: boolean }) {
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-2 text-sm text-muted-foreground">Welcome, {name}.</p>
         </div>
-        <Button
-          render={<a href="/api/pilot/export" download />}
-          nativeButton={false}
-          variant="outline"
-        >
-          <ArrowDownToLine aria-hidden="true" /> Export JSON
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {state?.spendingChat && <SpendingChat />}
+          <Button
+            render={<a href="/api/pilot/export" download />}
+            nativeButton={false}
+            variant="outline"
+          >
+            <ArrowDownToLine aria-hidden="true" /> Export JSON
+          </Button>
+        </div>
       </div>
       <section
         className="panel mb-5 flex flex-wrap items-center justify-between gap-3"

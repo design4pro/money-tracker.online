@@ -7,7 +7,7 @@ import { Button } from "./ui/button"
 export function Session({
   children,
 }: {
-  children: (name: string) => ReactNode
+  children: (name: string, userId: string) => ReactNode
 }) {
   const session = authClient.useSession()
   const navigate = useNavigate()
@@ -59,7 +59,7 @@ export function Session({
               {error}
             </p>
           )}
-          {children(session.data.user.name)}
+          {children(session.data.user.name, session.data.user.id)}
         </>
       ) : (
         <section className="panel mx-auto max-w-xl">

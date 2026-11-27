@@ -3,6 +3,7 @@ import { errorMessage, requestJson } from "./client"
 
 interface Subscription {
   status: "active" | "pending" | "expired" | "stale" | "inactive"
+  spendingChat?: true
   expiresAt: number | null
 }
 

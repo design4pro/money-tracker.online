@@ -1,3 +1,5 @@
+import { spendingEndpoint } from "../lib/spending-chat"
+import { spendingChatEnabled } from "./chat-config"
 import { createAuth, verifiedUser } from "./auth"
 import {
   access,
@@ -35,6 +37,12 @@ export async function pilotApi(
   const { pathname } = new URL(request.url)
   const method = request.method
   const db = env.DB
+  const chatEnabled = spendingChatEnabled(env)
+  const isChat = pathname === spendingEndpoint
+  if (isChat && !chatEnabled)
+    return json({ message: "Endpoint not found." }, 404)
+  if (isChat && method !== "POST")
+    return json({ message: "POST required." }, 405, { Allow: "POST" })
   try {
     if (
       method === "POST" &&
@@ -64,6 +72,7 @@ export async function pilotApi(
 
     let entitlement = await getEntitlement(db, user.id)
     if (
+      isChat ||
       (pathname === "/api/pilot/status" && method === "GET") ||
       (pathname === "/api/pilot/ledger" &&
         (method === "GET" || method === "POST"))
@@ -73,7 +82,11 @@ export async function pilotApi(
     const status = access(entitlement)
 
     if (pathname === "/api/pilot/status" && method === "GET") {
-      return json({ status, expiresAt: entitlement?.expires_at || null })
+      return json({
+        status,
+        expiresAt: entitlement?.expires_at || null,
+        ...(chatEnabled && { spendingChat: true }),
+      })
     }
 
     if (pathname === "/api/pilot/catalog" && method === "GET") {
@@ -94,11 +107,16 @@ export async function pilotApi(
     }
 
     if (
-      pathname === "/api/pilot/ledger" &&
-      (method === "GET" || method === "POST")
+      isChat ||
+      (pathname === "/api/pilot/ledger" &&
+        (method === "GET" || method === "POST"))
     ) {
       if (status !== "active")
         throw new RequestError("An active subscription is required.", 403)
+      if (isChat) {
+        const { spendingChat } = await import("./spending-chat")
+        return await spendingChat(db, user.id, await readBody(request))
+      }
       if (method === "POST") {
         await writeLedger(db, user.id, await readBody(request))
         return json({ ok: true })
