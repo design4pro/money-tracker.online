@@ -6,7 +6,7 @@ import {bearer, digest, fctlSignature, githubSignature} from "./signatures";
 
 export type Ingress =
   | {kind: "issue"; issue: number; actor: string; maintainer?: MaintainerIntake}
-  | {kind: "finish"; session: string; schedule: string; at: number; result?: Result; completedTurns?: number}
+  | {kind: "finish"; session: string; schedule: string; at: number; result?: Result; completedTurns?: number; turns?: number; eventType?: string}
   | {kind: "delivery"; head: string}
   | {kind: "alert"; key: string; code: string; head?: string}
   | {kind: "wake"};
@@ -79,7 +79,8 @@ export async function ingress(request: Request, env: Env): Promise<Delivery | Re
     if (["session.finished", "session.failed", "session.stopped", "session.question"].includes(String(payload.type)) &&
         identifier(session.id, "ses") && identifier(schedule, "sch") && session.started_by === "schedule" &&
         [env.TRIAGE_SCHEDULE_ID, env.MAINTAINER_TRIAGE_SCHEDULE_ID, env.PLAN_SCHEDULE_ID, env.IMPLEMENT_SCHEDULE_ID].includes(schedule) && Number.isFinite(at)) {
-      return {id: `fctl:${payload.id}`, event: {kind: "finish", session: session.id, schedule, at,
+      return {id: `fctl:${payload.id}`, event: {kind: "finish", session: session.id, schedule, at, eventType: String(payload.type),
+        turns: integer(session.turns) ? session.turns : undefined,
         result: payload.type === "session.finished" ? parseResult(data.message) : undefined,
         completedTurns: payload.type === "session.finished" && !Object.hasOwn(data, "message") && integer(session.turns)
           ? session.turns : undefined}};
