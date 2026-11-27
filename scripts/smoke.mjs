@@ -1,6 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { access, endpoint, packages, request, required, sha, cmsBoundary, verifyBoundary, verifyHealth } from './probe.mjs';
+import { access, endpoint, packages, request, required, sha, cmsBoundary, verifyBoundary, verifyCmsBoundary, verifyHealth } from './probe.mjs';
 
 export function canonicalOrigin(name) {
   const origin = required(name);
@@ -76,10 +76,8 @@ export async function smoke(expected, local = false) {
       if (!response.ok) throw new Error(`Public app route ${url.pathname} returned ${response.status}`);
     }
   }
-  const { admin, status, login } = cmsBoundary(local);
-  const response = await request(admin, { headers: access('site') });
-  if (status === null) verifyBoundary(response, admin, login);
-  else if (response.status !== status) throw new Error(`Unexpected CMS status (${response.status})`);
+  const cms = cmsBoundary(local);
+  verifyCmsBoundary(await request(cms.admin, { headers: access('site') }), cms);
 
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();

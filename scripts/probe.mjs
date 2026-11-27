@@ -48,8 +48,8 @@ export function verifyBoundary(response, protectedUrl, signInUrl) {
   if ([401, 403].includes(response.status)) return;
   const location = response.headers.get('location');
   if ([301, 302, 303, 307, 308].includes(response.status) && location) {
-    const redirect = new URL(location, protectedUrl);
-    if (redirect.origin === signInUrl.origin && redirect.pathname === signInUrl.pathname) return;
+    const redirect = URL.parse(location, protectedUrl);
+    if (redirect?.origin === signInUrl.origin && redirect.pathname === signInUrl.pathname) return;
   }
   throw new Error(`Protected route did not enforce the expected auth boundary (${response.status})`);
 }
@@ -64,5 +64,38 @@ export function cmsBoundary(local = false) {
       login.username || login.password || login.hash) {
     throw new Error('Invalid CMS auth boundary configuration');
   }
-  return { admin, status, login };
+  const teamDomain = process.env.CF_ACCESS_TEAM_DOMAIN;
+  const accessLogin = !local && /^[a-z0-9-]+\.cloudflareaccess\.com$/.test(teamDomain ?? '')
+    ? `https://${teamDomain}/cdn-cgi/access/login/${admin.hostname}`
+    : null;
+  return { admin, status, login, accessLogin };
+}
+
+function matchesAccessLogin(location, accessLogin, returnPath) {
+  // Compare the raw URL prefix so URL normalization cannot hide credentials or path changes.
+  if (!location?.startsWith(`${accessLogin}?`) || /[\s\\#]|%(?![a-f\d]{2})/i.test(location)) return false;
+  const redirect = URL.parse(location);
+  if (!redirect) return false;
+
+  const parameters = new Map();
+  for (const [name, value] of redirect.searchParams) {
+    if (parameters.has(name) && parameters.get(name) !== value) return false;
+    parameters.set(name, value);
+  }
+  return parameters.get('redirect_url') === returnPath;
+}
+
+export function verifyCmsBoundary(response, { admin, status, login, accessLogin }) {
+  if (status !== null) {
+    if (response.status !== status) throw new Error(`Unexpected CMS status (${response.status})`);
+    return;
+  }
+  if ([401, 403].includes(response.status)) return;
+  const location = response.headers.get('location');
+  if (response.status === 302 && accessLogin && matchesAccessLogin(location, accessLogin, admin.pathname)) return;
+  const redirect = location && URL.parse(location, admin);
+  if (redirect?.username || redirect?.password) {
+    throw new Error(`Protected route did not enforce the expected auth boundary (${response.status})`);
+  }
+  verifyBoundary(response, admin, login);
 }
